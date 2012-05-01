@@ -1,0 +1,3940 @@
+#!/bin/sh
+# Do a little magic to run perl from anywhere in your path.
+
+lines=`cat $0 | wc -l`
+lines=`expr $lines - 20`
+if (test -n "$TMPDIR") then
+    if (test ! -d "$TMPDIR") then
+        TMPDIR=$HOME
+    fi
+else
+    TMPDIR=$HOME
+fi
+tail -$lines $0 1> $TMPDIR/visitilperl$$ 2>/dev/null
+if (test $? -ne 0) then
+    tail --lines=$lines $0 1>> $TMPDIR/visitilperl$$
+fi
+echo "__END__" >> $TMPDIR/visitilperl$$
+echo "$0 $*" >> $TMPDIR/visitilperl$$
+exec perl $TMPDIR/visitilperl$$ $0 ${1+"$@"}
+
+unlink $0;
+$0 = shift @ARGV;
+
+
+###############################################################################
+#
+#                  Run VisIt on various architectures
+#
+# Programmer:  Jeremy Meredith
+# Date      :  December  9, 2004
+#
+# NOTE: forked from what is now the "legacylauncher" script; look there
+#       for old comments and version tree history
+#
+# NOTE: this file is version-specific; feel free to put non-backwards
+#       compatible code in here and remove things which might break on
+#       old versions
+#
+# Modifications:
+#    Jeremy Meredith, Thu Dec  9 16:32:11 PST 2004
+#    Forked this script from the old visit script, which has now
+#    become the new file "legacylauncher".  This one contains things
+#    which are version-specific.  It is somewhat modified from the
+#    original visit script: it has the version argument parsing
+#    removed, it no longer can parse tools by their arguments
+#    (e.g. "-silex"), it pulls some important things (VISITVERSION,
+#    VISITPROGRAM, VISITDIR) from environment variables assuming that
+#    they came set by the frontendlauncher, I removed the old
+#    backwards-compatibility hacks, and made it assume executable
+#    programs are in a top-level 'exe' directory for development
+#    versions (e.g. running in the VOB).  I removed any assumptions
+#    about the splashscreen being a separate program as well.....
+#
+#    Jeremy Meredith, Thu Dec  9 16:51:55 PST 2004
+#    Also, added support for more than one available architecture for
+#    any platform -- e.g. try 64-bit and fall back to 32- if that
+#    fails.  Coincidentally, also added support for 64-bit objects on
+#    IBM.  It keys off the OBJECT_MODE environment variable which is
+#    standard on AIX, apparently, for their entire build toolchain.
+#
+#    Jeremy Meredith, Mon Dec 13 13:36:23 PST 2004
+#    Made it look for makemovie.py in its actual location instead of
+#    assuming it was an executable.
+#
+#    Jeremy Meredith, Thu Feb 17 15:29:20 PST 2005
+#    Added support for valgrind.
+#
+#    Jeremy Meredith, Tue Feb 22 18:57:58 PST 2005
+#    Renamed convert to visitconvert because it is more unique.
+#
+#    Hank Childs, Sun Mar  6 08:56:30 PST 2005
+#    Added -allowdynamic to fullhelp listing.
+#
+#    Hank Childs, Mon Mar 28 10:00:15 PST 2005
+#    Added more timings options to -fullhelp.
+#
+#    Jeremy Meredith, Fri Apr  1 16:05:49 PST 2005
+#    Added valgrind to -fullhelp, and unlimited the errors it will report.
+#
+#    Jeremy Meredith, Thu Apr 28 18:02:28 PDT 2005
+#    Added multi-compiler support.  Added linux-intel-icc platform.
+#
+#    Brad Whitlock, Mon May 9 11:45:21 PDT 2005
+#    Added support for -newconsole. I split the makemovie.py script and
+#    made this program call makemoviemain.py.
+#
+#    Jeremy Meredith, Wed Jul  6 14:46:56 PDT 2005
+#    Added xlc compiler-specific support.
+#
+#    Jeremy Meredith, Thu Jul 21 11:13:46 PDT 2005
+#    Q underwent a major upgrade, so the hardcoded paths changed.
+#
+#    Brad Whitlock, Mon Jul 25 11:58:46 PDT 2005
+#    Fixed problem with -newconsole on AIX.
+#
+#    Jeremy Meredith, Wed Aug  3 10:21:31 PDT 2005
+#    Added -stereo to the help text.
+#
+#    Hank Childs, Wed Aug 24 16:48:02 PDT 2005
+#    Added text to -config for absolute paths.
+#
+#    Jeremy Meredith, Tue Aug 30 10:00:17 PDT 2005
+#    Keep track of original environment variables like library paths and
+#    plugin dirs explicitly.  In some cases, the engine may try to set them
+#    differently from the other components, and the existing logic would fail.
+#
+#    Jeremy Meredith, Thu Sep 15 16:34:15 PDT 2005
+#    Added ability to launch visit script under mpirun in order to set up
+#    the environment on beowulf clusters (and similar).  Added -machinefile
+#    for the same enviroment under mpich.
+#
+#    Jeremy Meredith, Tue Sep 27 16:49:03 PDT 2005
+#    Added -machinefile to options for engineargs.
+#
+#    Jeremy Meredith, Thu Sep 29 11:11:35 PDT 2005
+#    Made the "-setupenv" flag force the full path name to the visit script.
+#
+#    Brad Whitlock, Fri Oct 28 11:17:28 PDT 2005
+#    Added AWE fix for -newconsole under AIX.
+#
+#    Kathlene Bonnell, Wed Nov  9 16:23:19 PST 2005
+#    Added qsub launch command.
+#
+#    Mark C. Miller, Tue Nov 22 09:42:57 PST 2005
+#    Removed refs to sl_io subdirectory
+#
+#    Hank Childs, Sat Dec  3 20:47:45 PST 2005
+#    Add support for hardware acceleration.  Also allow for processors to
+#    be specified without nodes being specified (ie -nn without -ln) with
+#    psub, which is tricky because syntax changes in this case.
+#
+#    Brad Whitlock, Wed Jan 11 17:46:19 PST 2006
+#    Added help for -nowindowmetrics.
+#
+#    Jeremy Meredith, Mon Aug 28 17:23:42 EDT 2006
+#    When launching the engine, choose the serial one if the number of
+#    processors is 1.
+#
+#    Eric Brugger, Fri Nov 17 16:01:04 PST 2006
+#    Added support for multiple switch types.  Added linux-x86_64-ib platform.
+#
+#    Brad Whitlock, Tue Nov 21 16:30:17 PST 2006
+#    Prevent -compiler flag from being passed on to most programs since
+#    they either can't deal with it or don't need it because they don't
+#    start other VisIt components. Added -viewer_geometry, -window_anchor.
+#
+#    Eric Brugger, Tue Nov 28 15:06:42 PST 2006
+#    Added support for the psub/mpirun launch method.
+#
+#    Eric Brugger, Wed Nov 29 12:54:32 PST 2006
+#    Modified the psub arguments to pass both -np and -g to indicate the
+#    number of processors.
+#
+#    Jeremy Meredith, Wed Jan 17 15:53:46 EST 2007
+#    Made GDB only set paths to the main program source directory
+#    for the executable being launched.
+#
+#    Eric Brugger, Thu Feb 15 12:35:04 PST 2007
+#    Added support for passing additional sublauncher arguments.  Enhanced
+#    the qsub launch method to support qsub/mpiexec and qsub/srun.  Corrected
+#    several qsub errors.
+#
+#    Jeremy Meredith, Fri Mar 16 14:16:00 EDT 2007
+#    Clear the PYTHONHOME environment variable if exe_name is "engine_par".
+#    MPICH-2, for example, has a python-based launcher, and setting this
+#    unconditionally will prevent parallel engines from launching.
+#
+#    Eric Brugger, Wed Apr  4 10:07:51 PDT 2007
+#    Added support for specifying 32 or 64 bit executables for aix.
+#
+#    Thomas R. Treadway, Wed Apr  4 18:02:52 PDT 2007
+#    Treat the platformDir like all of the others, allowing darwin-ppc,
+#    darwin-i386, [or darwin (universal) directory].
+#
+#    Eric Brugger, Fri Apr  6 13:54:55 PDT 2007
+#    Modified the script to not dump core files if running a parallel
+#    engine using either psub or qsub.
+#
+#    Thomas R. Treadway, Tue Apr 10 11:46:50 PDT 2007
+#    Replacing "uname -m" with "uname -p" for darwin.
+#
+#    Thomas R. Treadway, Wed May 23 17:04:07 PDT 2007
+#    FreeBSD patches from Nathan Lay <nlay@scs.fsu.edu>
+#
+#    Jeremy Meredith, Wed Jun  6 12:42:27 EDT 2007
+#    Added documentation of -outputtoinputdir flag for xml tools.
+#
+#    Jeremy Meredith, Wed Jun  6 16:45:55 EDT 2007
+#    Added documentation of -forceinteractivecli flag for CLI interpreter.
+#
+#    Mark C. Miller, Thu Jun 14 10:26:37 PDT 2007
+#    Added documentation for -cycleregex
+#
+#    Jeremy Meredith, Thu Jun 28 13:27:34 EDT 2007
+#    Understand the -sshtunneling argument to prevent -guesshost from
+#    overriding the correct host name and to set a default value of
+#    localhost when no host name was specified.
+#
+#    Jeremy Meredith, Tue Jul 17 16:36:07 EDT 2007
+#    Added -fullscreen argument to help text.
+#
+#    Eric Brugger, Wed Jul 18 13:29:32 PDT 2007
+#    Made a number of miscellaneous enhancements to the qsub launch method
+#    including getting it to also work with msub (they have the same syntax
+#    for what we are using), adding support for mpirun as a sublauncher,
+#    adding support for banks, improving the support for time limits, and
+#    fixing a couple of bugs.
+#
+#    Mark C. Miller, Thu Jul 19 17:12:33 PDT 2007
+#    Added -strace option. Also, adding this comment to indicate that
+#    'visit -diff <dbl> <dbr>' capability was added since June 28th, 2007
+#    modification comment.
+#
+#    Kathleen Bonnell, Wed Aug  8 14:34:50 PDT 2007 
+#    For redrose at sandia, parse the launchargs for '-l vis', in order
+#    to add it correctly to the qsub args. 
+#
+#    Kathleen Bonnell, Thu Aug  9 10:40:04 PDT 2007 
+#    For redrose at sandia, added HACK to set the correct LD_LIBRARY_PATH,
+#    in case user's loaded modules don't match what VisIt was built with. 
+#
+#    Hank Childs, Wed Aug 29 17:14:57 PDT 2007
+#    For non-Darwin, when the "-newconsole" command starts an xterm, have
+#    it call the VisIt script, not the program directly.  This is because some 
+#    "xterm" programs have the sticky bit set for the group.  If the
+#    sticky bit is set, then the LD_LIBRARY_PATH is unset to prevent a Trojan
+#    horse attack ... meaning that the program wouldn't be able to run,
+#    since it depends on a valid LD_LIBRARY_PATH.  So, always have the xterm 
+#    call the VisIt script, which can then set up the environment again.
+#
+#    Thomas R. Treadway, Tue Sep 11 12:38:17 PDT 2007
+#    Changed DYLD_LIBRARY_PATH to DYLD_FALLBACK_LIBRARY_PATH, because
+#    DYLD_LIBRARY_PATH overrides the system libraries causing the wrong
+#    libraries to be loaded.
+#
+#    Mark C. Miller, Thu Nov 15 21:44:19 PST 2007
+#    Modified the way args to tools such as valgrind and totalview are
+#    processed. Before the user had to place all args to be passed to
+#    the tools in a single quoted string. Now, all args that appear between
+#    the tool's name and the name of the VisIt component it is to be
+#    launched on are treated as args to the tool. No special quoting is
+#    necessary.
+#
+#    Hank Childs, Fri Dec  7 09:14:57 PST 2007
+#    Added -info-dump to -fullhelp message.
+#
+#    Brad Whitlock, Mon Dec 10 14:05:43 PST 2007
+#    Added -protocol to the -fullhelp message.
+#
+#    Dave Pugmire, Tue Dec 11 08:15:16 EST 2007
+#    For qsub, pass the environment variables on the command line via
+#    the -v option. Also, for qsub/mpirun, set the -plugindir argument
+#    to engine_par as some installations don't pass the env vars to the
+#    executable.
+#
+#    Jeremy Meredith, Thu Dec 13 13:23:20 EST 2007
+#    Moved version parsing code to frontendlauncher.
+#
+#    Jeremy Meredith, Fri Dec 14 15:33:57 EST 2007
+#    Added documentation for -forceversion option.
+#
+#    Dave Pugmire, Mon Dec 17 12:42:34 EST 2007
+#    Add qsub/aprun launch option.
+#
+#    Brad Whitlock, Thu Dec 20 17:19:56 PST 2007
+#    Added -debug-malloc for the Mac.
+#
+#    Eric Brugger, Thu Jan 17 13:42:58 PST 2008
+#    Removed the extra spaces between the comma seperated list of
+#    variable=value pairs that get passed to the -v option for qsub or msub.
+#
+#    Mark C. Miller, Mon Jan 28 16:38:48 PST 2008
+#    Removed Gig-E hack for tidalwave, white and edgewater. Added
+#    management of PYTHONPATH to support specifying where PIL is for testing. 
+#
+#    Dave Pugmire, Mon Feb  4 12:19:22 EST 2008
+#    Added jaguarcnl.ornl.gov specific code.
+#
+#    Dave Pugmire, Thu Feb  7 07:45:46 EST 2008
+#    Fixed the addtion of jaguarcnl.ornl.gov specific code for macs.
+#
+#    Jeremy Meredith, Mon Feb 11 15:01:24 EST 2008
+#    Components directory was renamed to avt.
+#
+#    Cyrus Harrison, Wed Feb 13 14:24:35 PST 2008
+#    Added info about optional output directory argument for -dump and 
+#    -info-dump
+#
+#    Jeremy Meredith, Thu Feb 14 13:00:03 EST 2008
+#    Added the -viewerdisplay <dpy> argument.
+#
+#    Hank Childs, Sat Feb 23 09:57:21 PST 2008
+#    Feed arguments into MOAB in a way that it will accept.
+#
+#    Jeremy Meredith, Wed Mar 19 14:19:32 EDT 2008
+#    Added code to obsolete -default_format.  This can be removed in future
+#    versions.  Replaced it with -fallback_format.
+#
+#    Sean Ahern, Thu Mar 20 13:52:30 EDT 2008
+#    Unset DYLD_LIBRARY_PATH on Darwin so that we can't be hit by anything the
+#    user might have set.
+#
+#    Mark C. Miller, Thu Apr  3 14:54:42 PDT 2008
+#    Added comments regarding -debug_<compname> and -vtk-debug arguments.
+#
+#    Gunther H. Weber, Tue Apr  8 17:32:24 PDT 2008
+#    Added franklin.nersc.gov specific code
+#
+#    Brad Whitlock, Wed Apr  9 14:17:18 PDT 2008
+#    Added -locale option.
+#
+#    Eric Brugger, Fri Apr 11 11:42:26 PDT 2008
+#    Added a hack to use the moab ttc option to specify the number of
+#    processors if running on yana.
+#
+#    Dave Bremer, Wed Apr 16 17:54:14 PDT 2008
+#    Added hooks for commands to run pre and post the mpi command,
+#    and added a flag to qsub to indicate num procs per node.
+#
+#    Jeremy Meredith, Wed Apr 30 13:12:13 EDT 2008
+#    Added loopback support: it replaces the remote host name with 127.0.0.1
+#    unless the "-noloopback" flag is given by visit or by the user.
+#
+#    Sean Ahern, Mon May 12 14:47:11 EDT 2008
+#    Added lens.ccs.ornl.gov specific code.
+# 
+#    Sean Ahern, Mon May 12 14:47:11 EDT 2008
+#    Put back use_vis logic that got accidentally blown away.
+#
+#    Jeremy Meredith, Thu Jun 12 14:52:56 EDT 2008
+#    Need to check for parallel arguments here to disable loopback.
+#    Previously I was checking when adding profile arguments inside
+#    the proxy code, but you can add parallel arguments either on
+#    the command line, or through the CLI, without going through that
+#    code.  So the only truly safe place to check is here.
+#
+#    Gunther H. Weber, Tue Jul  1 11:03:51 PDT 2008
+#    Added -pluginpath option when launching via mpirun since not all
+#    mpi variants will propagate environment variables.
+#
+#    Tom Fogal, Mon Jul 21 10:54:22 EDT 2008
+#    I added a warning to IsAVisItComponent which is triggered if the user
+#    enters `engine' but screws up (or forgets) the suffix.
+#    I abstracted valgrind settings out to a method, and made launching a
+#    parallel engine under valgrind work for the straight `mpirun' case.
+#
+#    Tom Fogal, Tue Jul 22 16:02:22 EDT 2008
+#    Added help output for `-icet' flag.
+#
+#    Tom Fogal, Thu Jul 24 14:53:49 EDT 2008
+#    Remove unused arguments from generate_args_valgrind; they weren't passed
+#    as references and wouldn't be interpreted correctly anyway.
+#
+#    Sean Ahern, Wed Jul 30 11:46:45 EDT 2008
+#    Made the check for X11-based terminals in darwin a bit more robust.
+#
+#    Sean Ahern, Mon Aug  4 10:54:52 EDT 2008
+#    Changed how we run perl.
+#
+#    Eric Brugger, Mon Aug 11 10:33:40 PDT 2008
+#    I modified the script to make sure that it doesn't add any leading ":",
+#    trailing ":", or imbedded "::" strings to any paths, since this adds
+#    "." to the search path, which is insecure and can cause tough to
+#    diagnose problems.
+#
+#    Eric Brugger, Wed Aug 13 09:43:07 PDT 2008
+#    Added a hack to use the moab ttc option to specify the number of
+#    processors if running on hopi.
+#
+#    Eric Brugger, Mon Aug 18 10:32:47 PDT 2008
+#    I added support for just "msub" as a parallel launch method.
+#
+#    Tom Fogal, Fri Aug 15 17:31:35 EDT 2008
+#    Added valgrind support to the qsub/mpirun launch method.
+#
+#    Tom Fogal, Fri Aug 15 17:31:35 EDT 2008
+#    Made the function which creates valgrind arguments set an environment
+#    variable which helps prevent false positive.
+#
+#    Sean Ahern (via Tom Fogal), Fri Aug 22 16:08:37 EDT 2008
+#    Fixed up the hack included for ORNL's `Lens' cluster, which likes to load
+#    PGI-based libraries behind the user's back.
+#    Default to use `sh' in qsub scripts; it's more portable than tcsh.
+#
+#    Tom Fogal, Sat Aug 23 14:45:04 EDT 2008
+#    Removed all force specification's of the xterm's font, allowing the user's
+#    X resource DB to take effect.
+#
+#    Tom Fogal, Tue Aug 26 14:02:15 EDT 2008
+#    Fixed a couple minor errors with the recent qsub changes.
+#
+#    Hank Childs, Wed Aug 27 08:38:49 PDT 2008
+#    Change ncpus to ppn.  This takes out compatibility with cosmea, but
+#    it is a safe thing to do on the RC and I'll fix up cosmea manually.
+#
+#    Eric Brugger, Fri Oct 10 16:25:17 PDT 2008
+#    Removed support for the switch type.
+#
+#    Gunther H. Weber, Wed Oct 15 11:42:55 PDT 2008
+#    Improved detection of whether script is running on franklin.nersc.gov
+#    If Running on franklin.nersc.gov look for plugins in /scratch instead
+#    of user's home since an engine running on compute nodes does not have
+#    access to a user's home directory.
+#
+#    Tom Fogal, Tue Oct 14 12:36:16 MDT 2008
+#    Fixed the fullhelp for parallel hardware acceleration.
+#
+#    Mark C. Miller, Thu Oct 16 11:02:12 PDT 2008
+#    Fixed processing of args to debug tools like totalview, valgrind, strace
+#    and debug_malloc. These looped over command line args until the hit a 
+#    VisIt component name. However, if they never hit a VisIt component name,
+#    things could fail in obscure and hard to understand ways. Now, they print
+#    an error message and exit. Also, fixed totalview invokation for mpirun'd
+#    parallel engines.
+#
+#    Mark C. Miller, Fri Oct 17 08:54:45 PDT 2008
+#    Fixed documentation for cycleregex which had a non-backslashed '$'
+#    character causing the process number to be inserted in the fullhelp string
+#
+#    Hank Childs, Wed Nov  5 15:48:09 PST 2008
+#    Add support for Eureka at Argonne.  Note that this sets up an environment
+#    variable (PYTHONPATH) that is likely to change.
+#
+#    Hank Childs, Wed Dec  3 10:39:44 PST 2008
+#    Add -sshtunneling to the "-fullhelp" message.
+#
+#    Jeremy Meredith, Wed Dec  3 15:52:00 EST 2008
+#    Added a little warning to -sshtunneling.
+#
+#    Dave Pugmire, Thu Jan 15 16:43:07 EST 2009
+#    Add -debug_engine_rank option.
+#
+#    Gunther H. Weber, Mon Feb  2 18:05:13 PST 2009
+#    Set up LD_LIBRARY_PATH on franklin expicitly to include the path to the
+#    gcc version used to build VisIt so that users with different loaded modules
+#    still have a path to the correct C++ standard libraries. Use copy of env
+#    in VisIt directory since using the system version breaks some NERSC job
+#    validation scripts.
+#
+#    Hank Childs, Wed Feb  4 15:40:22 CST 2009
+#    Remove PYTHONPATH logic for Argonne's Eureka machine.  No longer needed.
+#
+#    Jeremy Meredith, Wed Feb 11 15:03:18 EST 2009
+#    Confirmed PYTHONPATH isn't needed for Eureka and deleted the line.
+#    Added remote host fix for parallel launches; the remote nodes think
+#    it's called login1-mgmt.  (It used to be hard-coded in the ANL config
+#    host profiles, but that prevented client-server from working.)
+#
+#    Hank Childs, Fri Feb 13 12:27:28 CST 2009
+#    Merge in changes from RC, which includes new support for now unset
+#    env var for Myrinet libs.
+#
+#    Mark C. Miller, Wed Mar  4 18:02:40 PST 2009
+#    Added logic to run _lite versions of convert tool.
+#
+#    Patrick Shinpaugh, Wed Mar 11 11:39:36 MST 2009
+#    Add ppc64 to the launcher types we support / know of.
+#
+#    Mark C. Miller, Mon Mar 30 17:55:08 PDT 2009
+#    Added cli to list of component names in IsAVisItComponentName
+#
+#    Kathleen Bonnell, Wed Apr 22 17:43:26 PDT 2009
+#    Added environemnt variable VISITULTRAHOME, so that VisIt knows where to 
+#    find the ultra wrapper.
+#
+#    Kathleen Bonnell, Wed Apr 22 17:43:26 PDT 2009
+#    Added environemnt variable VISITULTRAHOME, so that VisIt knows where to 
+#    find the ultra wrapper.
+#
+#    Hank Childs, Sat Apr 25 11:35:31 CDT 2009
+#    (1) Undo Perl magic that Sean put in about a year ago.  It seemed like a
+#    more elegant solution, but it was biting LLNL and TACC and Perl experts
+#    were not able to figure it out.  (2) Add support for TACC.
+#
+#    Hank Childs, Sun Apr 26 21:18:36 CDT 2009
+#    Add support for Argonne machine "gadzooks", which has a weird connection
+#    system similar to eureka.
+#
+#    Dave Pugmire, Wed Apr 29 13:41:45 EDT 2009
+#    Fix module loading for lens.ccs.ornl.gov
+#
+#    Tom Fogal, Wed Apr 29 12:12:20 MDT 2009
+#    Add message about module loading.
+#
+#    Paul Navratil, Fri May  8 14:08:20 CDT 2009
+#    updated TACC support
+#
+#    Paul Navratil, Fri May  8 17:00:59 CDT 2009
+#    deleted ref to tacc_qsub, special qsub now gets auto-magically generated, like TFILE
+#
+#    Paul Navratil, Mon May 11 15:09:27 CDT 2009
+#    changed TACC-specific bits to use total procs and nodes format 
+#    for parallel engine request.  added error check for > 16way config, 
+#    will now generate (hopefully) helpful error message
+#
+#    Mark C. Miller, Tue May 26 15:49:57 PDT 2009
+#    Predicated usage and exit on help switch appearing AS THE ONLY other arg
+#    on the command line. This allows '--help' to be passed to visit cli
+#    scripts which may have their own help and argument processing.
+#
+#    Tom Fogal, Sun Jun 28 22:18:04 MDT 2009
+#    Made gdb at least print out a backtrace.
+#
+#    Mark C. Miller, Tue Jul  7 18:00:34 PDT 2009
+#    Added logic to avoid backtick pwd if possible. That is causing problems
+#    on LLNL systems when ANY lscratch filesystem happens to be down and
+#    the user may be starting VisIt from ANOTHER lscratch filesystem.
+#
+#    Mark C. Miller, Wed Jul  8 16:52:17 PDT 2009
+#    Alter fix applied above for pwd to use getcwd() instead of $ENV{PWD}.
+#
+#    Gunther H. Weber, Wed Jul 15 17:09:34 PDT 2009
+#    Modifications for Franklin: Explictly add path to qsub since otherwise it
+#    will not be found when using Windows version of VisIt as front end. Only
+#    add number of nodes option to qsub/aprun when the user specifies number of
+#    nodes in the host profile. Change batch job directory to user's scratch to
+#    ensure that current directory is visible to compute nodes making it
+#    possible to write log files etc. from compute nodes.
+#
+#    Tom Fogal, Mon Aug 24 11:27:50 MDT 2009
+#    gdb: allow pending breakpoints.
+#
+#    Gunther H. Weber, Tue Sep 22 15:57:16 PDT 2009
+#    Do not set PYTHONPATH and PYTHONHOME if VisIt install does not contain
+#    "private" Python version.
+#
+#    Hank Childs, Thu Nov  5 13:34:19 PST 2009
+#    Add support for running visitconvert in parallel.
+#
+#    Cyrus Harrison, Thu Nov  5 15:05:16 PST 2009
+#    Added hack to make sure msub never sees the "ppn" argument on LLNL's 
+#    graph cluster.
+#
+#    Hank Childs, Fri Nov  6 15:49:14 PST 2009
+#    Incorporate TACC-specific launching changes from Paul Navratil
+#
+#    Hank Childs, Mon Nov 23 08:01:17 PST 2009
+#    Incorporate Brutus specific code from Stefan Kerkemeier.
+#
+#    Hank Childs, Tue Dec 22 22:44:13 MST 2009
+#    Incorporate Saguaro (ASU) specific code.
+#
+#    Hank Childs, Wed Dec 23 10:36:01 PST 2009
+#    Re-add ability to launch an engine from the command line, which was 
+#    mistakenly removed during my parallel visitconvert change.
+#
+#    Jeremy Meredith, Wed Dec 30 16:32:35 EST 2009
+#    Removed fallback and assumed format entirely.  They have been subsumed
+#    by a more advanced file format detection method.
+#
+#    Hank Childs, Tue Jan  5 07:16:29 PST 2010
+#    Replace xml2makefile with xml2cmake.
+#
+#    Tom Fogal, Sat Jan  9 13:33:59 MST 2010
+#    Add -no-icet fullhelp output.
+#
+#    Gunther H. Weber, Mon Jan 11 17:21:57 PST 2010
+#    Added VISITHOME and VISITARCHHOME to the list of environment variables
+#    passed to qsub to ensure that parallel engine on Franklin finds
+#    libOSMesa.
+#
+#    Gunther H. Weber, Thu Jan 14 11:51:13 PST 2010
+#    Added support for hopper.nersc.gov. IMPORTANT: Since it is necessary to
+#    chage the port number for a parallel launch on Hopper, the port argument
+#    is now also intercepted, removed and later re-added. This changes the
+#    order in which it is passed to the executables. The "-port xxx" option
+#    will now immediately follow the "-host xxxx" option. 
+#
+#    Gunther H. Weber, Fri Jan 29 10:38:45 PST 2010
+#    Pass VISITHOME and VISITARCHHOME by newly added command line options to
+#    engine when running via mpirun since the MPI variant prefered by LBNL
+#    ANAG/APDEC does not pass environment variables. (Furthermore, command
+#    line arguments are not available before MPI_Init() which prevents the
+#    use of the "-setupenv" option for this purpose).
+#
+#    Hank Childs, Sun Feb 14 13:34:39 CST 2010
+#    Add support for longhorn.
+#
+#    Brad Whitlock, Tue Feb 16 15:45:21 PST 2010
+#    I added a Mac-specific case for "visit -env" so the DYLD_LIBRARY_PATH
+#    will get printed. I also added code to print VISITARCHHOME so the we'll
+#    later know where to find Mesa. This was needed for simulations.
+#
+#    Hank Childs, Sun Feb 21 12:15:49 CST 2010
+#    Fix some way-ness issues on longhorn.
+#
+#    Eric Brugger, Thu Mar  4 13:51:50 PST 2010
+#    I modified the script so that it would properly launch VisIt in
+#    parallel on xchem.llnl.gov.
+#
+#    Hank Childs and Rick Angelini, Sat Mar 13 20:19:49 PST 2010
+#    Add support for salloc.
+#
+#    Dave Pugmire, Fri Mar 19 10:15:04 EDT 2010 
+#    Updates for jaguarpf.ccs.ornl.gov
+#
+#    Eric Brugger, Mon Mar 22 11:53:43 PDT 2010
+#    I modified the script so that it would properly launch VisIt in
+#    parallel on up and purple at LLNL.
+#
+#    Jeremy Meredith, Fri Mar 26 10:28:51 EDT 2010
+#    Allow assume_format and fallback_format arguments to still work.
+#    They are now deprecated, though.  I added good warning/error messages
+#    for both those and for the truly obsolete default_format option.
+#
+#    Gunther H. Weber, Tue Mar 30 15:35:26 PDT 2010
+#    Put qsub job submission file into user's home directory if running on
+#    Hopper @ NERSC since currently having it in /tmp does not work.
+#    Revert to having plugins in a user's home directory on Franklin @NERSC 
+#    since home is now visible from compute nodes.
+#
+#    Mark C. Miller, Wed Apr  7 16:33:30 PDT 2010
+#    Modified generate_args_valgrind to obtain and use abs. path to valgrind.
+#    Without it, newer mpi's and/or valgrinds couldn't deal with distinguishing
+#    args to valgrind apart from args to mpirun and/or VisIt.
+#
+#    Eric Brugger, Wed Apr  7 16:56:43 PDT 2010
+#    I modified the script so that it would properly launch VisIt in
+#    parallel on the opteron clusters at LLNL.
+#
+#    Jeremy Meredith, Mon Apr 12 11:12:19 EDT 2010
+#    Fixed -help variants so they work on installations.
+#
+#    Cyrus Harrison, Thu Apr 15 11:40:19 PDT 2010
+#    Make sure proper mpi path is used on alastor (extended yana & hopi case)
+#
+#    Jeremy Meredith, Thu Apr 22 12:33:42 EDT 2010
+#    Fix valgrind so it runs again.  It was inserting a newline in the
+#    middle of the command, causing it to run valgrind with no arguments.
+#
+#    Gunther H. Weber, Fri Apr 23 15:14:50 PDT 2010
+#    Modifications limited to LBL ANAG (tested by checking for /usr/local/anag)
+#    Delete PYTHONPHOME and PYTHONPATH to avoid conflict with their local
+#    Python installation. Iconify cli xterm at startup.
+#
+#    Rick Angelini (commit by HRC), Wed Apr 28 04:05:31 PDT 2010
+#    Add support for varying numbers of processors per node.
+#    
+#    Gunther H. Weber, Fri May  7 15:11:21 PDT 2010
+#    Detect whether we are running on Euclid @ NERSC and specify full path
+#    to mpirun if we do.
+#
+#    Gunther H. Weber, Thu May 13 11:42:57 PDT 2010
+#    Added information/error messages when trying to start gui or serial
+#    engine on Hopper.
+#
+#    Gunther H. Weber, Thu May 13 11:42:57 PDT 2010
+#    Added information/error messages when trying to start gui or serial
+#    engine on Franklin.
+#
+#    Eric Brugger, Tue Jul 20 17:21:16 PDT 2010
+#    I updated the help text for the "-v" option.
+#
+#    Larry Pezzaglia, Thu Jul 15 13:58:08 PDT 2010
+#    Add support for nautilus.nics.utk.edu.
+#
+#    Hank Childs, Tue Aug 31 19:55:04 PDT 2010
+#    Another change for longhorn.
+#
+#    Mark C. Miller, Tue Sep 28 16:15:25 PDT 2010
+#    Added usage notes for -idle-timeout and -exec-timeout. Note that
+#    -timeout was never documented here and I deprecated it in engine so no
+#    need to document it here now.
+#
+#    Hank Childs, Fri Oct 15 21:00:34 PDT 2010
+#    Pass along the the bank name for Eureka.
+#
+#    Hank Childs (on behalf of Stefan Kerkemeier), Wed Oct 20 08:21:08 PDT 2010
+#    Fix problem with bsub internallauncher
+#
+#    Brad Whitlock, Thu Oct 28 10:45:11 PDT 2010
+#    Print VISIT_MESA_LIB as part of the norun environment so plots will work
+#    when we run in an mxterm.
+#
+#    Eric Brugger, Fri Oct 29 09:44:21 PDT 2010
+#    I modified the script so that it would properly launch VisIt in
+#    parallel on aztec and inca at LLNL. I removed some unnecessary hacks
+#    for launching on some LLNL machines.
+#
+#    Hank Childs, Sun Oct 31 22:43:25 CDT 2010
+#    Add support for ANL MCS nodes.
+#
+#    Eric Brugger, Wed Nov 17 12:42:30 PST 2010
+#    I added logic to redirect standard error and standard out to /dev/null
+#    for a msub or qsub job if the user does not have write permission in
+#    the directory where visit was started.
+#
+#    Brad Whitlock, Tue Jan 25 11:34:37 PST 2011
+#    I made MacOS X 10.6 and later use the darwin-x86_64 architecture string.
+#
+#    Hank Childs, Mon Feb 14 13:27:04 PST 2011
+#    Make sure Eureka support doesn't spill into other "login1" nodes.
+#
+#    Hank Childs, Mon Feb 14 23:38:46 UTC 2011
+#    If we can't locate the current machine's architecture, at least tell them
+#    which architectures we could locate.
+#
+#    Eric Brugger, Fri Mar 25 09:17:16 PDT 2011
+#    I made the logic that distinguishes between 32 and 64 bits on Mac OS X
+#    smarter since it was overly aggressive in selecting the 64 bit version.
+#
+#    Gunther H. Weber, Wed Apr 13 11:43:51 PDT 2011
+#    Update LD_LIBRARY_PATH for franklin.nersc.gov
+#
+#    Eric Brugger, Wed Apr 20 10:25:53 PDT 2011
+#    I added support for Cielo at LANL.
+#
+#    Brad Whitlock, Fri May  6 15:21:05 PDT 2011
+#    Add support for version in the private plugin path.
+#
+#    Eric Brugger, Wed May 11 14:10:24 PDT 2011
+#    I added support for the sbatch launch method. I added support for Glory
+#    at Sandia.
+#
+#    Eric Brugger, Tue May 24 11:05:30 PDT 2011
+#    I added support for the aprun launch method.
+#
+#    Brad Whitlock, Thu Jun 16 09:07:40 PDT 2011
+#    Get the plugin version number from VISITPLUGINVERSION environment variable
+#    which is now set in frontendlauncher.
+#
+#    Brad Whitlock, Wed Jun 22 09:04:14 PDT 2011
+#    Allow 64-bit Mac to launch the 32-bit executable if it is present.
+#
+#    Hank Childs, Wed Aug  3 22:45:51 UTC 2011
+#    Add support for Eureka's new "login1" hostname.
+#
+#    Tom Fogal, Mon Nov 14 09:16:08 MST 2011
+#    Make "-xterm" help clearer.
+#
+#    Jean Favre, Fri Nov 18 08:43:21 PST 2011 (committed by Hank)
+#    Pass along additional launch arguments when using sbatch.
+#
+#    Eric Brugger, Mon Feb 27 17:51:04 PST 2012
+#    I added support for Unity and Whitney at Sandia.
+#
+#    Eric Brugger, Mon Mar  5 10:01:28 PST 2012
+#    I corrected a typo with my changes to support Unity and Whitney at
+#    Sandia.
+#
+#    Brad Whitlock, Fri Mar 30 10:02:36 PDT 2012
+#    Remove purple and Q machine hacks. Add LSU's "philip" machine.
+#
+###############################################################################
+
+use POSIX qw(ceil);
+use Cwd;
+
+# HACK for LBNL ANAG/APDEC: Delete PYTHONHOME and PYTHONPATH on ANAG machines
+# to ensure using the appropriate Python version
+if (-x "/usr/local/anag")
+{
+    delete $ENV{PYTHONHOME};
+    delete $ENV{PYTHONPATH};
+}
+
+# -----------------------------------------------------------------------------
+#                                 Setup
+# -----------------------------------------------------------------------------
+
+$visitdir = $ENV{VISITDIR};
+$progname = $ENV{VISITPROGRAM};
+$ver      = $ENV{VISITVERSION};
+$cwd      = getcwd();
+if (!$cwd)
+{
+    $cwd = `pwd`;
+}
+chomp $cwd;
+
+if (!defined $visitdir or
+    !defined $progname or
+    !defined $ver)
+{
+    print STDERR "This is not meant to be called directly; I'm expecting\n";
+    print STDERR "some environment variables to be set up for me.\n";
+    exit 1;
+}
+
+# setup the usage note about full help
+$helpnote = "
+    NOTE: For a more complete list of options, use '-fullhelp'.";
+
+# Do the usage help text
+$usage = "
+    Interface options
+    ---------------------------------------------------------------------------
+        -gui                 Run with the Graphical User Interface (default).
+        -cli                 Run with the Command Line Interface.
+
+    Movie making options
+    ---------------------------------------------------------------------------
+        -movie               Run the CLI in a movie making mode. Must be
+                             combined with -sessionfile. Will produce a simple
+                             movie by drawing all the plots in the specified
+                             session for every timestep of the database.
+
+    Startup options
+    ---------------------------------------------------------------------------
+        -o <filename>        Open the specified data file at startup.
+        -s <filename>        Run the specified VisIt script. Note: This
+                             argument only takes effect with -cli or -movie.
+        -sessionfile <filename>  Open the specified session file at startup
+                             Note that this argument only takes effect with
+                             -gui or -movie.
+        -config <filename>   Initialize the viewer at startup using the named
+                             config file.  If an absolute path is not given,
+                             the file is assumed to be in the .visit directory.
+        -noconfig            Don't process configuration files at startup.
+        -launchengine <host> Launch an engine at startup. The <host> parameter
+                             is optional. If it is not specified, the engine
+                             will be launched on the local host. If you wish
+                             to launch an engine on a remote host, specify 
+                             the host's name as the <host> parameter.
+        -nosplash            Do not display the splash screen at startup.
+
+    Window options
+    ---------------------------------------------------------------------------
+        -small               Use a smaller desktop area/window size.
+        -geometry <spec>     What portion of the screen to use.  This is a
+                             standard X Windows geometry specification. This
+                             option can be used to set the size of images
+                             generated from scripts and movies.
+
+        -viewer_geometry <spec> What portion of the screen the viewer windows
+                                will use. This is a standard X Windows geometry
+                                specification. This option overrides the
+                                -geometry option that the GUI passes to the
+                                viewer.
+
+        -window_anchor <x,y> The x,y position on the screen where VisIt's GUI
+                             will show its windows (Main window excluded).
+        -style <style>       One of: windows,cde,motif,sgi.
+        -locale <locale>     The locale that you want VisIt to use when displaying
+                             translated menus and controls. VisIt will use the
+                             default locale if the -locale option is not
+                             provided.
+        -background <color>  Background color for GUI.
+        -foreground <color>  Foreground color for GUI.
+        -nowin               Run with viewer windows off-screen (i.e. OSMesa).
+                             This is typically used with the -cli option.
+        -stereo              Enable active stereo, also known as the
+                             page-flipping, or 'CrystalEyes' mode.
+        -nowindowmetrics     Prevents X11 from grabbing and moving a test
+                             widget used in calculating window borders. This
+                             option can be useful if VisIt hangs when 
+                             displaying to an Apple X-server.
+
+    Version options
+    ---------------------------------------------------------------------------
+        -version             Do NOT run VisIt. Just print the current version.
+        -svn_revision        Do NOT run VisIt. Just print the Subversion 
+                             revision it was built from.
+        -beta                Run the current beta version.
+        -v <version>         Run a specified version. Specifying 2 digits,
+                             such as X.Y, will run the latest patch release
+                             for that version. Specifying 3 digits, such as
+                             X.Y.Z, will run that specific version.
+
+    Other resources for help
+    ---------------------------------------------------------------------------
+        run-time:            While running VisIt, look under the \"Help\" menu.
+        on-line:             https://visit.llnl.gov
+        email:               visit-users\@ornl.gov
+";
+
+# Do the full usage help text
+$fullusage = "$usage
+
+    ***************************************************************************
+                              ADDITIONAL OPTIONS
+    ***************************************************************************
+
+    Parallel launch options
+    ---------------------------------------------------------------------------
+        Notes: All of these options are ordinarily obtained from host profiles.
+        However, the command line options override anything in the profiles. 
+
+        When parallel arguments are added but the engine is not the
+        component being launched, -launchengine is implied.  Explicitly
+        add -launchengine to launch a remote parallel engine.
+    ---------------------------------------------------------------------------
+        -setupenv            Use the VisIt script to set up the environment
+                             for the engine on the compute nodes.
+        -par                 Run the parallel version. This option is implied
+                             by any of the other parallel options listed below.
+        -l    <method>       Launch in parallel using the given method.
+        -pl   <method>       Launch only the engine in parallel as specified.
+        -la   <args>         Additional arguments for the parallel launcher.
+        -sla  <args>         Additional arguments for the parallel sublauncher.
+        -np   <# procs>      The number of processors to use.
+        -nn   <# nodes>      The number of nodes to allocate.
+        -p    <part>         Partition to run in.
+        -n    <name>         The parallel job name.
+        -b    <bank>         Bank from which to draw resources.
+        -t    <time>         Maximum job run time.
+        -machinefile <file>  Machine file.
+        -expedite            Makes DPCS give priority scheduling.
+
+        -icet                In scalable rendering mode, use the IceT parallel
+                             image compositor (default).
+        -no-icet             Do not use the IceT parallel compositor.
+
+    Hardware accelerated parallel (scalable) rendering options
+    ---------------------------------------------------------------------------
+        Notes: These options should only be used with parallel clusters that
+        have graphics cards.  If you are using a serial version of VisIt, you
+        are already getting hardware acceleration and these options are not 
+        needed.  Furthermore, you must be in scalable rendering mode for VisIt
+        to utilize a cluster's GPUs.  By default, VisIt is configured to
+        switch into scalable rendering mode when rendering complexity exceeds
+        a predefined limit.
+
+        VisIt can manage the creation and teardown of X servers for you.  It
+        will do this automatically if you specify the -launch-x parameter,
+        but you can customize the process with the -x-args and -display
+        parameters, which respect %l and %n formatters.
+
+        See the VisIt wiki for more information:
+
+          http://visitusers.org/index.php?title=Parallel_Hardware_Acceleration
+
+    ---------------------------------------------------------------------------
+        -hw-accel              Tells VisIt that it should use graphics cards.
+        -n-gpus-per-node <int> Number of GPUs per node of the cluster (1).
+        -launch-x              Tell VisIt to manage the X servers
+        -no-launch-x           Let the cluster manager X servers [default]
+        -display               Tells VisIt which display to use.
+        -x-args '<string>'     Extra arguments to X server.
+
+    Load balance options
+    ---------------------------------------------------------------------------
+        Note: Each time VisIt executes a pipeline the relevant domains for the
+        execution are assigned to processors. This list of domains is sorted in
+        increasing global domain number. The options below effect how domains
+        in this list are assigned to processors. Assuming there are D domains
+        and P processors...
+    ---------------------------------------------------------------------------
+        -lb-block            Assign the first D/P domains to processor 0, the
+                             next D/P domains to processor 1, etc.
+        -lb-stride           Assign every Pth domain starting from the first
+                             to processor 0, every Pth domain starting from the
+                             second to processor 1, etc.
+        -lb-absolute         Assign domains by absolute domain number % P. This
+                             guarentees a given domain is always processed
+                             by the same processor but can also lead to poor
+                             balance when only a subset of domains is selected.
+        -lb-random           Randomly assign domains to processors.
+        -allowdynamic        Dedicate one processor to spreading the work 
+                             dynamically among the other processors.  This mode
+                             has limitations in the types of queries it can 
+                             perform.  Under development.
+        -lb-stream           Similar to -lb-block, but have the domains travel
+                             down the pipeline one at a time, instead of all
+                             together.  Under development.
+
+    Database differencing options
+    ---------------------------------------------------------------------------
+        Use the '-diff <ldb> <rdb>' option to run VisIt in a database
+        differencing mode. VisIt will generate expressions to facilitate
+        visualization and analysis of the difference between the left-database,
+        <ldb>, and right-database, <rdb>. VisIt will open windows to display
+        both the left and right databases as well as their difference.
+
+        VisIt uses the Cross-Mesh Field Evaluation (CMFE) expression functions
+        to help generate these differences. A CMFE function creates an instance
+        of a variable from another (source) mesh on the specified (destination)
+        mesh. VisIt can use two variants of CMFE expression functions depending
+        on how similar the source and destination meshes are; connectivity-based
+        (conn_cmfe) which assumes the underlying mesh(s) for the left and right
+        databases have identical connectivity and position-based (pos_cmfe) which
+        does not make this assumption. VisIt will attempt to automatically select
+        which variant of CMFE expression to use based on some simple heuristics.
+        For meshes with identical connectivity, conn_cmfe expressions are
+        preferrable because they are higher performance and do not require VisIt
+        to perform any interpolation. In fact, the conn_cmfe operation is
+        perfectly anti-symmetric. That is <ldb> - <rdb> = -(<rdb> - <ldb>).
+        The same cannot be said for pos_cmfe expressions. However, pos_cmfe
+        expressions will attempt to generate useful results regardless of the
+        similarity of the underlying meshes.
+
+        Note that the differences VisIt will compute in this mode are single
+        precision. This is true regardless of whether the input data is itself
+        double precision. VisIt will convert double precision to single 
+        precision before processing it. Although this is a result of earlier
+        visualization-specific design requirements and constraints, the intention
+        is that eventually double precision will be supported.
+
+        Finally, be sure to bring up Controls->Macros in the GUI to find a set
+        of useful operations specifically tailored to database differencing. Also,
+        typing 'help()' (including the '()') at the python prompt after starting
+        'visit -diff' will generate a more detailed help message.
+
+        -diff <ldb> <rdb>    Indicate you wish to run VisIt in database
+                             differencing mode and specify the two databases
+                             to difference.
+
+                             Note: All options occuring on the command-line
+                             *after* the '-diff' option are treated as options
+                             to the differencing script while all options
+                             occuring *before* the '-diff' option are treated
+                             as options to VisIt.
+
+        -diffsum <ldb> <rdb> Run only the DiffSummary() method of the
+                             'visit -diff' script, in nowin mode so its fast,
+                             print the results, and immediatly exit.
+
+        -force_pos_cmfe      Force use of position-based CMFE expressions.
+
+    Advanced options
+    ---------------------------------------------------------------------------
+        -guesshost           Try to guess the client host name from one of
+                             the SSH_CLIENT, SSH2_CLIENT, or SSH_CONNECTION
+                             environment variables.
+        -noloopback          Disable use of the 127.0.0.1 loopback device.
+        -sshtunneling        Tunnel all remote connections through ssh.  NOTE:
+                             this overrides values set in the host profiles.
+        -noint               Disable interruption capability.
+        -nopty               Run without PTYs.
+        -verbose             Prints status information during pipeline
+                             execution.
+        -dir <directory>     Run a version of VisIt in the specified directory.
+                             The directory argument should specify the 
+                             path to a visit installation directory.
+                             /bin is automatically appended to this path.
+        -forceversion <ver>  Force the given version.  Overrides all
+                             intelligent version selection logic.
+        -publicpluginsonly   Disable all plugins but the default ones.
+        -compiler <cc>       Require version built with the specified compiler.
+        -objectmode <mode>   Require a specific object file mode.
+        -forceinteractivecli Force the CLI to behave interactively, even if run
+                             with no terminal; similar to python's '-i' flag.
+        -fullscreen          Create the viewer window in full screen mode.
+                             May not be compatible with all window managers.
+        -viewerdisplay <dpy> Have the viewer use a different display than the
+                             current value of DISPLAY.  Can be useful for
+                             powerwall displays with a separate console.
+        -cycleregex <string> A regex-style regular expression to be used
+                             in extracting cycle numbers from file names. It
+                             is best to bracket this string in single
+                             quotes (') to avoid shell interpretation of
+                             special characters such as star (*). The format
+                             of the string begins with an opening '<' character,
+                             followed by the regular expression itself followed
+                             by a closing '>' character, optionally followed by
+                             a space ' ' character and sub-expression reference
+                             to indicate which part of the regular expression is
+                             the cycle number.  Default behavior is as if
+                             -cycleregex '<([0-9]+)[^0-9]*\$> \\0'
+                             was specified meaning the last sequence of one
+                             or more digits before the end of the string found
+                             is used as the cycle number. Do a 'man 7 regex'
+                             to get more information on regular expression
+                             syntax.
+        -ui-bcast-thresholds <int1> <int2> 
+                             Two integers controlling behavior of parallel
+                             engine waiting in a broadcast for the next RPC
+                             from the viewer. VisIt used to rely solely upon
+                             MPI_Bcast for this. However, many implementations
+                             of MPI_Bcast use a polling loop that winds up
+                             keeping all processors busy and can make them
+                             unuseable by other processes. This is particulary
+                             bad for SMPs. So, VisIt implemented its own
+                             broadcast using MPI's send/recv methods. <int1>
+                             specifies the number of nano-seconds a processor
+                             sleeps while polling for completion of the
+                             broadcast. Specifying a value of zero (0) for <int1>
+                             results in falling back to older behavior using
+                             MPI's MPI_Bcast. <int1> effectively controls how
+                             'busy' processors will be, polling for completion
+                             of the broadcast. <int2> specifies the number of
+                             seconds all processors should spin, polling as fast
+                             as possible, checking for completion of the
+                             broadcast BEFORE inserting sleeps into their
+                             polling loops. <int2> effectivey controls how
+                             many seconds VisIt's server will be maximally
+                             responsive (although also keeping all processors
+                             occupied) before becoming more 'friendly' to
+                             other processes on the same node. The defaults
+                             are <int1> = 50000000 nanoseconds (1/20th of a sec)
+                             and <int2> = 5 seconds meaning VisIt will spin
+                             processors maximally for 5 seconds before inserting
+                             sleeps such that polling happens at the rate of 20
+                             times per second.
+        -idle-timeout <int>  An integer representing the number of minutes an
+                             engine is allowed to idle (e.g. sit there doing no
+                             executation whatsoever, waiting for commands from
+                             the viewer). If this timeout is reached, the engine
+                             will terminate itself. The default is 480 minutes
+                             (8 hours).
+        -exec-timeout <int>  An integer representing the number of minutes an
+                             executing engine is allowed to remain in the
+                             execution of any single command from the viewer.
+                             If this timeout is reached, the engine will
+                             terminate itself. the default is 30 minutes.
+                             Beware that among other things, this timeout
+                             effects how long orphaned parallel processes will
+                             hang around, tying up parallel compute resources,
+                             following an exit-triggering error condition on
+                             any one process.
+                     
+    Developer options (most for xml2... tools)
+    ---------------------------------------------------------------------------
+        -public              xml2cmake: force install plugins publicly
+        -private             xml2cmake: force install plugins privately
+        -clobber             Permit xml2... tools to overwrite old files
+        -noprint             Silence debugging output from xml2... tools
+        -outputtoinputdir    Force xml2... tools to write output files to
+                             the directory containing the input xml file
+        -arch                print supported architecture(s) and exit
+
+    Debugging options
+    ---------------------------------------------------------------------------
+        Note: Debugging options may degrade performance 
+    ---------------------------------------------------------------------------
+        -debug <level>       Run with <level> levels of output logging.
+                             <level> must be between 1 and 5. This will generate
+                             debug logs (called 'vlogs' for ALL components.
+                             Note that debug logs are UNbuffered. However, if
+                             you also specify 'b' immediately after the digit
+                             indicating the debug level (e.g. '-debug 3b'), the
+                             logs will be buffered. This can substantially improve
+                             performance when a lot of debug output is generated.
+                             However, also beware that when debug logs are buffered,
+                             there isn't necessarily any guarentee they will contain
+                             the most recent debug output just prior to a crash.
+        -debug_<compname> <level>
+                             Run specified component with <level> of output
+                             logging. For example, '-debug_mdserver 4' will run
+                             the mdserver with level 4 debugging. Multiple
+                             '-debug_<compname> <level>' args are allowed.
+        -debug_engine_rank <r>
+                             Restrict debug output to the specified rank.
+        -debug-processor-stride N
+                             Have only every Nth processor output debug logs.
+                             Prevents overwhelming parallel file systems.
+        -clobber_vlogs       By default, VisIt maintains debug logs from the 5
+                             most recent invokations or restarts of each VisIt
+                             component. They are named something like
+                             A.mdserver.5.vlog, A.engine_ser.5.vlog, etc with
+                             the leading letter (A-E) indicating most to least
+                             recent. The clobber_vlogs flag causes VisIt to remove
+                             all debug logs and begin creating them anew.
+        -vtk-debug           Turn on debugging of vtk objects used in pipelines.
+        -pid                 Append process ids to the names of log files.
+        -timing              Save timing data to files.
+        -withhold-timing-output
+                             Withhold timing output during execution. Prevents
+                             output of timing information from affecting
+                             performance.
+        -never-output-timings
+                             Never output timings files.  This is used when
+                             you want the timer to be enabled (for usage by
+                             developers to measure inner loops), but you
+                             want to avoid blowing memory with the bookkeeping
+                             for each and every timing call.
+        -timing-processor-stride N
+                             Have only every Nth processor output timing info.
+                             Prevents overwhelming parallel file systems.
+        -env                 Print env. variables VisIt will use when run.
+        -dump (dump_dir)     Dump intermediate results from AVT filters,
+                             scalably rendered images, and html pages.
+                             Takes an optional argument that specifies the 
+                             directory for -dump output files.
+        -info-dump (dump_dir) 
+                             Dump html pages only. 
+                             Takes an optional argument that specifies the 
+                             directory for -info-dump output files.
+        -gdb                 Run under gdb.
+        -gdb-gui             Run the gui under gdb.
+        -gdb-cli             Run the cli under gdb.
+        -gdb-viewer          Run the viewer under gdb.
+        -gdb-engine          Run the engine under gdb.
+        -gdb-mdserver        Run the mdserver under gdb.
+        -gdb-xmledit         Run xmledit under gdb.
+        -break <funcname>    Add the specified breakpoint in gdb.
+        -xterm               With -gdb-something, run gdb in an xterm window.
+        -newconsole          Run any VisIt component in a new console window.
+        -totalview <args> <comp>
+                             Run totalview with <args> on component <comp>.
+                             Default <args> is whitespace.
+        -valgrind <args> <comp>
+                             Run valgrind with <args> on component <comp>.
+                             Default <args> is --tool=memcheck --error-limit=no
+                             --num-callers=50.
+        -strace <args> <comp>
+                             Run strace with <args> on component <comp>.
+                             Default <args> is -ttt -T.
+
+                             In the above, all arguments between the tool name
+                             and the visit component name are treated as args
+                             to the tool.
+
+        -debug-malloc <args> <comp>
+                             Run the component with the libMallocDebug library
+                             on MacOS X systems. The libMallocDebug library
+                             lets the MallocDebug application attach to the
+                             instrumented application and retrieve memory
+                             allocation statistics. The -debug-malloc flag
+                             also sets up the environment for the leaks and
+                             heap tools.
+
+                             Printing heap allocations:
+                             % visit -debug-malloc gui &
+                             % Get the gui's <pid>
+                             % heap <pid>
+
+                             Printing memory leaks:
+                             % visit -debug-malloc gui &
+                             % Get the gui's <pid>
+                             % leaks <pid>
+
+                             Run with MallocDebug:
+                             Perl does not seem to be happy with libMallocDebug
+                             so you can run the GUI like this:
+                             % visit -cli 
+                             >>> OpenGUI('-debug-malloc', 'MallocDebug', 'gui')
+                             Connect to the gui with MallocDebug and do your
+                             sampling.
+
+        -numrestarts <#>     Number of attempts to restart a failed engine.
+        -quiet               Don't print the Running message.
+        -protocol            Print the definitions of the state objects that
+                             comprise the VisIt protocol so they can be compared
+                             against the values on other computers.
+";
+
+# Get our location
+chomp($host   = `hostname`);
+($node)       = split /\./,$host;
+($sector      = $node) =~ tr/[0-9]//d;
+
+# -----------------------------------------------------------------------------
+#                              Get the version
+# -----------------------------------------------------------------------------
+
+$ver = $ENV{VISITVERSION};
+
+# -----------------------------------------------------------------------------
+#                     Determine which executable to run
+# -----------------------------------------------------------------------------
+if ($progname ne "visit")
+{
+    $exe_name = $progname;
+    $exe_name_passed = 0;
+}
+else
+{
+    $exe_name = "gui";
+    $exe_name_passed = 1;
+}
+
+# -----------------------------------------------------------------------------
+#                            Parse the arguments
+# -----------------------------------------------------------------------------
+
+# Set some defaults.
+$quiet        = 0;
+$parallel     = 0;
+$launch       = "";
+@launchargs   = ();
+@norun        = ();
+$publiconly   = 0;
+$launchengine = "";
+@breakpoints  = ();
+$debug_gdb    = 0;
+$debug_totalview = "";
+@debug_totalview_args = ();
+$debug_valgrind = "";
+@debug_valgrind_args = ();
+$debug_strace   = "";
+@debug_strace_args = ();
+$debug_malloc   = "";
+@debug_malloc_args = ();
+$add_movie_args = 0;
+$add_diff_args  = 0;
+$add_diffsum_args = 0;
+$envonly        = 0;
+$logging        = 0;
+$req_compiler   = "";
+$req_object_mode = "";
+$use_new_console = 0;
+$visit_sets_up_environment = 0;
+$pre_command = "";
+$post_command = "";
+$print_arch     = 0;
+$ssh_tunneling  = 0;
+$leftdb = "";
+$rightdb = "";
+$noloopback = 0;
+$assume_fallback_warned = 0;
+$showhelp = 0;
+
+# Parse the arguments 
+@visitargs = ();
+while (scalar(@ARGV) > 0) {
+    $arg = shift @ARGV;
+    if    ($arg eq "-par" || $arg eq "-parallel")  { $parallel = 1; }
+    elsif ($arg eq "-np")        { $procs= shift; $procs_set= 1; $parallel = 1; }
+    elsif ($arg eq "-nn")        { $nodes= shift; $nodes_set= 1; }
+    elsif ($arg eq "-l")         { $launch=shift; $launch_set=1; }
+    elsif ($arg eq "-pl")        { $parlaunch=shift; $parlaunch_set=1; }
+    elsif ($arg eq "-la")        { $_=shift; @launchargs=split; $launchargs_set=1; }
+    elsif ($arg eq "-sla")       { $_=shift; @sublaunchargs=split; $sublaunchargs_set=1; }
+    elsif ($arg eq "-slpre")     { $_=shift; @sublaunchprecmd=split; $sublaunchprecmd_set=1; }
+    elsif ($arg eq "-slpost")    { $_=shift; @sublaunchpostcmd=split; $sublaunchpostcmd_set=1; }
+    elsif ($arg eq "-n" )        { $name = shift; $name_set = 1; }
+    elsif ($arg eq "-p" )        { $part = shift; $part_set = 1; }
+    elsif ($arg eq "-b" )        { $bank = shift; $bank_set = 1; }
+    elsif ($arg eq "-t")         { $time = shift; $time_set = 1; }
+    elsif ($arg eq "-wd")        { $cwd = shift; $wd_set = 1; }
+    elsif ($arg eq "-machinefile") { $machinefile = shift; $machinefile_set = 1; }
+    elsif ($arg eq "-expedite")  { if($exe_name eq "engine") { $expedite_engine = 1;} else { push @visitargs, $arg; }}
+    elsif ($arg eq "-host")      { $remotehost = shift; $remotehost_set = 1; }
+    elsif ($arg eq "-port" )     { $remoteport = shift; $remoteport_set = 1;}
+    elsif ($arg eq "-key" )      { $security_key = shift; $security_key_set = 1;}
+    elsif ($arg eq "-viewer" )   { $exe_name = "viewer"; $exe_name_passed = 1;}
+    elsif ($arg eq "-gui" )      { $exe_name = "gui"; $exe_name_passed = 1;}
+    elsif ($arg eq "-cli" )      { $exe_name = "cli"; $exe_name_passed = 1;}
+    elsif ($arg eq "-mdserver" ) { $exe_name = "mdserver"; $exe_name_passed = 1;}
+    elsif ($arg eq "-engine" )   { $exe_name = "engine"; $exe_name_passed = 1;}
+    elsif ($arg eq "-vcl" )      { $exe_name = "vcl"; $exe_name_passed = 1;}
+    elsif ($arg eq "-diff" )     { $exe_name = "cli"; $add_diff_args = 1; $exe_name_passed = 1;
+                                   $leftdb = shift; $rightdb = shift;}
+    elsif ($arg eq "-diffsum" )  { $exe_name = "cli"; $add_diffsum_args = 1; $exe_name_passed = 1;
+                                   $leftdb = shift; $rightdb = shift;}
+    elsif ($arg eq "-movie" )    { $exe_name = "cli"; $add_movie_args = 1; $exe_name_passed = 1;}
+    elsif ($arg eq "-s")         { if($add_movie_args) { $sfile = shift; push @visitargs, "-scriptfile", $sfile;} else { push @visitargs, $arg;}}
+    elsif ($arg eq "-publicpluginsonly"){ $publiconly = 1; push @visitargs, $arg; }
+    elsif ($arg eq "-help" or $arg eq "-h" or $arg eq "--help")
+        { $showhelp = 1; push @visitargs, $arg; }
+    elsif ($arg eq "-fullhelp" or $arg eq "--fullhelp")
+        { $showhelp = 2; push @visitargs, $arg; }
+    elsif ($arg eq "-norun")     { $nr = shift; push @norun, $nr; push @visitargs, "-norun", $nr; }
+    elsif ($arg eq "-arch")      { $print_arch = 1; } 
+    elsif ($arg eq "-env")              { $envonly = 1; }
+    elsif ($arg eq "-launchengine")     { if (scalar(@ARGV)>0) {$launchengine = shift;}
+                                          if ($launchengine eq "") { $launchengine="localhost"; }
+                                          elsif ($launchengine =~ /^-/) { unshift @ARGV, $launchengine; $launchengine = "localhost";}}
+    elsif ($arg eq "-default_format")
+    {
+        # Obsolete in 2.0.
+        print STDERR "\n";
+        print STDERR "ERROR: -default_format is obsolete.\n";
+        print STDERR "Automatic file format detection has been improved\n";
+        print STDERR "in version 2.0, and any adjustments, if still\n";
+        print STDERR "necessary, can be made within VisIt proper.\n";
+        print STDERR "See the Preferred File Formats list and other\n";
+        print STDERR "settings available in the Databases tab of\n";
+        print STDERR "the Plugin Manager window.\n";
+        print STDERR "\n";
+        exit(1);
+    }
+    elsif (($arg eq "-assume_format" or $arg eq "-fallback_format") and
+          !$assume_fallback_warned and $exe_name eq "viewer")
+    {
+        $assume_fallback_warned = 1;
+        # Deprecated in 2.0.
+        print STDERR "\n";
+        print STDERR "NOTE: -assume_format and -fallback_format have been\n";
+        print STDERR "deprecated.  Automatic file format detection has been\n";
+        print STDERR "improved in version 2.0, and any adjustments, if still\n";
+        print STDERR "necessary, can be made within VisIt proper. See the\n";
+        print STDERR "Preferred File Formats list in the Databases tab of\n";
+        print STDERR "the Plugin Manager window.  The formats you supplied\n";
+        print STDERR "will be added to that list for you right now.\n";
+        print STDERR "\n";
+        push @visitargs, $arg;
+    }
+    elsif ($arg eq "-gdb")              { $debug_gdb = 1; $gdb_xterm = 1;}
+    elsif ($arg eq "-gdb-gui")          { if($exe_name eq "gui") {$debug_gdb = 1;} else {push @visitargs, $arg;}}
+    elsif ($arg eq "-gdb-cli")          { if($exe_name eq "cli") {$debug_gdb = 1;} else {push @visitargs, $arg;}}
+    elsif ($arg eq "-gdb-viewer")       { if($exe_name eq "viewer") {$debug_gdb = 1;} else {push @visitargs, $arg;}}
+    elsif ($arg eq "-gdb-engine")       { if($exe_name eq "engine") {$debug_gdb = 1;} else {push @visitargs, $arg;}}
+    elsif ($arg eq "-gdb-mdserver")     { if($exe_name eq "mdserver") {$debug_gdb = 1;} else {push @visitargs, $arg;}}
+    elsif ($arg eq "-gdb-xmledit")     { if($exe_name eq "xmledit") {$debug_gdb = 1;} else {push @visitargs, $arg;}}
+    elsif ($arg eq "-gdb-vcl")          { if($exe_name eq "vcl") {$debug_gdb = 1;} else {push @visitargs, $arg;}}
+    elsif ($arg eq "-xterm")            { $gdb_xterm = 1; {push @visitargs, $arg;}}
+    elsif ($arg eq "-newconsole")       { $use_new_console = 1; }
+    elsif ($arg eq "-break")            { if($debug_gdb) {$bp = shift; push @breakpoints, $bp; } else {push @visitargs, $arg;}}
+    elsif ($arg eq "-compiler")         { $req_compiler = shift; }
+    elsif ($arg eq "-objectmode")       { $req_object_mode = shift; push @visitargs, "-objectmode", $req_object_mode; }
+    elsif ($arg eq "-totalview" )       {
+                                          $debug_totalview = shift;
+                                          while (!IsAVisItComponentName($debug_totalview))
+                                          {
+                                            push @debug_totalview_args, $debug_totalview;
+                                            $debug_totalview = shift;
+                                            if ($debug_totalview eq "")
+                                            {
+                                                print STDERR "Did not find VisIt component name for -totalview option\n";
+                                                exit 1
+                                            }
+                                          }
+                                          push @norun, $debug_totalview;
+                                          push @visitargs, "-norun", $debug_totalview;
+                                          if ($exe_name ne $debug_totalview)
+                                          {
+                                            if (scalar(@debug_totalview_args) == 0)
+                                            {
+                                              push @visitargs, "-totalview", $debug_totalview;
+                                            }
+                                            else
+                                            {
+                                              push @visitargs, "-totalview", @debug_totalview_args, $debug_totalview;
+                                            }
+                                          }
+                                        }
+    elsif ($arg eq "-valgrind" )       {
+                                          $debug_valgrind = shift;
+                                          while (!IsAVisItComponentName($debug_valgrind))
+                                          {
+                                            push @debug_valgrind_args, $debug_valgrind;
+                                            $debug_valgrind = shift;
+                                            if ($debug_valgrind eq "")
+                                            {
+                                                print STDERR "Did not find VisIt component name for -valgrind option\n";
+                                                exit 1
+                                            }
+                                          }
+                                          push @norun, $debug_valgrind;
+                                          push @visitargs, "-norun", $debug_valgrind;
+                                          if ($exe_name ne $debug_valgrind)
+                                          {
+                                            if (scalar(@debug_valgrind_args) == 0)
+                                            {
+                                              push @visitargs, "-valgrind", $debug_valgrind;
+                                            }
+                                            else
+                                            {
+                                              push @visitargs, "-valgrind", @debug_valgrind_args, $debug_valgrind;
+                                            }
+                                          }
+                                        }
+    elsif ($arg eq "-strace" )          {
+                                          $debug_strace = shift;
+                                          while (!IsAVisItComponentName($debug_strace))
+                                          {
+                                            push @debug_strace_args, $debug_strace;
+                                            $debug_strace = shift;
+                                            if ($debug_strace eq "")
+                                            {
+                                                print STDERR "Did not find VisIt component name for -strace option\n";
+                                                exit 1
+                                            }
+                                          }
+                                          push @norun, $debug_strace;
+                                          push @visitargs, "-norun", $debug_strace;
+                                          if ($exe_name ne $debug_strace)
+                                          {
+                                            if (scalar(@debug_strace_args) == 0)
+                                            {
+                                              push @visitargs, "-strace", $debug_strace;
+                                            }
+                                            else
+                                            {
+                                              push @visitargs, "-strace", @debug_strace_args, $debug_strace;
+                                            }
+                                          }
+                                        }
+    elsif ($arg eq "-debug-malloc" )    {
+                                          $debug_malloc = shift;
+                                          while (!IsAVisItComponentName($debug_malloc))
+                                          {
+                                            push @debug_malloc_args, $debug_malloc;
+                                            $debug_malloc = shift;
+                                            if ($debug_malloc eq "")
+                                            {
+                                                print STDERR "Did not find VisIt component name for -debug_malloc option\n";
+                                                exit 1
+                                            }
+                                          }
+                                          if (scalar(@debug_malloc_args) == 0)
+                                          {
+                                            push @visitargs, "-debug-malloc", $debug_malloc;
+                                          }
+                                          else
+                                          {
+                                            push @visitargs, "-debug-malloc", @debug_malloc_args, $debug_malloc;
+                                          }
+                                          if ($exe_name eq $debug_malloc)
+                                          {
+                                             $ENV{MallocStackLogging} = "1";
+                                             if (scalar(@debug_malloc_args) > 0 and $debug_malloc_args[0] eq "MallocDebug")
+                                             {
+                                                 $ENV{DYLD_INSERT_LIBRARIES} = "/usr/lib/libMallocDebug.A.dylib";
+                                             }
+                                          }
+                                          else
+                                          {
+                                             delete $ENV{MallocStackLogging};
+                                             if (scalar(@debug_malloc_args) > 0 and $debug_malloc_args[0] eq "MallocDebug")
+                                             {
+                                                 delete $ENV{DYLD_INSERT_LIBRARIES};
+                                             }
+                                          }
+                                        }
+    elsif ($arg eq "-guesshost" )       { $guesshost = 1; }
+    elsif ($arg eq "-setupenv" )        { $visit_sets_up_environment = 1; }
+    elsif ($arg eq "-quiet" )           { $quiet = 1; push @visitargs, "-quiet"; }
+    elsif ($arg eq "-hw-pre" )          { $pre_command = shift; }
+    elsif ($arg eq "-hw-post" )         { $post_command = shift; }
+    elsif ($arg eq "-sshtunneling" )    { $ssh_tunneling = 1; push @visitargs, $arg; }
+    elsif ($arg eq "-viewerdisplay" )   { $viewerdisplay = shift; push @visitargs, $arg, $viewerdisplay; }
+    elsif ($arg eq "-noloopback")       { push @visitargs, $arg if (!$noloopback); $noloopback = 1; }
+    else                         { push @visitargs, $arg; }
+}
+
+# -----------------------------------------------------------------------------
+#                             Display help messages
+# -----------------------------------------------------------------------------
+
+if ($showhelp != 0 and $exe_name eq "gui")
+{
+    if ($showhelp == 1)
+    {
+        print STDERR "\nUSAGE: visit [options] $helpnote\n $usage\n";
+        exit(0);
+    }
+    else # ($showhelp == 2)
+    {
+        print STDERR "\nUSAGE: visit [options] $fullusage\n";
+        exit(0);
+    }
+}
+
+# -----------------------------------------------------------------------------
+#                               Check for errors
+# -----------------------------------------------------------------------------
+
+if ((!$procs_set) and ($name_set or $part_set or $bank_set or
+                       $time_set or $part_set or $nodes_set or
+                       $machinefile_set))
+{
+    print STDERR "You specified a parallel argument without using -np to specify\n".
+                 "the number of processors.  Please add an -np argument.\n";
+    print STDERR $usage;
+    exit 1;
+}
+
+if (($procs_set) and ($procs < 1))
+{
+    print STDERR "You must specify more at least one processor to execute a parallel Visit program.\n".
+                 "You specified \"$procs\" processor(s).\n";
+    exit 1;
+}
+
+@engine_parallel_args = ();
+$had_to_strip_parallel_args = 0;
+if ((($parallel) or ($launchengine)) and
+    (($exe_name eq "gui") or ($exe_name eq "viewer") or ($exe_name eq "cli")))
+{
+    $had_to_strip_parallel_args = 1;
+    # If we're trying to run in parallel, or we've been explicitly
+    # told to launch an engine, add any parallel arguments back on
+    push @engine_parallel_args, "-par"                   if ($parallel && !$procs_set);
+    push @engine_parallel_args, "-l",  $launch           if ($launch_set);
+    push @engine_parallel_args, "-la", "@launchargs"     if ($launchargs_set);
+    push @engine_parallel_args, "-np", $procs            if ($procs_set);
+    push @engine_parallel_args, "-nn", $nodes            if ($nodes_set);
+    push @engine_parallel_args, "-n",  $name             if ($name_set);
+    push @engine_parallel_args, "-p",  $part             if ($part_set);
+    push @engine_parallel_args, "-b",  $bank             if ($bank_set);
+    push @engine_parallel_args, "-t",  $time             if ($time_set);
+    push @engine_parallel_args, "-machinefile",  $machinefile if ($machinefile_set);
+
+    # ... but don't confuse the script
+    $parallel=0;
+    $launchargs_set=0;
+    $procs_set=0;
+    $name_set=0;
+    $part_set=0;
+    $bank_set=0;
+    $time_set=0;
+    $nodes_set=0;
+    $machinefile_set=0;
+
+    # If we didn't specify a location for the engine, assume localhost.
+    push @visitargs, "-launchengine", "localhost"   if (!$launchengine);
+    push @visitargs, "-launchengine", $launchengine if ($launchengine);
+}
+
+# -----------------------------------------------------------------------------
+#                  Hostname Overrides and Host-specific Hacks
+# -----------------------------------------------------------------------------
+
+
+# Localhost override to loopback.  The default behavior is that we
+# will always override the given host with the loopback device unless
+# otherwise specified.  This means that the viewer needs to add the
+# -noloopback flag when initiating a remote process (e.g. the vcl
+# with -ssh, or another remote process launched through vcl).  A
+# parallel engine also needs to add the flag since even "local"
+# parallel jobs may run on compute nodes.
+if ($parallel and ($exe_name eq "engine") and !$noloopback)
+{
+    $noloopback = 1;
+    push @visitargs, "-noloopback";
+}
+
+if (!$noloopback)
+{
+    $remotehost = "127.0.0.1";
+}
+
+
+# Only add -compiler to the visitargs too if the component name was passed.
+# Other applications won't need to propagate that flag because only the
+# components that have their names passed possibly spawn any other VisIt
+# processes. When we don't add it, note that we still use it - just not
+# in subprocesses.
+if ($req_compiler ne "" && $exe_name_passed)
+{
+    push @visitargs, "-compiler", $req_compiler;
+}
+
+if ($guesshost && !$ssh_tunneling)
+{
+    if ($ENV{SSH_CLIENT})
+    {
+        ($remotehost) = split /\s/, $ENV{SSH_CLIENT};
+        $remotehost_set = 1;
+    }
+    elsif ($ENV{SSH2_CLIENT})
+    {
+        ($remotehost) = split /\s/, $ENV{SSH2_CLIENT};
+        $remotehost_set = 1;
+    }
+    elsif ($ENV{SSH_CONNECTION})
+    {
+        ($remotehost) = split /\s/, $ENV{SSH_CONNECTION};
+        $remotehost_set = 1;
+    }
+    else
+    {
+        print STDERR "Error: -guesshost was specified, but it was\n".
+                     "unable to parse the SSH_CLIENT/CONNECTION\n".
+                     "environment variable to get a valid host name\n";
+        exit 1;
+    }
+    $remotehost =~ s/.*:([^:]*)/$1/;
+}
+
+# If -sshtunneling was enabled and the host name was not already set.
+# assume localhost.  This should never happen, but just in case, this
+# is the safest solution.
+if ($ssh_tunneling && !$remotehost_set)
+{
+    $remotehost = "localhost";
+    $remotehost_set = 1;
+}
+
+# ----
+#  HACK for Sandia's redrose machine:
+#
+#  If we're on Sandia's redrose machine, then we need to make sure that 
+#  the correct the library path is correct.
+# ----
+if ($host eq "redrose1.sandia.gov" || $host eq "redrose2.sandia.gov")
+{
+    $ENV{LD_LIBRARY_PATH} = join ':' ,
+       ("/apps/x86_64/mpi/openmpi/intel-9.1/openmpi-1.1.2-ofed/lib",
+        "/projects/global/x86_64/compilers/intel/intel-9.1-cce-045/lib",
+        "/apps/torque/lib"); 
+}
+
+# ----
+# HACK for lens.ccs.ornl.gov @ ORNL
+# ----
+$IsRunningOnLens_ORNL = 0;
+if ( ($parallel) and $exe_name eq "engine" and $host =~ /lens/ )
+{
+    chomp($domain   = `hostname -d`);
+    if ( $domain eq "ccs.ornl.gov" )
+    {
+        $IsRunningOnLens_ORNL = 1;
+    }
+}
+
+# ----
+# HACK for saguaro @ ASU
+# ----
+$IsRunningOnSaguaro_ASU = 0;
+if ( ($parallel) and $exe_name eq "engine" and ($host eq "saguaro1.local" or $host eq "saguaro2.local"))
+{
+    $IsRunningOnSaguaro_ASU = 1;
+}
+
+# ----
+# HACK for ranger/spur @ TACC
+# ----
+$IsRunningOnRanger_TACC = 0;
+$IsRunningOnSpur_TACC = 0;
+$IsRunningOnLonghorn_TACC = 0;
+$IsRunningOnLonestar_TACC = 0;
+# Hostnames are of the form spur.tacc.utexas.edu, (vis*|login#).ranger.tacc.utexas.edu
+if ( ($parallel) and $exe_name eq "engine" and (($host =~ /tacc/) or ($host =~ /longhorn/)))
+{
+    $IsRunningOnRanger_TACC = 1;
+    $IsRunningOnSpur_TACC = 1 if $part =~ /vis/ ;  # determine machine by queue, since all jobs submit from spur
+    $IsRunningOnLonghorn_TACC = 1 if $host =~ /longhorn/ ;  # determine machine by queue, since all jobs submit from spur
+    $IsRunningOnLonestar_TACC = 1 if $host =~ /ls4/ ;  # determine machine by queue, since all jobs submit from spur
+    print STDERR "\n\nAttempting to launch parallel engine at TACC\n";
+    print STDERR "For more information about TACC resources and configurations, see:\n";
+    print STDERR "\thttp://www.tacc.utexas.edu/user-services/user-guides\n\n";
+
+    # if launching from spur visnode to ranger, prepend 'i' to visnode hostname to get IB interface
+    $remotehost = "i".$remotehost if ($remotehost =~ /vis([0-9]|big).ranger/) and ($remotehost !~ /^i/);
+}
+
+# ----
+# HACK for jaguarpf.ccs.ornl.gov
+#
+# ----
+$IsRunningOnJaguar_ORNL = 0;
+if ( ($parallel) and $exe_name eq "engine" and ($host =~ /jaguarpf/ or $host =~ /jaguar/) )
+{
+    chomp($domain   = `hostname -d`);
+    if ( $domain eq "ccs.ornl.gov" )
+    {
+        $IsRunningOnJaguar_ORNL = 1;
+        $remotehost = $host;
+        if ($host =~ /jaguarpf/)
+        {
+            $remotehost =~ s/jaguarpf-//;
+        }
+        else
+        {
+            $remotehost =~ s/jaguar/login/;
+        }
+        
+        if ($ENV{PATH} eq "")
+        {
+            $ENV{PATH} = "/opt/torque/default/bin";
+            $ENV{PATH} = join ':' , ("$ENV{PATH}","/usr/bin");
+        }
+        else
+        {
+            $ENV{PATH} = join ':' , ("$ENV{PATH}","/opt/torque/default/bin");
+            $ENV{PATH} = join ':' , ("$ENV{PATH}","/usr/bin");
+        }
+    }
+}
+
+# ----
+# HACK for nautilus.nics.utk.edu
+#
+# ----
+$IsRunningOnNautilus_UTK = 0;
+if ( $host =~ /^nautilus/ or $host =~ /^arronax/ or $host =~ /^conseil/ )
+{
+    chomp($domain = `hostname -d`);
+    if ( $domain eq "nics.utk.edu" )
+    {
+        $IsRunningOnNautilus_UTK = 1;
+    }
+}
+
+# ----
+# HACK for kraken.nics.utk.edu
+#
+# ----
+$IsRunningOnKraken_UTK = 0;
+if ( ($parallel) and $exe_name eq "engine" and $host =~ /krakenpf/)
+{
+    chomp($domain = `hostname -d`);
+    if ( $domain eq "nics.utk.edu" )
+    {
+        $IsRunningOnKraken_UTK = 1;
+        $remotehost = $host;
+        if ($host =~ /krakenpf/)
+        {
+            $remotehost =~ s/krakenpf/login/;
+            #$remotehost = `getent hosts $remotehost | awk '{printf \$1}'`
+        }
+
+    # The /sw filesystem is not accessible from the compute nodes.
+    # NICS requires that only required support files be present on /lustre.
+    # Here, we instruct the engine to use support files on /lustre.
+    $visitsupportdir = "/lustre/scratch/proj/sw/visit/support/$ver/linux-x86_64";
+        push @visitargs, "--mesa-lib", "$visitsupportdir/lib/libOSMesa.so";
+        push @visitargs, "-plugindir", "$visitsupportdir/plugins";
+
+    for (my $count = 0; $count < scalar(@visitargs); $count++) {
+        if($visitargs[$count] eq "-dir") {
+        $visitargs[$i+1] = $visitsupportdir;
+        }
+    }
+    }
+}
+
+
+# ----
+# HACK for franklin @ NERSC
+#
+# ----
+$IsRunningOnFranklinNERSC = 0;
+if ( $host =~ /^nid/ )
+{
+    $nodename=`/usr/syscom/nsg/bin/nodename`;
+    if ($nodename =~ /^franklin/ || $nodename =~ /^nid/)
+    {
+        $IsRunningOnFranklinNERSC = 1;
+        $ENV{LD_LIBRARY_PATH} = "/opt/gcc/4.4.4/snos/lib64";
+        if ($ENV{PATH} eq "")
+        {
+            $ENV{PATH} = "/opt/torque/2.3.4-200809011357/bin";
+        }
+        else
+        {
+            $ENV{PATH} = join ':' , ("$ENV{PATH}","/opt/torque/2.3.4-200809011357/bin");
+        }
+        if ($exe_name eq "gui")
+        {
+            print "The VisIt install on Franklin is provided for the purpose of running ";
+            print "the parallel remote visualization backend on Franklin or run scripts ";
+            print "via VisIt's Python Command Line Interface (CLI). If you need to run ";
+            print "VisIt's gui, please install VisIt $ver on your local workstation.\n\n";
+            print "For more information, see ";
+            print "http://www.nersc.gov/nusers/resources/software/apps/visualization/visit/visit_franklin_remote.php\n\n";
+            print "If you do not want to install VisIt on your local machine, run the ";
+            print "VisIt GUI on Euclid, and follow the instructions under \"Running a ";
+            print "remote compute engine on Franklin\" on the Web page above. (VisIt on ";
+            print "Euclid already is configured with a host profile for Franklin).\n\n";
+            print "Please note that you will achieve the best performance by running the ";
+            print "VisIt GUI on your local workstation and the remote compute engine on ";
+            print "Franklin (or any other NERSC machine with VisIt).\n\n";
+            print "If you would like to perform batch data analysis or visualization on ";
+            print "Franklin using VisIt\'s CLI, add the options \"-cli -nowin\" to your ";
+            print "command line. Please contact NERSC Analytics at consult@nersc.gov for ";
+            print "further help.\n\n";
+            print "For more information about running VisIt at NERSC:";
+            print "http://www.nersc.gov/nusers/resources/software/apps/visualization/visit/\n\n";
+            exit 1;
+        }
+        elsif (($exe_name eq "engine") and not $parallel)
+        {
+            print "The VisIt install on Franklin only supports running a parallel ";
+            print "engine on the compute nodes!\n";
+            exit 1;
+        }
+    }
+}
+
+# ----
+# HACK for hopper @ NERSC
+#
+# ----
+$IsRunningOnHopperNERSC = 0;
+if ($ENV{NERSC_HOST} eq "hopper")
+{
+    $IsRunningOnHopperNERSC = 1;
+    $ENV{LD_LIBRARY_PATH} = "/opt/gcc/4.6.2/snos/lib64";
+
+    # Are we running on a login node?
+    if ($host =~ /^hopper/)
+    {
+        if ((!$envonly) and ($exe_name eq "gui"))
+        {
+            print "To run the VisIt GUI on Hopper, you need to run it on a MOM node!\n\n ";
+            print "For more information about running VisIt at NERSC:";
+            print "http://www.nersc.gov/nusers/resources/software/apps/visualization/visit/\n\n";
+            exit 1;
+        }
+
+        if ($exe_name eq "engine")
+        {
+            if ($parallel)
+            {
+                $loginnodeport = $remoteport;
+                $remoteport = "\$MOM_PORT";
+                $loginnodehost = $remotehost;
+                $remotehost = "\$MOM_HOST";
+            }
+            else
+            {
+                print "The VisIt install on Hopper does not support running ";
+                print "a serial engine on the login nodes!\n";
+                exit 1;
+            }
+        }
+    }
+}
+
+# ----
+# HACK for euclid @ NERSC
+#
+# ----
+$IsRunningOnEuclidNERSC = 0;
+if ( $host =~ /^euclid.nersc.gov/ )
+{
+    $IsRunningOnEuclidNERSC = 1;
+}
+
+# ----
+# HACK for xchem @ LLNL
+#
+# ----
+$IsRunningOnXchemLLNL = 0;
+if ( $host =~ /^xchem.llnl.gov/ )
+{
+    $IsRunningOnXchemLLNL = 1;
+    $ENV{LD_LIBRARY_PATH} = join ':' ,
+        ("/opt/intel/cc/10.1.021/lib",
+         "/opt/llnl/mpich2_shared/ch3-ssm/lib");
+}
+
+# ----
+# HACK for yana, alastor, hopi, aztec, inca  @ LLNL
+#
+# ----
+$UseTTC = 0;
+if ($host =~ /^yana\d+$/ or $host =~ /^alastor\d+$/ or $host =~ /^hopi\d+$/ or
+    $host =~ /^aztec\d+$/ or $host =~ /^inca\d+$/)
+{
+    $UseTTC = 1;
+}
+
+# ----
+# HACK for graph @ LLNL
+#
+# ----
+$UsePPN = 1;
+if ($host =~ /^graph\d+$/)
+{
+    $UsePPN  = 0;
+}
+
+# ----
+# HACK for Eureka @ Argonne
+# ----
+$IsRunningOnEureka_ANL = 0;
+if (($parallel) and $exe_name eq "engine" and 
+      ( (($host =~ /eureka/) and ($host =~ /alcf/)) 
+        or ($host =~ /login1/) ) )
+{
+    chomp($domain   = `hostname -d`);
+    if ( $domain eq "gadzooks.alcf.anl.gov" or $domain eq "mcs.anl.gov" or $domain eq "eureka.alcf.anl.gov")
+    {
+        $IsRunningOnEureka_ANL = 1;
+        if ( $domain eq "gadzooks.alcf.anl.gov" )
+        {
+            $remotehost = "login1-mgmt.gadzooks";
+        }
+        else
+        {
+            if ( $domain eq "mcs.anl.gov" )
+            {
+                # Don't need to set remotehost.
+            }
+            else
+            {
+                $remotehost = "login1-mgmt.eureka";
+            }
+        }
+    }
+}
+
+# ----
+# HACK for Brutus @ ETH Zurich
+# ----
+if ( ($parallel) and $exe_name eq "engine" and $host =~ /brutus/ )
+{
+   chomp($remotehost = `hostname -s`);
+   $remotehost = $remotehost . ".hpc-net.ethz.ch";
+}
+
+# ----
+# HACK for Cielo @ LANL
+# ----
+$IsRunningOnCieloLANL = 0;
+if ( $host =~ /^ci-fe\d+$/ or $host =~ /^ci-login\d+$/ or
+     $host =~ /^ci-vizlogin\d+$/ )
+{
+    chomp($domain = `hostname -d`);
+    if ( $domain eq "lanl.gov" )
+    {
+        $IsRunningOnCieloLANL = 1;
+        $ENV{LIBGL_ALWAYS_INDIRECT} = "1";
+        $ENV{LD_LIBRARY_PATH} = "/opt/cray/mpt/5.2.0/xt/gemini/mpich2-gnu/lib:/opt/gcc/mpc/0.8.1/lib:/opt/gcc/mpfr/2.4.2/lib:/opt/gcc/gmp/4.3.2/lib:/opt/gcc/4.5.2/snos/lib64:$ENV{LD_LIBRARY_PATH}";
+    }
+}
+
+# ----
+# HACK for Glory, Unity and Whitney @ Sandia
+# ----
+$IsRunningOnGlorySandia = 0;
+if ( $host =~ /^glory\d+$/ or $host =~ /^unity\d+$/ or $host =~ /^whitney\d+$/ )
+{
+    $IsRunningOnGlorySandia = 1;
+    $ENV{LD_LIBRARY_PATH} = "/apps/x86_64/compilers/gcc/gcc-4.3.4/lib64:/apps/x86_64/compilers/gcc/gcc-4.3.4/lib64:$ENV{LD_LIBRARY_PATH}";
+}
+
+# ----
+# HACK for Redsky and Redsky-s @ Sandia
+# ----
+$IsRunningOnRedskySandia = 0;
+if ( $host =~ /^redsky-login\d+$/ )
+{
+    $IsRunningOnRedskySandia = 1;
+}
+
+# ----
+# HACK for LSU Philip machine:
+# ----
+if ( $host =~ /^philip\d+$/ )
+{
+    if ($ENV{LD_LIBRARY_PATH} eq "")
+    {
+        $ENV{LD_LIBRARY_PATH} = join ':' ,
+                             ("/usr/local/compilers/GNU/gcc-4.3.2/lib64");
+    }
+    else
+    {
+        $ENV{LD_LIBRARY_PATH} = join ':' ,
+                             ("$ENV{LD_LIBRARY_PATH}",
+                              "/usr/local/compilers/GNU/gcc-4.3.2/lib64");
+    }
+}
+
+#  We stripped off the "port" argument above, so put it back here. Put it
+#  at the beginning so that it ends after the -host argument, see below.
+if ($remoteport_set)
+{
+    unshift @visitargs, $remoteport;
+    unshift @visitargs, "-port";
+}
+
+#  We stripped off the "host" argument above, so put it back here.
+#  This allowed us to change it if needed, e.g. for the Q machine.
+#  VisIt seems to need the -host argument before the -nread and -nwrite
+#  values, so when we put it back, put it at the beginning.
+if ($remotehost_set)
+{
+    unshift @visitargs, $remotehost;
+    unshift @visitargs, "-host";
+}
+
+# -----------------------------------------------------------------------------
+#                         Determine the architecture
+# -----------------------------------------------------------------------------
+
+@supportedarchs = ();
+chomp( $os = `uname -s` );
+$os =~ tr/[A-Z]/[a-z]/;
+for ($os) {
+    /freebsd/ && do {
+        $mach = `uname -m`;
+        $version = `uname -r`;
+        push @supportedarchs, "freebsd-$version-$mach";
+        last;
+    };
+    /irix/ && do {
+        $version = `uname -r`;
+        $version =~ s/(^[6])\..*/irix$1/ ;
+        for ($version) {
+            /irix6/ && do {
+                push @supportedarchs, "sgi-irix6-mips2";
+                last;
+            };
+        }
+        $launch = "mpirun" if ($procs_set && $launch eq "");
+        last;
+    };
+    /sunos/ && do {
+        chomp( $mach    = `uname -m` );
+        chomp( $version = `uname -r` );
+        $version =~ s/([45])\..*/sunos$1/ ;
+        if ($mach =~ /^sun4/) {
+            push @supportedarchs, "sun4-$version-sparc";
+        }
+        $launch = "mpirun" if ($procs_set && $launch eq "");
+        last;
+    };
+    /hp-ux/ && do {
+        if (`uname -m` =~ /9000\/[78]/) {
+            push @supportedarchs, "hp-hpux-pa";
+        }
+        $launch = "mpirun" if ($procs_set && $launch eq "");
+        last;
+    };
+    /aix/ && do {
+        if ($req_object_mode eq "64")
+        {
+            if ($req_compiler eq "xlc") {
+                push @supportedarchs, "ibm-aix-pwr64-xlc";
+            }
+            else {
+                push @supportedarchs, "ibm-aix-pwr64";
+            }
+        }
+        else
+        {
+            if ($req_compiler eq "xlc") {
+                push @supportedarchs, "ibm-aix-pwr-xlc";
+            } else {
+                push @supportedarchs, "ibm-aix-pwr";
+            }
+        }
+        $launch = "poe" if ($procs_set && $launch eq "");
+        last;
+    };
+    /osf/ && do {
+        push @supportedarchs, "dec-osf1-alpha";
+        $launch = "mpirun" if ($procs_set && $launch eq "");
+        last;
+    };
+    /linux/ && do {
+        chomp( $mach    = `uname -m` );
+        if ($mach =~ /alpha/) {
+            push @supportedarchs, "linux-alpha";
+        }
+        elsif ($mach =~ /ia64/) {
+            push @supportedarchs, "linux-ia64";
+        }
+        elsif ($mach =~ /x86_64/) {
+            push @supportedarchs, "linux-x86_64";
+        }
+        elsif ($mach =~ /ppc64/) {
+            if ($exe_name eq "engine" && $req_compiler eq "powerpc-bgp-linux-g++") {
+                push @supportedarchs, "linux-ppc64-powerpc-bgp-linux-g++";
+            }
+            else {
+                push @supportedarchs, "linux-ppc64";
+            }
+        }
+        else {
+            if ($req_compiler eq "icc") {
+                push @supportedarchs, "linux-intel-icc";
+            }
+            else {
+                push @supportedarchs, "linux-intel";
+            }
+        }
+        $launch = "mpirun" if ($procs_set && $launch eq "");
+        last;
+    };
+    /darwin/ && do {
+        # Unset the DYLD_LIBRARY_PATH variable so we don't conflict with other
+        # things the user might have set.
+        $ENV{DYLD_LIBRARY_PATH} = "";
+
+        if ($req_compiler eq "ppc") {
+                push @supportedarchs, "darwin-ppc";
+        }
+        elsif ($req_compiler eq "i386") {
+                push @supportedarchs, "darwin-i386";
+        }
+        elsif ($req_compiler eq "x86_64") {
+                push @supportedarchs, "darwin-x86_64";
+        }
+        elsif ( -d "$visitdir/darwin")
+        {
+            push @supportedarchs, "darwin";
+        }
+        else
+        {
+            #
+            # The logic below should be simplified to only use
+            # system_profiler when we decide to permanently remove
+            # support for power pc systems.
+            #
+            chomp( $mach    = `uname -p` );
+            if ($mach =~ /i386/) {
+                #
+                # Sometimes uname returns i386 even when it is a 64 bit
+                # processor, so we use system_profiler to get the real
+                # answer. From http://support.apple.com/kb/ht3696 a
+                # Processor Name of "Intel Core Solo" or "Intel Core Duo"
+                # is 32 bits and a Processor Name of "Intel Core 2 Duo" or
+                # "Intel Quad-Core Xeon" or "Dual-Core Intel Xeon" or
+                # "Quad-Core Intel Xeon" is 64 bits.
+                #
+                # Since we only support the 64 bit version with Mac OS X
+                # 10.6 or above, we always choose the 32 bit version prior
+                # to 10.6 and in the case of 10.6 or newer, distinguish
+                # between 32 and 64 bits using system_profiler.
+                #
+                chomp( $darwinver = `uname -r`);
+                my @darwinversions = split('\.', $darwinver);
+                if ($darwinversions[0] >= 10) {
+                    chomp( $darwinproc = `/usr/sbin/system_profiler -detailLevel -2 | grep "Processor Name"`);
+                    if ($darwinproc =~ "Intel Core Solo" or
+                        $darwinproc =~ "Intel Core Duo") {
+                        push @supportedarchs, "darwin-i386";
+                    }
+                    else {
+                        # Prefer the 64-bit executable but back up to the 32-bit one.
+                        push @supportedarchs, "darwin-x86_64", "darwin-i386";
+                    }
+                }
+                else {
+                    push @supportedarchs, "darwin-i386";
+                }
+            }
+            elsif ($mach =~ /x86_64/) {
+                push @supportedarchs, "darwin-x86_64";
+            }   
+            elsif ($mach =~ /powerpc/) {
+                push @supportedarchs, "darwin-ppc";
+            }   
+            elsif ($mach =~ /ppc_64/) {
+                push @supportedarchs, "darwin-ppc_64";
+            }
+        }
+        $launch = "mpirun" if ($procs_set && $launch eq "");
+        last;
+    };
+    /tflops/ && do {
+        push @supportedarchs, "intel-tflops-ppro";
+        $launch = "yod" if ($procs_set && $launch eq "");
+        last;
+    };
+}
+
+#
+# If there are no supported architectures, fail
+#
+if (scalar(@supportedarchs) == 0)
+{
+    print STDERR <<"EOF";
+This hardware platform is not supported by VisIt.
+EOF
+    exit 1;
+}
+
+#
+# Pick one arch as the default in case we are running a development version.
+#
+$defaultarch = $supportedarchs[0];
+
+#
+# If -arch was requested, just print architecture info and exit
+#
+if ($print_arch)
+{
+    print STDOUT <<"EOF";
+@supportedarchs
+EOF
+    exit 1;
+}
+
+#
+# Set any unfinished defaults
+#
+if (!$part_set && (substr($launch,0,4) eq "psub"))
+{
+    # Set a reasonable partition for psub assuming the IBM SP environment
+    $part = "pbatch,$sector";
+    $part_set = 1;
+}
+
+# -----------------------------------------------------------------------------
+#                             Determine versions
+# -----------------------------------------------------------------------------
+
+# If we still think the exe_name is makemili or convert, we're not running 
+# in parallel.
+if (($exe_name eq "makemili") or ($exe_name eq "visitconvert"))
+{
+    if ($parallel) 
+    {
+        if (-e "$visitdir/exe/$exe_name" . "_par_lite")
+        {
+            $exe_name .= "_par_lite";
+        }
+        else
+        {
+            $exe_name .= "_par";
+        }
+    }
+    else
+    {
+        if (-e "$visitdir/exe/$exe_name" . "_ser_lite")
+        {
+            $exe_name .= "_ser_lite";
+        }
+        else
+        {
+            $exe_name .= "_ser";
+        }
+    }
+}
+
+# Determine the version number of the executable.
+if ($exe_name eq "engine")
+{
+    if (!$parallel || ($procs_set && $procs==1))
+    {
+        $exe_name .= "_ser";
+    }
+    else
+    {
+        $exe_name .= "_par";
+    }
+
+    # if we've designated a parallel launcher, then we are sharing
+    # one batch job between the mdserver and engine (through the vcl)
+    # so: if we're launching a parallel engine with -pl specified, then
+    # make the real launcher the parallel launcher
+    if ($parallel and $parlaunch_set)
+    {
+        $launch = $parlaunch;
+    }
+}
+
+# If there is no version, then this is a development executable.
+if ($ver eq "")
+{
+    $archdir = $defaultarch;
+
+    $visitarchdir   = "$visitdir";
+    $visitbindir    = "$visitdir/exe";
+    $visitscriptdir = "$visitdir/bin";
+    $visitlauncher  = "$visitdir/bin/visit";
+    if($os eq "darwin" and ($exe_name eq "gui" or $exe_name eq "viewer" or $exe_name eq "xmledit" or $exe_name eq "silex"))
+    {
+        $visitbindir = "$visitbindir/$exe_name.app/Contents/MacOS";
+    }
+    $visitlibdir  = "$visitdir/lib";
+    $visithelpdir = "$visitdir/help";
+    $visitultradir = "$visitdir/ultrawrapper";
+    $visitplugins = "$visitdir/plugins";
+    $publicversion = 0;
+
+    if (! -x "$visitbindir/$exe_name")
+    {
+        print STDERR "Development version of '$exe_name' does not exist.\n";
+        if ($exe_name eq "engine_par")
+        {
+            print STDERR "Note that the serial engine may still work.\n";
+        }
+        exit 1;
+    }
+}
+else # We're running a public version.
+{
+    foreach (@supportedarchs)
+    {
+        if (-x "$visitdir/$_/bin/$exe_name" || -x "$visitdir/$_/bin/$exe_name.app")
+        {
+            $archdir = $_;
+            last;
+        }
+    }
+    if (! defined $archdir)
+    {
+        print STDERR "Version $ver of '$exe_name' does not exist for \n";
+        if (scalar(@supportedarchs) > 1)
+        {
+            print STDERR "any of the valid architectures (@supportedarchs).\n";
+        }
+        else
+        {
+            print STDERR "the architecture '@supportedarchs'.\n";
+        }
+        if ($exe_name eq "engine_par")
+        {
+            print STDERR "Note that the serial engine may still work.\n";
+        }
+        $dirs = `ls -1 $visitdir/ | grep -v bin`;
+        if ($dirs eq "")
+        {
+            print STDERR "VisIt cannot locate binaries for any architectures.\n";
+        }
+        else
+        {
+            print STDERR "VisIt located binaries for the following architectures:\n";
+            print STDERR "\t$dirs";
+        }
+        exit 1;
+    }
+
+    $visitarchdir   = "$visitdir/$archdir";
+    $visitbindir    = "$visitdir/$archdir/bin";
+    $visitscriptdir = "$visitdir/$archdir/bin";
+    $visitlauncher  = "$visitdir/../bin/visit";
+    if($os eq "darwin" and ($exe_name eq "gui" or $exe_name eq "viewer" or $exe_name eq "xmledit" or $exe_name eq "silex"))
+    {
+        $visitbindir = "$visitbindir/$exe_name.app/Contents/MacOS";
+    }
+    $visitlibdir  = "$visitdir/$archdir/lib";
+    $visithelpdir = "$visitdir/$archdir/help";
+    $visitultradir = "$visitdir/$archdir/ultrawrapper";
+    $visitplugins = "$visitdir/$archdir/plugins";
+    $publicversion = 1;
+}
+
+if ($had_to_strip_parallel_args)
+{
+    if (scalar(@engine_parallel_args) > 0)
+    {
+        $engine_arg_string = ";".join(';', @engine_parallel_args);
+        push @visitargs, "-engineargs", $engine_arg_string;
+    }
+}
+
+
+# Confirm we have found some version
+$msg = "";
+if (! -e "$visitbindir/$exe_name")
+{
+    $msg = "parallel " if ($parallel);
+    print STDERR <<"EOF";
+No versions of ${msg}VisIt have been installed for this hardware platform.
+EOF
+    exit 1;
+}
+
+# Add the movie script to the arguments.
+if($add_movie_args)
+{
+    push @visitargs, "-s", "$visitscriptdir/makemoviemain.py", "-nowin";
+}
+
+# Add the diff script to the arguments.
+if($add_diff_args)
+{
+    push @visitargs, "-s", "$visitscriptdir/visitdiff.py", "-vdiff", $leftdb, $rightdb;
+}
+if($add_diffsum_args)
+{
+    push @visitargs, "-nowin", "-s", "$visitscriptdir/visitdiff.py", "-vdiff", $leftdb, $rightdb, "-summary_only";
+}
+
+# -----------------------------------------------------------------------------
+#                   Set up the plugin/shared library environment
+# -----------------------------------------------------------------------------
+
+@plugincategories = ("plots", "operators", "databases");
+
+
+# Make sure there is a .visit directory in the user's home directory
+# and that it includes all current plugin types.
+if (defined($ENV{HOME}))
+{
+    foreach my $archdir (@supportedarchs)
+    {
+        $makedir  = "$ENV{HOME}/.visit";mkdir $makedir,0777 if (! -e $makedir);
+        $makedir .= "/$archdir";        mkdir $makedir,0777 if (! -e $makedir);
+        $makedir .= "/plugins";         mkdir $makedir,0777 if (! -e $makedir);
+
+        foreach (@plugincategories)
+        {
+            mkdir "$makedir/$_", 0777 if (! -e $makefir);
+        }
+    }
+}
+
+# Set up stuff for shared libraries for various platforms
+if (! defined($ENV{LD_LIBRARY_PATH_VISITORIG}))
+{
+    $ENV{LD_LIBRARY_PATH_VISITORIG} = "$ENV{LD_LIBRARY_PATH}";
+}
+if (! defined($ENV{LD_LIBRARY32_PATH_VISITORIG}))
+{
+    $ENV{LD_LIBRARY32_PATH_VISITORIG} = "$ENV{LD_LIBRARY32_PATH}";
+}
+if (! defined($ENV{LD_LIBRARYN32_PATH_VISITORIG}))
+{
+    $ENV{LD_LIBRARYN32_PATH_VISITORIG} = "$ENV{LD_LIBRARYN32_PATH}";
+}
+if (! defined($ENV{LD_LIBRARY64_PATH_VISITORIG}))
+{
+    $ENV{LD_LIBRARY64_PATH_VISITORIG} = "$ENV{LD_LIBRARY64_PATH}";
+}
+if (! defined($ENV{LIBPATH_VISITORIG}))
+{
+    $ENV{LIBPATH_VISITORIG} = "$ENV{LIBPATH}";
+}
+if (! defined($ENV{PYTHONPATH_VISITORIG}))
+{
+    $ENV{PYTHONPATH_VISITORIG} = "$ENV{PYTHONPATH}";
+}
+
+if ($ENV{LD_LIBRARY_PATH_VISITORIG} eq "")
+{
+    $ENV{LD_LIBRARY_PATH} = "$visitlibdir";
+}
+else
+{
+    $ENV{LD_LIBRARY_PATH} = "$visitlibdir:$ENV{LD_LIBRARY_PATH_VISITORIG}";
+}
+if ($ENV{LD_LIBRARY32_PATH_VISITORIG} eq "")
+{
+    $ENV{LD_LIBRARY32_PATH} = "$visitlibdir";
+}
+else
+{
+    $ENV{LD_LIBRARY32_PATH} = "$visitlibdir:$ENV{LD_LIBRARY32_PATH_VISITORIG}";
+}
+if ($ENV{LD_LIBRARYN32_PATH_VISITORIG} eq "")
+{
+    $ENV{LD_LIBRARYN32_PATH} = "$visitlibdir";
+}
+else
+{
+    $ENV{LD_LIBRARYN32_PATH} = "$visitlibdir:$ENV{LD_LIBRARYN32_PATH_VISITORIG}";
+}
+if ($ENV{LD_LIBRARY64_PATH_VISITORIG} eq "")
+{
+    $ENV{LD_LIBRARY64_PATH} = "$visitlibdir";
+}
+else
+{
+    $ENV{LD_LIBRARY64_PATH} = "$visitlibdir:$ENV{LD_LIBRARY64_PATH_VISITORIG}";
+}
+if ($ENV{LIBPATH_VISITORIG} eq "")
+{
+    $ENV{LIBPATH} = "$visitlibdir";
+}
+else
+{
+    $ENV{LIBPATH} = "$visitlibdir:$ENV{LIBPATH_VISITORIG}";
+}
+if (-x "$visitlibdir/python")
+{
+    if ($ENV{PYTHONPATH_VISITORIG} eq "")
+    {
+        $ENV{PYTHONPATH} = "$visitlibdir/python";
+    }
+    else
+    {
+        $ENV{PYTHONPATH} = "$visitlibdir/python:$ENV{PYTHONPATH_VISITORIG}";
+    }
+}
+
+#Set R_HOME in case R has been installed it will be in this location..
+$ENV{R_HOME} = "$visitlibdir/r_support/R/";
+
+# Add /usr/local/lib to the shared library path.  This was added for the
+# c++ library on some sun systems, but it may have broader applicability.
+# Note that we can assume that LD_LIBRARY_PATH is not empty, since it was
+# set to $visitlibdir above.
+$ENV{LD_LIBRARY_PATH}    = "$ENV{LD_LIBRARY_PATH}:/usr/local/lib";
+
+# Set up some environment flags that let VisIt run on Darwin.
+if($os eq "darwin")
+{
+    $privateplugins="$ENV{HOME}/.visit/$ver/$archdir/plugins/plots:$ENV{HOME}/.visit/$ver/$archdir/plugins/databases:$ENV{HOME}/.visit/$ver/$archdir/plugins/operators";
+    $oldprivateplugins="$ENV{HOME}/.visit/$archdir/plugins/plots:$ENV{HOME}/.visit/$archdir/plugins/databases:$ENV{HOME}/.visit/$archdir/plugins/operators";
+    if ($ENV{DYLD_FALLBACK_LIBRARY_PATH} eq "")
+    {
+        $ENV{DYLD_FALLBACK_LIBRARY_PATH} = "$visitlibdir:$privateplugins:$oldprivateplugins:/System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries";
+    }
+    else
+    {
+        $ENV{DYLD_FALLBACK_LIBRARY_PATH} = "$visitlibdir:$privateplugins:$oldprivateplugins:/System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries:$ENV{DYLD_FALLBACK_LIBRARY_PATH}";
+    }
+}
+
+# Set up plugin search paths in the correct order
+if ($IsRunningOnJaguar_ORNL)
+{
+    $visitprivateplugins = "/lustre/widow1/scratch/$ENV{USER}/.visit/$ENV{VISITPLUGINVERSION}/$archdir/plugins";
+    $visitprivateplugins_old = "/lustre/widow1/scratch/$ENV{USER}/.visit/$archdir/plugins";
+}
+elsif ($IsRunningOnKraken_UTK)
+{
+    $visitprivateplugins = "/lustre/scratch/$ENV{USER}/.visit/$archdir/plugins";
+}
+else
+{
+    $visitprivateplugins = "$ENV{HOME}/.visit/$ENV{VISITPLUGINVERSION}/$archdir/plugins";
+    $visitprivateplugins_old = "$ENV{HOME}/.visit/$archdir/plugins";
+}
+if ($ENV{VISITPLUGINVERSION} eq "")
+{
+    $visitprivateplugins = $visitprivateplugins_old;
+}
+
+if ($publiconly)
+{
+    # Forget the private and user-specified paths, and only use the public one
+    $ENV{VISITPLUGINDIR}="$visitplugins";
+}
+else
+{
+    if (! defined($ENV{VISITPLUGINDIRORIG}))
+    {
+        $ENV{VISITPLUGINDIRORIG} = $ENV{VISITPLUGINDIR};
+    }
+    $ENV{VISITPLUGINDIR}="$ENV{VISITPLUGINDIRORIG}:$visitprivateplugins:$visitprivateplugins_old:$visitplugins";
+}
+
+
+# If we are using a public version, or if any main plugin directory is
+# not writeable, then we should default to a private plugin installation.
+$ENV{VISITPLUGININSTPUB}="$visitplugins";
+$ENV{VISITPLUGININSTPRI}="$visitprivateplugins";
+
+# Only set up the default installation path if needed
+if (!defined($ENV{VISITPLUGININST}))
+{
+    $shouldinstallprivate = $publicversion;
+    foreach (@plugincategories)
+    {
+        $shouldinstallprivate=1  if (! -w "$visitplugins/$_");
+    }
+
+    if ($shouldinstallprivate)
+    {
+        $ENV{VISITPLUGININST}="$visitprivateplugins";
+    }
+    else
+    {
+        $ENV{VISITPLUGININST}="$visitplugins";
+    }
+}
+
+# Set required environment variables
+$ENV{VISITHOME}     = "$visitdir";
+$ENV{VISITARCHHOME} = "$visitarchdir";
+$ENV{VISITHELPHOME} = "$visithelpdir";
+$ENV{VISITULTRAHOME} = "$visitultradir";
+
+if (-x "$visitlibdir/python")
+{
+    $ENV{PYTHONHOME}    = "$visitlibdir/python";
+
+    # Some engine launchers (like MPICH2's mpirun) may be python-based
+    # and we don't want to point them to our python environment.
+    if ($exe_name eq "engine_par")
+    {
+        delete $ENV{PYTHONHOME};
+    }
+}
+
+# Turn off trapping of floating point exceptions.
+$ENV{TRAP_FPE} = "";
+
+# Turn off a warning message when running on Linux systems displaying
+# to a remote display.  The message messes up the communication between
+# the GUI and Viewer.
+$ENV{MESA_GLX_FX} = disable;
+
+# The -viewerdisplay argument allows the user to specify an argument
+# that the viewer should use, no matter what the GUI was using.  This
+# can be useful for wall-type displays with a separate console, e.g.
+# the console on :0 and the DMX server on :2, you could run
+# env DISPLAY=:0 visit -viewerdisplaay :2
+if ($exe_name eq "viewer" and defined $viewerdisplay)
+{
+    $ENV{DISPLAY} = $viewerdisplay;
+}
+
+
+# If logging is true and we are running the mdserver, then add usage
+# information to the log file.
+if ($logging and $exe_name eq "mdserver")
+{
+    chomp ( $user_info = `whoami` );
+    chomp ( $host_info = `hostname` );
+    chomp ( $date_info = `date` );
+    $info = "$user_info"." "."$host_info"." "."$date_info"."\n";
+
+    $filename=">>$visitdir/usagelog";
+    open(USERINFO, $filename);
+    print USERINFO "$info";
+    close(USERINFO);
+}
+
+# -----------------------------------------------------------------------------
+#                                   Run it!
+# -----------------------------------------------------------------------------
+
+if ($envonly)
+{
+    PrintEnvironment($os);
+    exit(0);
+}
+
+@post_args=();
+if ($visit_sets_up_environment and
+    $exe_name eq "engine_par")
+{
+    @visitcmd = ();
+    if ($pre_command ne "")
+    {
+        push @visitcmd, $pre_command;
+    }
+    push @visitcmd, "$visitlauncher", "-engine", "-par", "-quiet";
+    push @visitcmd, "-v", $ver if $ver ne "";
+    push @visitcmd, @visitargs;
+}
+elsif ($pre_command ne "")
+{
+    @visitcmd = ($pre_command, "$visitbindir/$exe_name", @visitargs);
+    @post_args = ($post_command);
+}
+elsif ($exe_name eq "engine_par" and $IsRunningOnKraken_UTK)
+{
+    @visitcmd = ("$visitsupportdir/bin/$exe_name", @visitargs);
+}
+else
+{
+    @visitcmd = ("$visitbindir/$exe_name", @visitargs);
+}
+
+$printonly = grep(/^$exe_name$/, @norun) unless ($debug_totalview or
+                                                 $debug_valgrind or
+                                                 $debug_strace);
+
+if ($procs_set or ($parallel and $parlaunch_set))
+{
+    # aprun
+    if ($launch eq "aprun")
+    {
+        if ( $IsRunningOnHopperNERSC )
+        {
+            @parcmd = ("env");
+            push @parcmd, "DISPLAY=";
+            push @parcmd, "CRAY_ROOTFS=DSL";
+            push @parcmd, "aprun";
+        }
+        else
+        {
+            @parcmd = ("aprun");
+        }
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-n", $procs if $procs_set;
+        push @parcmd, "-N",  $nodes if $nodes_set;
+        if ( $IsRunningOnFranklinNERSC || $IsRunningOnJaguar_ORNL )
+        {
+            push @parcmd, "$visitbindir/env";
+            push @parcmd, "LD_LIBRARY_PATH=$visitlibdir:$visitarchdir/system_libs";
+            push @parcmd, "MPICH_PTL_UNEX_EVENTS=6200000";
+            push @parcmd, "MPICH_MAX_SHORT_MSG_SIZE=12000";
+        }
+
+        push @parcmd,
+             generate_args_valgrind(@debug_valgrind_args) if $debug_valgrind;
+        push @parcmd, @visitcmd;
+        push @parcmd, "-plugindir";
+        push @parcmd, "$ENV{VISITPLUGINDIR}";
+        push @parcmd, "-visithome";
+        push @parcmd, "$ENV{VISITHOME}";
+        push @parcmd, "-visitarchhome";
+        push @parcmd, "$ENV{VISITARCHHOME}";
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # mpirun
+    elsif ($launch eq "mpirun")
+    {
+        if ($IsRunningOnEuclidNERSC)
+        {
+            @parcmd = ("/usr/common/usg/openmpi/1.4.1/gnu/bin/mpirun");
+        }
+        else
+        {
+            @parcmd = ("mpirun");
+        }
+        if ($debug_totalview eq $exe_name)
+        {
+            push @parcmd, "-tv";
+            if (!(scalar(@debug_totalview_args) == 0))
+            {
+                $ENV{TOTALVIEW} = "totalview @debug_totalview_args" if not exists $ENV{TOTALVIEW};
+            }
+        }
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-np", $procs if $procs_set;
+        push @parcmd, "-p",  $part  if $part_set;
+        push @parcmd, "-machinefile", $machinefile if $machinefile_set;
+        push @parcmd,
+             generate_args_valgrind(@debug_valgrind_args) if $debug_valgrind;
+        push @parcmd, @visitcmd;
+        push @parcmd, "-plugindir";
+        push @parcmd, "$ENV{VISITPLUGINDIR}";
+        push @parcmd, "-visithome";
+        push @parcmd, "$ENV{VISITHOME}";
+        push @parcmd, "-visitarchhome";
+        push @parcmd, "$ENV{VISITARCHHOME}";
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # aprun
+    elsif ($launch eq "aprun")
+    {
+        @parcmd = ("aprun");
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-n", $procs if $procs_set;
+        push @parcmd, @visitcmd;
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # dmpirun
+    elsif ($launch eq "dmpirun")
+    {
+        @parcmd = ("dmpirun");
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-np", $procs if $procs_set;
+        push @parcmd, "-p",  $part  if $part_set;
+        push @parcmd, @visitcmd;
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # poe
+    elsif ($launch eq "poe")
+    {
+        @parcmd = @visitcmd;
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-procs",  $procs if $procs_set;
+        push @parcmd, "-nodes",  $nodes if $nodes_set;
+        push @parcmd, "-rmpool", $part  if $part_set;
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # ibrun
+    elsif ($launch eq "ibrun")
+    {
+        my $is_big = `hostname –s`;
+        chomp $is_big;
+        if ($is_big eq "visbig")
+        {
+            @parcmd = ("ibrun");
+        }
+        else
+        {
+            @parcmd = ("ibrun", "tacc_affinity");
+        }
+        push @parcmd, @visitcmd;
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # prun
+    elsif ($launch eq "prun")
+    {
+        @parcmd = ("prun");
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-n",  $procs if $procs_set;
+        push @parcmd, "-N",  $nodes if $nodes_set;
+        push @parcmd, "-p",  $part  if $part_set;
+        push @parcmd, @visitcmd;
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # srun
+    elsif (substr($launch,0,4) eq "srun")
+    {
+        @parcmd = ("srun");
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-n",  $procs if $procs_set;
+        push @parcmd, "-N",  $nodes if $nodes_set;
+        push @parcmd, "-J",  $name  if $name_set;
+        push @parcmd, "-p",  $part  if $part_set;
+        push @parcmd, "-t",  $time  if $time_set;
+        #push @parcmd, "-b";  # Could be used for "batch mode"
+        push @parcmd, @visitcmd;
+
+        @printcmd = @parcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # psub
+    elsif (substr($launch,0,4) eq "psub")
+    {
+        ($psubcmd, $sublauncher) = split /\W+/, substr($launch,4);
+        $sublauncher = "" if (!defined $sublauncher);
+        $sublauncherargs = "";
+        $sublauncherargs = "$sublaunchargs $sublauncherargs" if $sublaunchargs_set;
+        if ($sublauncher eq "srun" and $procs_set)
+        {
+            $sublauncherargs = "$sublauncherargs -n $procs";
+        }
+        elsif ($sublauncher eq "mpirun" and $procs_set)
+        {
+            $sublauncherargs = "$sublauncherargs -np $procs";
+        }
+
+        if (grep(/csh/, "$ENV{SHELL}"))
+        {
+            $libpathcmd="setenv LIBPATH $ENV{LIBPATH} ; setenv LD_LIBRARY_PATH $ENV{LIBPATH}";
+            $limitcmd="limit coredumpsize 0";
+        }
+        else
+        {
+            $libpathcmd="LIBPATH=$ENV{LIBPATH} ; export LIBPATH ; LD_LIBRARY_PATH=$ENV{LIBPATH} ; export LD_LIBRARY_PATH";
+            $limitcmd="ulimit -c 0";
+        }
+        if ($security_key_set) { push @visitcmd, "-key", $security_key; }
+        push @visitcmd, @post_args;
+        @parcmd = ("psub");
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-x";
+        # Use both -g and -np to set procs if we have multiple processors
+        # per node.  On some machines the -np is used and the -g ignored
+        # and on others it is the opposite.
+        # Otherwise, syntax is not accepted, so use -ln.
+        if ($procs_set and $nodes_set)
+        {
+            push @parcmd, "-g",  $procs;
+            push @parcmd, "-np", $procs;
+            push @parcmd, "-ln", $nodes;
+        }
+        elsif ($procs_set)
+        {
+            push @parcmd, "-ln",  $procs;
+        }
+        push @sublaunchprecmd,  " ; "  if $sublaunchprecmd_set;
+        push @sublaunchpostcmd, " ; "  if $sublaunchpostcmd_set;
+
+        push @parcmd, "-r",  $name  if $name_set;
+        push @parcmd, "-c",  $part  if $part_set;
+        push @parcmd, "-b",  $bank  if $bank_set;
+        push @parcmd, "-tM", $time  if $time_set;
+        push @parcmd, "-expedite"   if $expedite_engine;
+        push @parcmd, "-i", "cd $cwd ; $limitcmd ; $libpathcmd ; ".
+                            " @sublaunchprecmd $sublauncher $sublauncherargs @visitcmd ; @sublaunchpostcmd";
+        @printcmd = @parcmd;
+        push @printcmd, ("\"".(pop @printcmd)."\"");
+    }
+    # salloc
+    elsif (substr($launch,0,6) eq "salloc")
+    {
+        @parcmd = ("salloc");
+        push @parcmd, "-p", $part  if $part_set;
+        push @parcmd, "-t", $time  if $time_set; 
+        push @parcmd, "-N", $nodes if $nodes_set;
+        push @parcmd, "-n", $procs if $procs_set;    
+        if ($nodes_set)
+        {
+           $ppn = ceil($procs / $nodes);
+           push @parcmd, "--ntasks-per-node=$ppn";
+        }
+        push @parcmd, "srun","-N1","-n1","--preserve-env","--mpi=none", "mpirun";
+
+        if ($nodes_set)
+        {
+           $ppn = ceil($procs / $nodes);
+           push @parcmd, "--npernode", $ppn;
+        }
+        push @parcmd, @visitcmd;
+        if ($security_key_set) { push @parcmd, "-key", $security_key; }
+        push @parcmd, @post_args;
+        @printcmd = @parcmd;
+        push @printcmd, ("\"".(pop @printcmd)."\"");
+    }
+    # sbatch
+    elsif (substr($launch,0,6) eq "sbatch")
+    {
+        @parcmd = ("sbatch");
+        push @parcmd, "--partition=$part" if $part_set;
+        push @parcmd, "--account=$bank" if $bank_set;
+        push @parcmd, "--time=$time" if $time_set;
+        push @parcmd, "--nodes=$nodes" if $nodes_set;
+        push @parcmd, "--ntasks=$procs" if $procs_set;
+        push @parcmd, @launchargs if $launchargs_set;
+
+        $ppn = 8;
+        if ($nodes_set)
+        {
+           $ppn = ceil($procs / $nodes);
+        }
+
+        ($sbatchcmd, $sublauncher) = split /\W+/, substr($launch,6);
+        $sublauncher = "" if (!defined $sublauncher);
+        if ($sublauncher eq "mpiexec")
+        {
+            @mpicmd = ("mpiexec");
+            push @mpicmd, @sublaunchargs if $sublaunchargs_set;
+            if ($IsRunningOnGlorySandia)
+            {
+                push @mpicmd, "--np", $procs;
+                push @mpicmd, "/apps/contrib/numa_wrapper-16ppn";
+            }
+            else
+            {
+                push @mpicmd, "--npernode", $ppn;
+                push @mpicmd, "numa_wrapper";
+                push @mpicmd, "--ppn", $ppn;
+            }
+            push @mpicmd, "@visitcmd";
+            if ($security_key_set) { push @mpicmd, "-key", $security_key; }
+            push @mpicmd, @post_args;
+        }
+        elsif ($sublauncher eq "aprun")
+        {
+            @mpicmd = ("aprun");
+            push @mpicmd, "-n", $procs;
+            push @mpicmd, @sublaunchargs if $sublaunchargs_set;
+            push @mpicmd, "@visitcmd";
+            if ($security_key_set) { push @mpicmd, "-key", $security_key; }
+            push @mpicmd, @post_args;
+        }
+        elsif ($sublauncher eq "")
+        {
+            @mpicmd = "@visitcmd";
+        }
+
+        chomp($tdate = `date | cut -c 12-19`);
+        chomp($tuser = `whoami`);
+        $script_dir="/tmp";
+        $tfilename = "$script_dir/visit.$tuser.$tdate";
+        $tfile_opened = 1;
+        open(TFILE, ">$tfilename") or $tfile_opened = 0;
+        if ($tfile_opened)
+        {
+            print TFILE "#!/bin/sh\n";
+            if ($IsRunningOnGlorySandia)
+            {
+                print TFILE "source /usr/share/modules/init/bash\n";
+                print TFILE "module purge\n";
+                print TFILE "module load mpi/openmpi-1.4.3_pgi-9.0-4\n";
+                print TFILE "module load compilers/gcc-4.3.4\n";
+            }
+            if ($IsRunningOnRedskySandia)
+            {
+                print TFILE "source /usr/share/Modules/init/bash\n";
+                print TFILE "module purge\n";
+                print TFILE "module load mpi/openmpi-1.4.3_oobpr_intel-11.1-f064-c064\n";
+            }
+            print TFILE $cdcmd;
+            print TFILE $limitcmd;
+            print TFILE "@sublaunchprecmd", "\n", if $sublaunchprecmd_set;
+            print TFILE "@mpicmd", "\n";
+            print TFILE "@sublaunchpostcmd", "\n", if $sublaunchpostcmd_set;
+            close(TFILE);
+        }
+
+        @printcmd = @parcmd;
+        push @parcmd, $tfilename;
+        push @printcmd, $cdcmd;
+        push @printcmd, $limitcmd;
+        push @printcmd, $libcmd;
+        push @printcmd, $ldlibcmd;
+        push @printcmd, $plugincmd;
+        push @printcmd, @sublaunchprecmd, "\n", if $sublaunchprecmd_set;
+        push @printcmd, @mpicmd;
+        push @printcmd, @sublaunchpostcmd, "\n", if $sublaunchpostcmd_set;
+        push @printcmd, ("\"".(pop @printcmd)."\"");
+    }
+    # bsub
+    elsif (substr($launch,0,4) eq "bsub")
+    {
+        ($bsubcmd, $sublauncher) = split /\W+/, substr($launch,4);
+        $sublauncher = "" if (!defined $sublauncher);
+        if ($security_key_set) { push @visitcmd, "-key", $security_key; }
+        push @visitcmd, @post_args;
+        @parcmd = ("bsub");
+        push @parcmd, "-I";
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-n",  $procs if $procs_set;
+        push @parcmd, "-q",  $part  if $part_set;
+        push @parcmd, "-W" , $time  if $time_set;
+        push @parcmd, $sublauncher;
+        push @parcmd, @sublaunchargs if $sublaunchargs_set;
+        push @parcmd, @visitcmd;
+        @printcmd = @parcmd;
+        push @printcmd, ("\"".(pop @printcmd)."\"");
+    }
+    # yod
+    elsif ($launch eq "yod")
+    {
+        @parcmd = ("/cougar/bin/yod");
+        push @parcmd, @launchargs if $launchargs_set;
+        push @parcmd, "-sz", $procs if $procs_set;
+        push @parcmd, @visitcmd;
+        push @parcmd, @post_args;
+
+        @printcmd = @parcmd;
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+    }
+    # qsub
+    elsif (substr($launch,0,4) eq "qsub" or substr($launch,0,4) eq "msub")
+    {
+        ($psubcmd, $sublauncher) = split /\W+/, substr($launch,4);
+        $plauncher = substr($launch,0,4);
+        $sublauncher = "" if (!defined $sublauncher);
+        chomp($tdate = `date | cut -c 12-19`);
+        chomp($tuser = `whoami`);
+        $script_dir="/tmp";
+        if ($IsRunningOnEureka_ANL)
+        {
+            $script_dir="/home/$tuser";
+        }
+        elsif ($IsRunningOnHopperNERSC)
+        {
+            $script_dir = $ENV{HOME};
+        }
+        $tdate =~ s/:/./g if ($IsRunningOnRanger_TACC);
+        $tfilename = "$script_dir/visit.$tuser.$tdate";
+        $tfile_opened = 1;
+        open(TFILE, ">$tfilename") or $tfile_opened = 0;
+        if ($tfile_opened)
+        {
+            if ($security_key_set) { push @visitcmd, "-key", $security_key; }
+            push @visitcmd, @post_args;
+
+            if ($IsRunningOnJaguar_ORNL)
+            {
+                # Need a location visible from compute nodes
+                $cdcmd     = "cd /lustre/widow1/scratch/$ENV{USER}\n";
+            }
+            elsif ($IsRunningOnKraken_UTK)
+            {
+                # Need a location visible from compute nodes
+                $cdcmd     = "cd /lustre/scratch/$ENV{USER}\n";
+            }
+            else
+            {
+                $cdcmd     = "cd $cwd\n";
+            }
+            $limitcmd  = "ulimit -c 0\n";
+
+            if ($sublauncher eq "mpiexec")
+            {
+                if ($IsRunningOnSaguaro_ASU)
+                {
+                    @mpicmd = ("/packages/gcc-openmpi-1.2.7/bin/mpiexec");
+                }
+                elsif ($IsRunningOnXchemLLNL)
+                {
+                    @mpicmd = ("/opt/mpiexec/bin/mpiexec");
+                }
+                else
+                {
+                    @mpicmd = ("mpiexec");
+                }
+                push @mpicmd, @sublaunchargs if $sublaunchargs_set;
+                push @mpicmd, "-n", $procs if $procs_set;
+                push @mpicmd, "-machinefile", $machinefile if $machinefile_set;
+                push @mpicmd, "@visitcmd\n";
+            }
+            elsif ($sublauncher eq "mpirun")
+            {
+                @mpicmd = ("mpirun");
+                push @mpicmd, @sublaunchargs if $sublaunchargs_set;
+                push @mpicmd, "-np", $procs if $procs_set;
+                push @mpicmd, "-machinefile", $machinefile if $machinefile_set;
+                push @mpicmd, generate_args_valgrind(@debug_valgrind_args)
+                              if $debug_valgrind;
+                push @mpicmd, "@visitcmd -plugindir $ENV{VISITPLUGINDIR}\n";
+            }
+            elsif ($sublauncher eq "srun")
+            {
+                @mpicmd = ("srun");
+                push @mpicmd, @sublaunchargs if $sublaunchargs_set;
+                push @mpicmd, "-n",  $procs if $procs_set;
+                push @mpicmd, "@visitcmd\n";
+            }
+            elsif ($sublauncher eq "aprun")
+            {
+                @mpicmd = ("aprun");
+                push @mpicmd, @sublaunchargs if $sublaunchargs_set;
+                push @mpicmd, "-n",  $procs if $procs_set;
+                if ($nodes_set and $procs_set)
+                {
+                    $ppn = ceil($procs / $nodes);
+                    push @mpicmd, "-N",  $ppn;
+                }
+                if ( $IsRunningOnFranklinNERSC || $IsRunningOnJaguar_ORNL )
+                {
+                    push @mpicmd, "$visitbindir/env LD_LIBRARY_PATH=$visitlibdir:$visitarchdir/system_libs";
+                }
+                elsif ( $IsRunningOnKraken_UTK )
+                {
+                    push @mpicmd, "$visitsupportdir/bin/env LD_LIBRARY_PATH=$visitsupportdir/lib:$visitsupportdir/system_libs";
+                }
+                push @mpicmd, "@visitcmd\n";
+            }
+            elsif ($sublauncher eq "ibrun")
+            {
+                @mpicmd = ("ibrun");
+                push @mpicmd, "@visitcmd\n";
+            }
+            elsif ($sublauncher eq "")
+            {
+                @mpicmd = "@visitcmd\n";
+            }
+
+            print TFILE "#!/bin/sh\n";
+            if ($IsRunningOnLens_ORNL)
+            {
+                # Lens loads modules that we hate, by default.
+                print "NOTE I'm forcing a specific MPI implementation " .
+                      "which release versions of VisIt are known to be " .
+                      "compiled against.  If you are a *developer*, it's " .
+                      "very likely I've chosen the wrong MPI " .
+                      "implementation; you might have to hack " .
+                      "internallauncher to load the module you need.\n";
+                print TFILE 'eval $(modulecmd sh swap PE-pgi PE-gnu)',"\n";
+            }
+            if ($IsRunningOnKraken_UTK)
+            {
+                print TFILE 'eval $(modulecmd sh unload PrgEnv-pgi)',"\n";
+                print TFILE 'eval $(modulecmd sh load PrgEnv-gnu)',"\n";
+
+            }
+            if ($IsRunningOnJaguar_ORNL)
+            {
+                print TFILE 'eval $(modulecmd sh load PrgEnv-gnu)',"\n";
+            }
+            if ($IsRunningOnEureka_ANL)
+            {
+                print TFILE "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/mx/lib\n";
+            }
+            if ($IsRunningOnCieloLANL)
+            {
+                print TFILE "module swap PrgEnv-pgi PrgEnv-gnu\n";
+                print TFILE "module swap xt-mpt xt-mpich2\n";
+            }
+            if ($IsRunningOnRanger_TACC)
+            {
+                # put some SGE opts in the script header, since command-line opts fail
+                print TFILE "#\$ -V\n";  # inherit shell env
+                if ($time_set)
+                {
+                    print TFILE "#\$ -l h_rt=$time\n";
+                } else {
+                    # if no time set, put in something reasonable, since job won't launch without it
+                    if ($part eq "development")
+                    {print TFILE "#\$ -l h_rt=0:10:0\n";}
+                    else 
+                    {print TFILE "#\$ -l h_rt=1:0:0\n";}
+                }            
+
+                # get correct module environmnet for Ranger/Spur
+                print TFILE "module purge\n";
+                print TFILE "module load TACC\n";
+                print TFILE "module delete pgi mvapich CTSSV4\n";
+                print TFILE "module load intel mvapich\n";
+                if ($IsRunningOnSpur_TACC) {
+                    # Spur has GPUs and a usable GL stack
+                    print TFILE "module load vis visit\n";
+                } else {
+                    # Ranger has no GPUs or GL stack, so load Mesa
+                    print TFILE "module load vis mesa visit\n";
+                }
+
+                # cache the binary on each node so lustre doesn't get hammered for large jobs
+                $pwd = getcwd();
+                if (!$pwd)
+                {
+                    $pwd = `pwd`;
+                }
+                chomp $pwd;
+                print TFILE "cache_binary $pwd $visitbindir/engine_par\n";
+            }
+            print TFILE $cdcmd;
+            print TFILE $limitcmd;
+            if ($IsRunningOnHopperNERSC)
+            {
+                print TFILE "MOM_HOST=\`hostname\`\n";
+                print TFILE "$visitbindir/visit_socket_relay $loginnodehost $loginnodeport > $tfilename.port\n";
+                print TFILE "MOM_PORT=\`cat $tfilename.port\`\n";
+                print TFILE "rm $tfilename.port\n";
+
+                print TFILE 'eval $(modulecmd sh unload xt-shmem)',"\n";
+                print TFILE "export CRAY_ROOTFS=DSL\n";
+            }
+            print TFILE "@sublaunchprecmd", "\n", if $sublaunchprecmd_set;
+            print TFILE "@mpicmd";
+            print TFILE "@sublaunchpostcmd", "\n", if $sublaunchpostcmd_set;
+            close(TFILE);
+
+            if ($IsRunningOnEureka_ANL)
+            {
+                `chmod 755 $tfilename`;
+            }
+            @parcmd = ($plauncher);
+            if ($IsRunningOnRanger_TACC)
+            {
+                # full path to qsub hack until TACC non-interactive shells work correctly
+                $tqsubname = "$script_dir/tacc_qsub.$tuser.$tdate";
+                $tqsub_opened = 1;
+                open(TQSUB, ">$tqsubname") or $tqsub_opened = 0;
+                if ($tqsub_opened) {
+                    print TQSUB "#!/bin/bash -l\n";
+                    print TQSUB "qsub \$@\n";
+                    close(TQSUB);
+                    `chmod 755 $tqsubname`;
+
+                    @parcmd = ("$tqsubname") if ($plauncher eq "qsub");
+                }
+                else
+                {
+                    print STDERR "Could not create temporary qsub (\"$tqsubname\").\n";
+                    exit 1;
+                }
+            }
+
+            # Dump the standard error and standard output to /dev/null if
+            # the user does not have write permission in the current directory.
+            if (! -w $cwd)
+            {
+                print "\n                                WARNING:\n";
+                print "The directory you started VisIt in does ";
+                print "not have write permission. Using\n";
+                print "/dev/null for the batch job standard error and ";
+                print "standard output streams.\n\n";
+                push @parcmd, "-e", "/dev/null", "-o", "/dev/null";
+            }
+
+            # Add the env variables.
+            if (! $IsRunningOnRanger_TACC)
+            {
+                push @parcmd, "-v LIBPATH=$ENV{LIBPATH},LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH},VISITHOME=$ENV{VISITHOME},VISITARCHHOME=$ENV{VISITARCHHOME},VISITPLUGINDIR=$ENV{VISITPLUGINDIR}";
+            }
+
+            # parse for '-l vis' so it can be separated from the
+            # launchargs
+            $use_vis = 0;
+            $newlaunchargs_set = 0; 
+            @newlaunchargs=();
+            while (scalar(@launchargs) > 0) {
+                $larg = shift @launchargs;
+                if ($larg eq "-l") {
+                    $nextarg = shift @launchargs;
+                    if ($nextarg eq "vis") {
+                        $use_vis = 1;
+                    } else {
+                        push @newlaunchargs, $larg;
+                        push @newlaunchargs, $nextarg;
+                        $newlaunchargs_set = 1;
+                    }
+                } else {
+                    push @newlaunchargs, $larg;
+                    $newlaunchargs_set = 1;
+                }
+            }
+            push @parcmd, @newlaunchargs if $newlaunchargs_set;
+            $nodes = $procs if (!$nodes_set);
+            $ppn = ceil($procs / $nodes);
+            if ($IsRunningOnRanger_TACC)
+            {
+                $thread_factor=16;
+                if ($IsRunningOnLonghorn_TACC)
+                {
+                   $thread_factor=8;
+                }
+                if ($IsRunningOnLonestar_TACC)
+                {
+                   $thread_factor=12;
+                }
+                if ($nodes_set) 
+                { $tacc_way = $ppn; $tacc_procs = $thread_factor*$nodes; }
+                # if nodes not set explicitly assume 1way
+                else 
+                { $tacc_way = 1; $tacc_procs = $thread_factor*$procs; }  
+                if ($tacc_way > $thread_factor) {
+                    print STDERR "TACC-hosted engine configured with $procs procs on $nodes nodes (${ppn}x).\n";
+                    print STDERR "Number of procs must be no more than ${thread_factor}x number of nodes.\n";
+                    exit(1);
+                }
+                push @parcmd, "-pe", "${tacc_way}way", $tacc_procs;
+            }
+            elsif ($IsRunningOnFranklinNERSC || $IsRunningOnHopperNERSC)
+            {
+                push @parcmd, "-d", "$cwd" if $wd_set;
+                if ($nodes_set) {
+                    if ($IsRunningOnFranklinNERSC) {
+                        $nprocpernode=4;
+                    } else {
+                        $nprocpernode=24;
+                    }
+                    $nwidth=$nprocpernode*$nodes;
+                    # If the number of nodes is set, we need to modify mppwidth to ensure
+                    # allocation of the proper number of nodes. The number of nodes allocated
+                    # is mppwidth divided by the number of cores per node (compare
+                    # http://www.nersc.gov/users/computational-systems/hopper/running-jobs/batch-jobs/).
+                    push @parcmd, "-l", "mppwidth=$nwidth";
+                }
+                else 
+                {
+                    # Number of nodes is not specified. We use all cores on each node and do not
+                    # need to modify mppdith to ensure the allocation of the appropriate number of
+                    # nodes.
+                    push @parcmd, "-l", "mppwidth=$procs";
+                }
+            }
+            elsif ($IsRunningOnJaguar_ORNL || $IsRunningOnKraken_UTK)
+            {
+                $qsubNumNodeStr = "size";
+                $asubPPNStr = "";
+                $qsubSeparator = "";
+                $nodes = $procs;
+                push @parcmd, "-l size=$procs";
+            }
+            elsif ($IsRunningOnNautilus_UTK)
+            {
+                $qsubNumNodeStr = "ncpus";
+                $asubPPNStr = "";
+                $qsubSeparator = "";
+                $nodes = $procs;
+                push @parcmd, "-l ncpus=$procs";
+            }
+            else
+            {
+                $qsubNumNodeStr = "nodes";
+                $qsubPPNStr = "ppn";
+                $qsubSeparator = ":";
+                if ( $IsRunningOnLens_ORNL ) {$qsubPPNStr = "ppn";}
+                if ( $use_vis ) { push @parcmd, "-l", "$qsubNumNodeStr=$nodes$qsubSeparator$qsubPPNStr=$ppn:vis";}
+                elsif ( $UsePPN ) { push @parcmd, "-l", "$qsubNumNodeStr=$nodes$qsubSeparator$qsubPPNStr=$ppn"; }
+                else { push @parcmd, "-l", "$qsubNumNodeStr=$nodes"; }
+            }
+
+            # command-line time fails on TACC machines, must be set in the TFILE, above
+            if (! $IsRunningOnRanger_TACC)
+            {
+                push @parcmd, "-l", "walltime=$time" if $time_set;
+            }
+
+            if ($UseTTC) { push @parcmd, "-l", "ttc=$procs"; }
+            push @parcmd, "-q",  $part  if $part_set;
+            if ($IsRunningOnLonghorn_TACC)
+            {
+                push @parcmd, "-P";
+                push @parcmd, "vis";
+            }
+            push @parcmd, "-A",  $bank  if $bank_set;
+      
+            @printcmd = @parcmd;
+            push @parcmd, $tfilename;
+            push @printcmd, $cdcmd;
+            push @printcmd, $limitcmd;
+            if ($IsRunningOnHopperNERSC)
+            {
+                push @printcmd, "MOM_HOST=\`hostname\`\n";
+                push @printcmd, "$visitbindir/visit_socket_relay $loginnodehost $loginnodeport > $tfilename.port\n";
+                push @printcmd, "MOM_PORT=\`cat $tfilename.port\`\n";
+                push @printcmd, "rm $tfilename.port\n";
+
+                push @printcmd, 'eval $(modulecmd sh unload xt-shmem)',"\n";
+                push @printcmd, "export CRAY_ROOTFS=DSL\n";
+            }
+            push @printcmd, $libcmd; 
+            push @printcmd, $ldlibcmd; 
+            push @printcmd, $plugincmd; 
+            push @printcmd, @sublaunchprecmd, "\n", if $sublaunchprecmd_set;
+            push @printcmd, @mpicmd; 
+            push @printcmd, @sublaunchpostcmd, "\n", if $sublaunchpostcmd_set;
+            push @printcmd, ("\"".(pop @printcmd)."\"");
+            if ( $IsRunningOnEureka_ANL ) {
+               @parcmd = "qsub";
+               push @parcmd, "-A",  $bank  if $bank_set;
+               push @parcmd, "-n";
+               push @parcmd, $nodes;
+               push @parcmd, "-t";
+               push @parcmd, $time;
+               push @parcmd, $tfilename;
+            }
+        }
+        else
+        {
+            print STDERR "To use qsub, launcher must create a temporary file.  Launch failed because launcher could not open file $tfilename\n";
+        }
+    }
+    else
+    {
+        print STDERR "Attempted an unsupported launch method (\"$launch\").\n";
+        exit 1;
+    }
+
+    if ($printonly)
+    {
+        print STDERR "RUN USING: @parcmd\n\n";
+        PrintEnvironment($os);
+        exit 0;
+    }
+    else
+    {
+        print STDERR "Running: @printcmd\n" if (! $quiet);
+        exec @parcmd or die "Can't launch using $launch: $!\n";
+    }
+}
+else
+{
+    if ($printonly)
+    {
+        if ($security_key_set) { push @visitcmd, "-key", $security_key; }
+        print STDERR "RUN USING: @visitcmd\n\n";
+        PrintEnvironment($os);
+        exit 0;
+    }
+    elsif ($debug_totalview eq $exe_name)
+    {
+        # Run totalview
+        @debugcmd = ("totalview", "$visitbindir/$exe_name", "-a", "-dograb");
+        if (!(scalar(@debug_totalview_args) == 0))
+        {
+            push @debugcmd, @debug_totalview_args;
+        }
+        push @debugcmd, @visitargs;
+        if ($security_key_set) { push @debugcmd, "-key", $security_key; }
+        print STDERR "Running: @debugcmd\n" if (! $quiet);
+        $exec_totalview_failed = 0;
+        exec @debugcmd or $exec_totalview_failed = 1;
+    }
+    elsif ($debug_valgrind eq $exe_name)
+    {
+        # Run valgrind
+        my @debugcmd = generate_args_valgrind(@debug_valgrind_args);
+        push @debugcmd, "$visitbindir/$exe_name", @visitargs;
+        if ($security_key_set) { push @debugcmd, "-key", $security_key; }
+        print STDERR "Running: @debugcmd\n" if (! $quiet);
+        exec @debugcmd or die "Could not execute $exe_name under valgrind\n";
+    }
+    elsif ($debug_strace eq $exe_name)
+    {
+        # Run strace with given args 
+        @debugcmd = ("strace");
+        if (!(scalar(@debug_strace_args) == 0))
+        {
+            push @debugcmd, @debug_strace_args;
+        }
+        else
+        {
+            push @debugcmd, "-ttt", "-T";
+        }
+        push @debugcmd, "$visitbindir/$exe_name", @visitargs;
+        if ($security_key_set) { push @debugcmd, "-key", $security_key; }
+        print STDERR "Running: @debugcmd\n" if (! $quiet);
+        exec @debugcmd or die "Could not execute $exe_name under strace\n";
+    }
+    elsif ($debug_gdb)
+    {
+        # Determine the name of the program. This is only necessary on
+        # MacOS X to make sure that we run the executable from its
+        # bundle directory so it gets events while we debug it.
+        $real_exe = $exe_name;
+        if($os eq "darwin" and ($exe_name eq "gui" or $exe_name eq "viewer" or $exe_name eq "xmledit" or $exe_name eq "silex"))
+        {
+            $real_exe = "$visitbindir/$exe_name";
+        }
+
+        $gdbfilename = "$exe_name$ver-gdbcommands";
+        $gdbfile_opened = 1;
+        open(GDBFILE, ">$gdbfilename") or $gdbfile_opened = 0;
+        if($gdbfile_opened)
+        {
+            # Write a GDB command file to run the desired VisIt component.
+            print GDBFILE "set environment LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}\n";
+            print GDBFILE "set environment LD_LIBRARY32_PATH=$ENV{LD_LIBRARY32_PATH}\n";
+            print GDBFILE "set environment LD_LIBRARYN32_PATH=$ENV{LD_LIBRARYN32_PATH}\n";
+            print GDBFILE "set environment LD_LIBRARY64_PATH=$ENV{LD_LIBRARY64_PATH}\n";
+            print GDBFILE "set environment LIBPATH=$ENV{LIBPATH}\n";
+            print GDBFILE "set environment VISITHOME=$ENV{VISITHOME}\n";
+            print GDBFILE "set environment VISITHELPHOME=$ENV{VISITHELPHOME}\n";
+            print GDBFILE "set environment VISITULTRAHOME=$ENV{VISITULTRAHOME}\n";
+            print GDBFILE "set environment VISITPLUGINDIR=$ENV{VISITPLUGINDIR}\n";
+            print GDBFILE "set environment PYTHONHOME=$ENV{PYTHONHOME}\n";
+            if($ENV{TRAP_FPE} ne "")
+            {
+                print GDBFILE "set environment TRAP_FPE=$ENV{TRAP_FPE}\n";
+            }
+            print GDBFILE "set environment MESA_GLX_FX=$ENV{MESA_GLX_FX}\n";
+            print GDBFILE "path $visitbindir\n";
+            if($os eq "darwin" and ($exe_name eq "gui" or $exe_name eq "viewer"))
+            {
+                print GDBFILE "file $real_exe\n";
+            }
+            else
+            {
+                print GDBFILE "file $visitbindir/$real_exe\n";
+            }
+            print GDBFILE "directory $ENV{VISITHOME}/common/Exceptions/Database\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/Exceptions/Pipeline\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/comm\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/state\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/misc\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/parser\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/proxybase\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/plugin\n";
+            print GDBFILE "directory $ENV{VISITHOME}/common/utility\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/DBAtts/MetaData\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/DBAtts/SIL\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Database/Database\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Database/Formats\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Database/Ghost\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Expressions/Abstract\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Expressions/Conditional\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Expressions/Derivations\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Expressions/General\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Expressions/Management\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Expressions/Math\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Expressions/MeshQuality\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Filters\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Math\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/MIR/Base\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/MIR/Tet\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/MIR/Zoo\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Pipeline/Data\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Pipeline/Pipeline\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Pipeline/AbstractFilters\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Pipeline/Sinks\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Pipeline/Sources\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Plotter\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Preprocessor\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/QtVisWindow\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Queries/Abstract\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Queries/Misc\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/Queries/Queries\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/View\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/VisWindow/Colleagues\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/VisWindow/Interactors\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/VisWindow/Proxies\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/VisWindow/Tools\n";
+            print GDBFILE "directory $ENV{VISITHOME}/avt/VisWindow/VisWindow\n";
+            if ($exe_name eq "engine_ser" or $exe_name eq "engine_par")
+            {
+                print GDBFILE "directory $ENV{VISITHOME}/engine/main\n";
+            }
+            print GDBFILE "directory $ENV{VISITHOME}/engine/proxy\n";
+            print GDBFILE "directory $ENV{VISITHOME}/engine/rpc\n";
+            if ($exe_name eq "gui")
+            {
+                print GDBFILE "directory $ENV{VISITHOME}/gui\n";
+            }
+            if ($exe_name eq "vcl")
+            {
+                print GDBFILE "directory $ENV{VISITHOME}/launcher/main\n";
+            }
+            print GDBFILE "directory $ENV{VISITHOME}/launcher/proxy\n";
+            print GDBFILE "directory $ENV{VISITHOME}/launcher/rpc\n";
+            if ($exe_name eq "mdserver")
+            {
+                print GDBFILE "directory $ENV{VISITHOME}/mdserver/main\n";
+            }
+            print GDBFILE "directory $ENV{VISITHOME}/mdserver/proxy\n";
+            print GDBFILE "directory $ENV{VISITHOME}/mdserver/rpc\n";
+            if ($exe_name eq "viewer")
+            {
+                print GDBFILE "directory $ENV{VISITHOME}/viewer/main\n";
+            }
+            print GDBFILE "directory $ENV{VISITHOME}/viewer/proxy\n";
+            print GDBFILE "directory $ENV{VISITHOME}/viewer/rpc\n";
+            if ($exe_name eq "cli")
+            {
+                print GDBFILE "directory $ENV{VISITHOME}/visitpy\n";
+            }
+            if ($exe_name eq "xmledit")
+            {
+                print GDBFILE "directory $ENV{VISITHOME}/tools/xml\n";
+                print GDBFILE "directory $ENV{VISITHOME}/tools/xmledit\n";
+            }
+            print GDBFILE "directory $ENV{VISITHOME}/visit_vtk/full\n";
+            print GDBFILE "directory $ENV{VISITHOME}/visit_vtk/lightweight\n";
+            print GDBFILE "directory $ENV{VISITHOME}/vtkqt\n";
+            print GDBFILE "directory $ENV{VISITHOME}/winutil\n";
+
+            if ($security_key_set)
+            {
+                print GDBFILE "set args @visitargs -dograb -key $security_key\n";
+            }
+            else
+            {
+                print GDBFILE "set args @visitargs -dograb \n";
+            }
+
+            print GDBFILE "set breakpoint pending on\n";
+            # Set up any breakpoints
+            if($#breakpoints eq -1)
+            {
+                # No breakpoints. Just run.
+                print GDBFILE "run\n";
+            }
+            else
+            {
+                foreach (@breakpoints)
+                {
+                    print GDBFILE "break $_\n";
+                }
+                print GDBFILE "run\n";
+            }
+            # Our gdb isn't interactive in this case, so default to giving a
+            # backtrace; that's what someone would want in 90% of the cases.
+            # If you really want to control gdb, use -xterm.
+            if(!$gdb_xterm)
+            {
+                print GDBFILE "bt full\n";
+            }
+            close GDBFILE;
+
+            # Run gdb directly
+            @debugcmd = ("gdb", "-q", $real_exe, "-x", $gdbfilename);
+            if($gdb_xterm)
+            {
+                # Run GDB under an xterm
+                $debugtitle = "\"Debug $real_exe\"";
+                @debugcmd = ("xterm", "-title", $debugtitle, "-e");
+                push @debugcmd, "gdb", "-q", $real_exe, "-x", $gdbfilename;
+            }
+
+            print STDERR "Running: @debugcmd\n" if (! $quiet);
+            $exec_gdb_failed = 0;
+            exec @debugcmd or $exec_gdb_failed = 1;
+            if($exec_gdb_failed)
+            {
+                print STDERR "Could not run $real_exe in the gdb debugger. Running VisIt normally.\n";
+                RunComponent($real_exe, $ver, $security_key_set, $security_key, @visitcmd);
+            }
+        }
+        else
+        {
+            print STDERR "Could not create GDB command file \"$gdbfilename\". Running VisIt normally.\n";
+            RunComponent($real_exe, $ver, $security_key_set, $security_key, @visitcmd);
+        }
+    }
+    else
+    {
+        @printcmd = ("$exe_name$ver", @visitargs);
+        chomp($printcmd[0] = `basename $printcmd[0]`);
+        print STDERR "Running: @printcmd\n" if (! $quiet);
+        if ($security_key_set) { push @visitcmd, "-key", $security_key; }
+
+        $launched = 0;
+        if($use_new_console)
+        {
+            if($os eq "darwin")
+            {
+                if($ENV{TERM_PROGRAM} eq "Apple_Terminal")
+                {
+                    push @newcmd, $visitlauncher;
+                    push @newcmd, "-$exe_name";
+                    if("$ver" ne "")
+                    {
+                        push @newcmd, "-v", "$ver";
+                    }
+                    splice @visitcmd, 0, 1, @newcmd;
+
+                    open(OSAHANDLE, "| osascript");
+                    print OSAHANDLE "tell application \"Terminal\"\n";
+                    print OSAHANDLE "activate\n";
+                    print OSAHANDLE "do script with command \"cd $ENV{PWD};@visitcmd; exit\"\n";
+                    print OSAHANDLE "end tell\n";
+                    close OSAHANDLE;
+
+                    $launched = 1;
+                }
+                elsif($ENV{TERM} eq "xterm" or $ENV{DISPLAY} ne undef)
+                {
+                    @tmpcmd = @visitcmd;
+                    @visitcmd = ("xterm", "-title", "VisIt $exe_name$ver", "-e");
+                    push @visitcmd, @tmpcmd;
+                }
+                else
+                {
+                    print STDERR "VisIt does not recognize your terminal application so it will ignore the -newconsole argument.\n";
+                }
+            }
+            else
+            {
+                push @newcmd, $visitlauncher;
+                push @newcmd, "-$exe_name";
+                if("$ver" ne "")
+                {
+                    push @newcmd, "-v", "$ver";
+                }
+                splice @visitcmd, 0, 1, @newcmd;
+
+                @tmpcmd = @visitcmd;
+
+                if (-x "/usr/local/anag")
+                {
+                    # HACK: Iconify cli xterm window for ANAG/APDEC users
+                    @visitcmd = ("xterm", "-iconic", "-title", "VisIt $exe_name$ver", "-e");
+                }
+                else
+                {
+                    @visitcmd = ("xterm", "-title", "VisIt $exe_name$ver", "-e");
+                }
+
+                push @visitcmd, @tmpcmd;
+            }
+        }
+
+        if(!$launched)
+        {
+            exec @visitcmd or die "Can't execute visit: $!\n";
+        }
+    }
+}
+
+sub RunComponent {
+   my $exe_name = shift;
+   my $ver = shift;
+   my $security_key_set = shift;
+   my $security_key = shift;
+   my @visitcmd = shift;
+
+   @printcmd = ("$exe_name$ver", @visitargs);
+   chomp($printcmd[0] = `basename $printcmd[0]`);
+   print STDERR "Running: @printcmd\n" if (! $quiet);
+   if ($security_key_set) { push @visitcmd, "-key", $security_key; }
+   exec @visitcmd or die "Can't execute visit: $!\n";
+}
+
+sub PrintEnvironment {
+    my $os = shift;
+    my $soext="so";
+    if ($os eq "darwin") { $soext="dylib"; }
+    if ($envonly)
+    {
+        if($os eq "darwin")
+        {
+        # We use DYLD_LIBRARY_PATH on the Mac for libsim.
+        print STDOUT <<"EOF"
+DYLD_LIBRARY_PATH=$ENV{DYLD_FALLBACK_LIBRARY_PATH}
+LIBPATH=$ENV{LIBPATH}
+VISITHOME=$ENV{VISITHOME}
+VISITARCHHOME=$ENV{VISITARCHHOME}
+VISITHELPHOME=$ENV{VISITHELPHOME}
+VISITULTRAHOME=$ENV{VISITULTRAHOME}
+VISITPLUGINDIR=$ENV{VISITPLUGINDIR}
+VISIT_MESA_LIB=$visitlibdir/libOSMesa.$soext
+PYTHONHOME=$ENV{PYTHONHOME}
+TRAP_FPE=$ENV{TRAP_FPE}
+MESA_GLX_FX=$ENV{MESA_GLX_FX}
+EOF
+        }
+        else
+        {
+        print STDOUT <<"EOF"
+LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}
+LD_LIBRARY32_PATH=$ENV{LD_LIBRARY32_PATH}
+LD_LIBRARYN32_PATH=$ENV{LD_LIBRARYN32_PATH}
+LD_LIBRARY64_PATH=$ENV{LD_LIBRARY64_PATH}
+LIBPATH=$ENV{LIBPATH}
+VISITHOME=$ENV{VISITHOME}
+VISITARCHHOME=$ENV{VISITARCHHOME}
+VISITHELPHOME=$ENV{VISITHELPHOME}
+VISITULTRAHOME=$ENV{VISITULTRAHOME}
+VISITPLUGINDIR=$ENV{VISITPLUGINDIR}
+VISIT_MESA_LIB=$visitlibdir/libOSMesa.$soext
+PYTHONHOME=$ENV{PYTHONHOME}
+TRAP_FPE=$ENV{TRAP_FPE}
+MESA_GLX_FX=$ENV{MESA_GLX_FX}
+EOF
+       }
+    }
+    elsif (grep(/csh/, "$ENV{SHELL}"))
+    {
+        print STDERR <<"EOF"
+Be sure to set your environment variables:
+    setenv LD_LIBRARY_PATH $ENV{LD_LIBRARY_PATH}
+    setenv LD_LIBRARY32_PATH $ENV{LD_LIBRARY32_PATH}
+    setenv LD_LIBRARYN32_PATH $ENV{LD_LIBRARYN32_PATH}
+    setenv LD_LIBRARY64_PATH $ENV{LD_LIBRARY64_PATH}
+    setenv LIBPATH $ENV{LIBPATH}
+    setenv VISITHOME $ENV{VISITHOME}
+    setenv VISITHELPHOME $ENV{VISITHELPHOME}
+    setenv VISITULTRAHOME $ENV{VISITULTRAHOME}
+    setenv VISITPLUGINDIR $ENV{VISITPLUGINDIR}
+    setenv VISIT_MESA_LIB $visitlibdir/libOSMesa.$soext
+    setenv PYTHONHOME $ENV{PYTHONHOME}
+    setenv TRAP_FPE $ENV{TRAP_FPE}
+    setenv MESA_GLX_FX $ENV{MESA_GLX_FX}
+EOF
+    }
+    else
+    {
+        print STDERR <<"EOF"
+Be sure to set your environment variables:
+    LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}
+    LD_LIBRARY32_PATH=$ENV{LD_LIBRARY32_PATH}
+    LD_LIBRARYN32_PATH=$ENV{LD_LIBRARYN32_PATH}
+    LD_LIBRARY64_PATH=$ENV{LD_LIBRARY64_PATH}
+    LIBPATH=$ENV{LIBPATH}
+    VISITHOME=$ENV{VISITHOME}
+    VISITHELPHOME=$ENV{VISITHELPHOME}
+    VISITULTRAHOME=$ENV{VISITULTRAHOME}
+    VISITPLUGINDIR=$ENV{VISITPLUGINDIR}
+    VISIT_MESA_LIB=$visitlibdir/libOSMesa.$soext
+    PYTHONHOME=$ENV{PYTHONHOME}
+    TRAP_FPE=$ENV{TRAP_FPE}
+    MESA_GLX_FX=$ENV{MESA_GLX_FX}
+EOF
+    }
+}
+
+sub IsAVisItComponentName {
+    use warnings::register;
+    my $theName = shift;
+    if    ($theName eq "mdserver")   { return 1; }
+    elsif ($theName eq "gui")        { return 1; }
+    elsif ($theName eq "engine_ser") { return 1; }
+    elsif ($theName eq "engine_par") { return 1; }
+    elsif ($theName eq "viewer")     { return 1; }
+    elsif ($theName eq "cli")        { return 1; }
+    elsif ($theName =~ m/engine*/i) {
+        warnings::warn("You passed in a string " . $theName . " which " .
+                       "you might have intended to be a VisIt component " .
+                       "name.  You probably meant 'engine_par' or " .
+                       "'engine_ser'!");
+    }
+    return 0;
+}
+
+=head1 Generates the valgrind part of the command line.  Sets up a
+       valgrind-friendly environment.
+
+=over
+=item arg1
+    Array which should contain the arguments to valgrind proper.
+=back
+=cut
+
+sub generate_args_valgrind {
+    my @args_vg = @_;
+
+    # setting this environment variable causes libstdc++ routines to free
+    # memory ASAP, instead of leaving it around in pools.  This helps valgrind
+    # properly detect leaks, at a performance cost.
+    $ENV{GLIBCXX_FORCE_NEW} = "1" if not exists $ENV{GLIBCXX_FORCE_NEW};
+
+    my $full_path_vg = `which valgrind`;
+    chomp($full_path_vg);
+    my @cmd = ("$full_path_vg");
+    if(scalar(@args_vg) != 0) {
+        push(@cmd, @args_vg);
+    } else {
+        push(@cmd, "--tool=memcheck", "--error-limit=no", "--num-callers=50");
+    }
+    return @cmd;
+}

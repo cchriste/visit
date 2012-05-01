@@ -1,0 +1,74 @@
+
+
+                       Installation instructions for VisIt
+                      =====================================
+
+This document contains instructions for installing VisIt on both Unix and
+Windows systems.  The Unix installation instructions are first followed
+by the Windows installation instructions.
+
+Unix and Mac OS X:
+
+1.  Run the visit-install script to install visit.  If you have built your
+    own visit binary distribution, you can find the visit-install script
+    in the svn_bin directory.  The visit-install script can create a new
+    distribution directory or update an existing distribution.  This is
+    handled automatically.
+
+        chmod 755 visit-install2_4_2
+        ./visit-install2_4_2 "version" "platform" "directory"
+
+    where
+
+        "version" will be 2.4.2 for the current distribution.
+
+        "platform" will be one of the following:  linux-rhel3, linux-rhel4,
+        linux-rhel5, linux-x86_64-rhel4, linux-x86_64-ubuntu8, linux-x86_64,
+        linux-x86_64-euclid, darwin-i386 or darwin-x86_64 depending on the
+        machine.  The one you use should match the name of the accompanying
+        distribution file.
+
+        "directory" is the directory you wish to install visit into.
+        If the directory doesn't exist the script will create it.
+
+    For example
+
+        chmod 755 visit-install2_4_2
+        ./visit-install2_4_2 2.4.2 linux-rhel3 /usr/local/visit
+
+    will install the linux-rhel3, 2.4.2 version of visit in the directory
+    "/usr/local/visit".  Note that you will need to have the file
+    "visit2_4_2.linux-rhel3.tar.gz" present in the current directory for this
+    to function properly.  You can install multiple binaries into the
+    same directory.  For example, you could then execute
+
+        chmod 755 visit-install2_4_2
+        ./visit-install2_4_2 2.4.2 darwin-i386 /usr/local/visit
+
+    to add a linux, 2.4.2 version of visit to the same directory.
+
+2.  Add the bin directory below the installation directory
+    (/usr/local/visit/bin in our example) to each user's search path.
+    The best way to do this is to add it to the user's .cshrc file.
+    The bin directory contains the visit script which starts VisIt.
+    It can be run on many machines.  The script determines the type of
+    machine it is running on and starts the appropriate executable.
+    If visit were installed in the directory "/usr/local/visit",
+    then the following commands would set your search path
+    appropriately.
+
+        cd
+        echo "set path = ($path /usr/local/visit/bin)" >> .cshrc
+
+    This completes the installation process for VisIt.
+
+3.  If you are installing VisIt on a Linux system with an NVidia graphics
+    card, we recommend using the latest driver.
+
+Windows:
+
+1.  Copy the file visit2.4.2.exe to your desktop.
+
+2.  Double click on the visit2.4.2.exe icon to run the installer.
+
+3.  Follow the directions provided by the installer.

@@ -1,0 +1,170 @@
+#!/bin/sh
+#
+#  Script: nersc_username_to_email
+#
+#  Purpose: 
+#     This script is used by our regression suite to send e-mails to developers 
+#     where there are failures.
+# 
+#  Note:  You should use your NERSC username and your normal e-mail adress.
+#
+#  Modifications:
+#
+#    Hank Childs, Mon Feb 25 11:18:06 PST 2008
+#    Added modifications log.  Also removed developers shelly, mblair, and 
+#    tarwater.
+#
+#    Hank Childs, Mon Feb 25 14:08:56 PST 2008
+#    Add back previous developers.
+#
+#    Randy Hudson, Wed Feb 27 12:05:00 CST 2008
+#    Add case for me (userid "rhudson").
+#
+#    John C. Anderson, Thu Sep 11 12:27:08 PDT 2008
+#    Added case for userid "jcanders".
+#
+#    Dave Semeraro, Tuesday December 9 13:26:45 CST 2008
+#    Added case for userid "semeraro".
+#
+#    Paul Navratil, Wednesday April 22 14:12:00 CST 2009
+#    Added case for userid "pnav".
+#
+#    Hank Childs, Wed Jun 10 09:59:48 PDT 2009
+#    Switch myself to my gmail account.
+#
+#    Marc Durant, Tue Feb 23 16:44:46 MST 2010
+#    Added case for userid "mdurant".
+#    
+#    Hari Krishnan, Fri Jan 21 15:50:55 PST 2011
+#    Added case for userid "hkrishna".
+#
+#    Hank Childs, Mon Jan 31 07:45:07 PST 2011
+#    Switch myself to hchilds@lbl.gov, add loring and allens.
+#
+#    Eric Brugger, Tue Apr 12 09:31:45 PDT 2011
+#    Added case for userid "oruebel".
+#
+#    Mark C. Miller, Mon Apr 18 11:08:07 PDT 2011
+#    Removed Tom Treadway
+#
+#    Hank Childs, Tue Aug 30 21:41:54 PDT 2011
+#    Add Iuri Prilepov.
+#
+#    Eric Brugger, Wed Jan  4 10:54:28 PST 2012
+#    I modified the script to return visit-core-support@elist.ornl.gov
+#    if the name is not in the list.
+#
+# *****************************************************************************
+
+
+case $1 in
+    # Sean Ahern, Oak Ridge National Laboratory
+    "ahern")
+        emaddr=ahern@ornl.gov
+        ;;
+    # Jeremy Meredith, Oak Ridge National Laboratory
+    "js9")
+        emaddr=jsmeredith@ornl.gov
+        ;;
+    # Hank Childs, Lawrence Berkeley National Laboratory
+    "hrchilds")
+        emaddr=hchilds@lbl.gov
+        ;;
+    # Mark Miller, Lawrence Livermore National Laboratory
+    "miller86")
+        emaddr=miller86@llnl.gov
+        ;;
+    # Brad Whitlock, Lawrence Livermore National Laboratory
+    "whitlocb")
+        emaddr=whitlock2@llnl.gov
+        ;;
+    # Cyrus Harrison, Lawrence Livermore National Laboratory
+    "cyrush")
+        emaddr=harrison37@llnl.gov
+        ;;
+    # David Bremer, Lawrence Livermore National Laboratory
+    "dbremer")
+        emaddr=bremer4@llnl.gov
+        ;;
+    # Gunther Weber, Lawrence Berkeley National Laboratory
+    "ghweber")
+        emaddr=ghweber@lbl.gov
+        ;;
+    # Kathleen Bonnell, Lawrence Livermore National Laboratory
+    "bonnell")
+        emaddr=bonnell2@llnl.gov
+        ;;
+    # Eric Brugger, Lawrence Livermore National Laboratory
+    "brugger")
+        emaddr=brugger1@llnl.gov
+        ;;
+    # Tom Fogal, University of New Hampshire / University of Utah
+    "fogal1")
+        emaddr=tfogal@sci.utah.edu
+        ;;
+    # Dave Pugmire, Oak Ridge National Laboratory
+    "pugmire")
+        emaddr=pugmire@ornl.gov
+        ;;
+    # Josh Stratton, formerly of the SCI institute
+    "stratton")
+        emaddr=strattonbrazil@gmail.com
+        ;;
+    # Randy Hudson, University of Chicago, Argonne National Laboratory
+    "rhudson")
+        emaddr=hudson@mcs.anl.gov
+        ;;
+    # David Camp, Lawrence Berkeley National Laboratory
+    "camp")
+        emaddr=dcamp@lbl.gov
+        ;;
+    # Dave Semeraro, NCSA / University of Illinois
+    "semeraro")
+        emaddr=semeraro@ncsa.uiuc.edu
+        ;;
+    # Paul Navratil, TACC / University of Texas
+    "pnav")
+        emaddr=pnav@tacc.utexas.edu
+        ;;
+    # Marc Durant, Tech-X Corp
+    "mdurant")
+        emaddr=mdurant@txcorp.com
+        ;;
+    # Harinarayan(Hari) Krishnan, Lawrence Berkeley National Laboratory
+    "hkrishna")
+        emaddr=hkrishnan@lbl.gov
+        ;;
+    # Rich Cook, Lawrence Livermore National Laboratory
+    "cook47")
+        emaddr=rcook@llnl.gov
+        ;;
+    # Burlen Loring, Lawrence Berkeley National Laboratory
+    "loring")
+        emaddr=bloring@lbl.gov
+        ;;
+    # Allen Sanderson, University of Utah
+    "allens")
+        emaddr=allen@sci.utah.edu
+        ;;
+    # Oliver Ruebel, Lawrence Berkeley National Laboratory
+    "oruebel")
+        emaddr=oruebel@lbl.gov
+        ;;
+    # Iuri Prilepov, UC Davis & Lawrence Berkeley
+    "iuri")
+        emaddr=iprilepov@lbl.gov
+        ;;
+    *)
+        emaddr=visit-core-support@elist.ornl.gov
+        ;;
+esac
+
+### Previous developers: *****************************************************
+##
+## shelly = Shelly Prevost, formerly of Lawrence Livermore National Laboratory
+## tarwater = Ellen Tarwater, Lawrence Livermore National Laboratory
+## mblair = Mark Blair, Lawrence Livermore National Laboratory
+##
+## ***************************************************************************
+
+echo $emaddr

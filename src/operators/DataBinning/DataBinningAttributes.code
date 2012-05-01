@@ -1,0 +1,203 @@
+Function: CopyAttributes
+Declaration: virtual bool CopyAttributes(const AttributeGroup *);
+Definition:
+// ****************************************************************************
+// Method: DataBinningAttributes::CopyAttributes
+//
+// Purpose: 
+//   CopyAttributes method for the DataBinningAttributes class.
+//
+// Note:       Copies over expressions as well
+//
+// Programmer: Hank Childs
+// Creation:   August 31, 2010
+//
+// ****************************************************************************
+
+bool
+DataBinningAttributes::CopyAttributes(const AttributeGroup *atts)
+{
+    bool retval = false;
+
+    if(TypeName() == atts->TypeName())
+    {
+        // Call assignment operator.
+        const DataBinningAttributes *tmp = (const DataBinningAttributes *)atts;
+        *this = *tmp;
+        retval = true;
+    }
+    else if(atts->TypeName() == "Expression")
+    {
+        Expression *exp = (Expression *)atts;
+        if (strstr(exp->GetName().c_str(), "operators/DataBinning/1D") != NULL)
+        {
+            SetNumDimensions(One);
+            retval = true;
+        }
+        else if (strstr(exp->GetName().c_str(), "operators/DataBinning/2D") != NULL)
+        {
+            SetNumDimensions(Two);
+            retval = true;
+        }
+        else if (strstr(exp->GetName().c_str(), "operators/DataBinning/3D") != NULL)
+        {
+            SetNumDimensions(Three);
+            retval = true;
+        }
+    }
+
+    return retval;
+}
+
+Function: CreateConstructionAtts
+Declaration: ConstructDataBinningAttributes CreateConstructionAtts(void);
+Definition:
+// **************************************************************
+//  Method: DataBinningAttributes::CreateConstructionAtts
+//
+//  Purpose:
+//      Creates attributes of type ConstructDataBinningAtts.
+//
+//  Programmer: Hank Childs
+//  Creation:   August 19, 2010
+//
+// **************************************************************
+
+ConstructDataBinningAttributes
+DataBinningAttributes::CreateConstructionAtts(void)
+{
+    ConstructDataBinningAttributes dba;
+    static int times = 0;
+    char name[1024];
+    sprintf(name, "_db_op_%d", times++);
+    dba.SetName(name);
+    stringVector varnames;
+    doubleVector range;
+    intVector    numBins;
+    std::vector<unsigned char> binType;
+    varnames.push_back(dim1Var);
+    range.push_back(dim1MinRange);
+    range.push_back(dim1MaxRange);
+    numBins.push_back(dim1NumBins);
+    switch (dim1BinBasedOn)
+    {
+      case X:
+        binType.push_back(ConstructDataBinningAttributes::X);
+        break;
+      case Y:
+        binType.push_back(ConstructDataBinningAttributes::Y);
+        break;
+      case Z:
+        binType.push_back(ConstructDataBinningAttributes::Z);
+        break;
+      case Variable:
+        binType.push_back(ConstructDataBinningAttributes::Variable);
+        break;
+    }
+    if (numDimensions == Two || numDimensions == Three)
+    {
+        varnames.push_back(dim2Var);
+        range.push_back(dim2MinRange);
+        range.push_back(dim2MaxRange);
+        numBins.push_back(dim2NumBins);
+        switch (dim2BinBasedOn)
+        {
+          case X:
+            binType.push_back(ConstructDataBinningAttributes::X);
+            break;
+          case Y:
+            binType.push_back(ConstructDataBinningAttributes::Y);
+            break;
+          case Z:
+            binType.push_back(ConstructDataBinningAttributes::Z);
+            break;
+          case Variable:
+            binType.push_back(ConstructDataBinningAttributes::Variable);
+            break;
+        }
+    }
+    if (numDimensions == Three)
+    {
+        varnames.push_back(dim3Var);
+        range.push_back(dim3MinRange);
+        range.push_back(dim3MaxRange);
+        numBins.push_back(dim3NumBins);
+        switch (dim3BinBasedOn)
+        {
+          case X:
+            binType.push_back(ConstructDataBinningAttributes::X);
+            break;
+          case Y:
+            binType.push_back(ConstructDataBinningAttributes::Y);
+            break;
+          case Z:
+            binType.push_back(ConstructDataBinningAttributes::Z);
+            break;
+          case Variable:
+            binType.push_back(ConstructDataBinningAttributes::Variable);
+            break;
+        }
+    }
+    dba.SetVarnames(varnames);
+    dba.SetBinBoundaries(range);
+    dba.SetNumBins(numBins);
+    dba.SetReductionOperator((ConstructDataBinningAttributes::ReductionOperator) reductionOperator);
+    dba.SetVarForReductionOperator(varForReduction);
+    dba.SetUndefinedValue(emptyVal);
+    dba.SetOverTime(false);
+    dba.SetOutOfBoundsBehavior((ConstructDataBinningAttributes::OutOfBoundsBehavior) outOfBoundsBehavior);
+    dba.SetBinType(binType);
+    
+    return dba;
+}
+
+Target: xml2info
+Function: DataBinningCommonPluginInfo::GetCreatedExpressions
+Declaration: virtual ExpressionList *GetCreatedExpressions(const avtDatabaseMetaData *);
+Definition:
+
+ExpressionList *
+DataBinningCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md)
+{
+    char name[1024];
+    char defn[1024];
+    ExpressionList *el = new ExpressionList;
+
+    for (int i = 0 ; i < md->GetNumMeshes() ; i++)
+    {
+        const char *mesh = md->GetMeshes(i).name.c_str();
+
+        Expression e2; 
+        sprintf(name, "operators/DataBinning/1D/%s", mesh);
+        e2.SetName(name);
+        e2.SetType(Expression::CurveMeshVar);
+        e2.SetFromOperator(true);
+        e2.SetOperatorName("DataBinning");
+        sprintf(defn, "cell_constant(%s, 0)", mesh);
+        e2.SetDefinition(defn);
+        el->AddExpressions(e2);
+    
+        Expression e; 
+        sprintf(name, "operators/DataBinning/2D/%s", mesh);
+        e.SetName(name);
+        e.SetType(Expression::ScalarMeshVar);
+        e.SetFromOperator(true);
+        e.SetOperatorName("DataBinning");
+        sprintf(defn, "cell_constant(%s, 0)", mesh);
+        e.SetDefinition(defn);
+        el->AddExpressions(e);
+    
+        Expression e3; 
+        sprintf(name, "operators/DataBinning/3D/%s", mesh);
+        e3.SetName(name);
+        e3.SetType(Expression::ScalarMeshVar);
+        e3.SetFromOperator(true);
+        e3.SetOperatorName("DataBinning");
+        sprintf(defn, "cell_constant(%s, 0)", mesh);
+        e3.SetDefinition(defn);
+        el->AddExpressions(e3);
+    }
+   
+    return el;
+}
+

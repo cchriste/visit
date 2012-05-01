@@ -1,0 +1,349 @@
+#!/bin/sh
+#-----------------------------------------------------------------------
+#
+# VISIT-BUILD-CLOSED - Build the visit distributions on the closed
+#                      network.
+#
+# Author: Eric Brugger
+# Date:   February 12, 2001
+#
+# Usage:
+#    visit-build-closed -d <distribution>
+#
+#
+# Modifications:
+#
+#   Hank Childs, Mon Oct 15 09:04:12 PDT 2007
+#   Add some print statements for usability.
+#
+#   Hank Childs, Thu Oct 18 15:40:05 PDT 2007
+#   Add ksh support for sunset.
+#
+#   Hank Childs, Mon Oct 22 09:25:47 PDT 2007
+#   More ksh support for sunset.
+#
+#   Hank Childs, Sat Feb  9 14:18:54 PST 2008
+#   Change clearcase_bin to svn_bin.
+#
+#   Eric Brugger, Mon Apr  7 13:51:23 PDT 2008
+#   Removed sc build.
+#
+#   Brad Whitlock, Tue Dec  2 13:49:50 PST 2008
+#   Add --prefix for Linux targets so we can use -rpath for the engine
+#   wrapper library. I commented out sunset since Qt4 does not build
+#   there.
+#
+#   Eric Brugger, Fri Nov  5 15:39:05 PDT 2010
+#   Replaced hopi with inca and removed pruple.
+#
+#   Eric Brugger, Wed Jan  5 09:39:22 PST 2011
+#   Added terminator.
+#
+#   Cyrus Harrison, Tue Jan 11 11:42:58 PST 2011
+#   Pass types on command line for cmake vars:
+#      CMAKE_BUILD_TYPE & VISIT_THIRD_PARTY_INSTALL
+#
+#   Eric Brugger, Fri Mar 25 10:20:22 PDT 2011
+#   Added cielo.
+#
+#   Eric Brugger, Tue Jun 21 15:06:05 PDT 2011
+#   I removed the code to swap out the xt-mpt module with the xt-mpich2
+#   module on cielo since the xt-mpich2 module was now the default.
+#
+#-----------------------------------------------------------------------
+
+test=no
+
+user=`whoami`
+
+#
+# Parse the execute line, providing default values for error checking.
+#
+termite=true
+terminator=false
+inca=true
+cielo=true
+
+dist=undefined
+
+#
+# The loop is executed once for each symbol on the execute line.  This means
+# that $1 may be blank for later executions of the loop if any "shift 2"
+# commands are executed.  The variable abc is not used in the loop.  
+#
+for abc
+do
+   case $1 in
+      -none)
+         termite=false
+         terminator=false
+         inca=false
+         cielo=false
+         shift
+         ;;
+      -termite)
+         termite=false
+         shift
+         ;;
+      +termite)
+         termite=true
+         shift
+         ;;
+      -terminator)
+         terminator=false
+         shift
+         ;;
+      +terminator)
+         terminator=true
+         shift
+         ;;
+      -inca)
+         inca=false
+         shift
+         ;;
+      +inca)
+         inca=true
+         shift
+         ;;
+      -cielo)
+         cielo=false
+         shift
+         ;;
+      +cielo)
+         cielo=true
+         shift
+         ;;
+      -d)
+         dist=$2
+         shift 2
+         ;;
+   esac
+done
+
+#
+# Check that the distribution name was provided.
+#
+if [ $dist = undefined ]
+then
+   echo "Usage: [-none] [-<machine name>] -d <distribution>"
+   echo "Valid machine names:"
+   echo "    termite (B-Div, Linux),"
+   echo "    terminator (B-Div, Linux),"
+   echo "    inca (LC, x86_64)"
+   echo "    cielo (LANL, x86_64)"
+   exit
+fi
+
+#
+# Check that the distribution exists.
+#
+distfile=$dist.tar.gz
+if [ ! -f $distfile ]
+then
+   echo "Distribution file doesn't exist."
+   exit
+fi
+
+#
+# Build on termite.
+#
+rm -f termite
+cat <<EOF > termite
+#!/bin/sh
+if test ! -e termite ; then
+   mkdir termite
+fi
+rm -rf termite/visitbuild
+mkdir termite/visitbuild
+mv termite_$dist.tar.gz termite/visitbuild/$dist.tar.gz
+cd termite/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/misc/gapps/visit/cmake/2.8.3/linux-i686_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 4 >> ../../buildlog 2>&1
+make package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-intel.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on termite"      > resultlog 2>&1
+echo "       ---------------------------"     >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+ 
+if [ $termite = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on termite"
+      scp -P 22 termite termite:termite_buildit
+      scp -P 22 $dist.tar.gz termite:termite_$dist.tar.gz
+      ssh -p 22 termite "chmod 750 termite_buildit;./termite_buildit" &
+   fi
+fi
+
+#
+# Build on terminator.
+#
+rm -f terminator
+cat <<EOF > terminator
+#!/bin/sh
+if test ! -e terminator ; then
+   mkdir terminator
+fi
+rm -rf terminator/visitbuild
+mkdir terminator/visitbuild
+mv terminator_$dist.tar.gz terminator/visitbuild/$dist.tar.gz
+cd terminator/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/misc/gapps/visit/cmake/2.8.3/linux-i686_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 4 >> ../../buildlog 2>&1
+make package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-intel.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on terminator"   > resultlog 2>&1
+echo "       ------------------------------"  >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+ 
+if [ $terminator = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on terminator"
+      scp -P 22 terminator terminator:terminator_buildit
+      scp -P 22 $dist.tar.gz terminator:terminator_$dist.tar.gz
+      ssh -p 22 terminator "chmod 750 terminator_buildit;./terminator_buildit" &
+   fi
+fi
+
+#
+# Build on inca.
+#
+rm -f inca
+cat <<EOF > inca
+#!/bin/sh
+XLOCALEDIR=/usr/lib/X11/locale
+PATH=/usr/bin/X11:\$PATH
+if test ! -d /usr/tmp/$user ; then
+   mkdir /usr/tmp/$user
+fi
+if test ! -d /usr/tmp/$user/inca ; then
+   mkdir /usr/tmp/$user/inca
+fi
+rm -rf /usr/tmp/$user/inca/visitbuild
+mkdir /usr/tmp/$user/inca/visitbuild
+mv inca_$dist.tar.gz /usr/tmp/$user/inca/visitbuild/$dist.tar.gz
+cd /usr/tmp/$user/inca/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/usr/gapps/visit/cmake/2.8.3/linux-x86_64_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 6 >> ../../buildlog 2>&1
+make -j 6 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on inca"         > resultlog 2>&1
+echo "       ------------------------"        >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $inca = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on inca"
+      scp inca inca3:inca_buildit
+      scp $dist.tar.gz inca3:inca_$dist.tar.gz
+      ssh inca3 "chmod 750 inca_buildit;./inca_buildit" &
+   fi
+fi
+
+#
+# Build on cielo.
+#
+rm -f cielo
+cat <<EOF > cielo
+#!/bin/sh
+if test ! -d /tmp/$user ; then
+   mkdir /tmp/$user
+fi
+if test ! -d /tmp/$user/cielo ; then
+   mkdir /tmp/$user/cielo
+fi
+rm -rf /tmp/$user/cielo/visitbuild
+mkdir /tmp/$user/cielo/visitbuild
+mv cielo_$dist.tar.gz /tmp/$user/cielo/visitbuild/$dist.tar.gz
+cd /tmp/$user/cielo/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/usr/projects/views/visit/cmake/2.8.3/linux-x86_64_gcc-4.5/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 6 >> ../../buildlog 2>&1
+make -j 6 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on cielo"        > resultlog 2>&1
+echo "       -------------------------"       >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $cielo = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on cielo"
+      scp cielo red-fta05.lanl.gov:cielo_buildit
+      scp $dist.tar.gz red-fta05.lanl.gov:cielo_$dist.tar.gz
+      ssh red-fta05.lanl.gov "ssh ci-fe2 'chmod 750 cielo_buildit;module swap PrgEnv-pgi PrgEnv-gnu;./cielo_buildit'" &
+   fi
+fi
+
+#
+# Clean up.
+#
+if [ $test = no ]
+then
+   rm -f termite terminator inca cielo
+fi

@@ -1,0 +1,47 @@
+The files in this directory are used to manage merges between branches.
+You should only modify these files if you *really* know what you are doing.
+
+Here's a brief synopsis of the process:
+
+This directory contains two files: Rev_fromTrunk and Rev_toTrunk. Inside 
+of the trunk, the values of these two files are always the same. They are
+placed inside the trunk so that a "svn cp" command, to make a branch, will
+guarantee that the branch contains these key files.
+On branches, the contents of these files can differ. These files simply 
+contain a revision number. Each time a merge script is executed, 
+it updates the revision number.
+
+Consider the following example. The trunk is at revision 923. Branch1 and 
+Branch2 are created from revision 923. Branch3 is later created at revision 
+940. (Since no one merged into the trunk, the original directory structure of 
+Branch3 will be identical to that of Branch1 and Branch2.) Work happens on all 
+three branches. Branch1 gets up to revision 960, Branch2 gets to 970 and 
+Branch3 to 980.
+
+The developer of Branch2 decides to merge. So the script merge_branch_to_trunk 
+is called. The script knows that it needs to merge from revision 923->, 
+since it spawned from a 923 version of the trunk. At the end, the Branch2 
+file of "Rev_toTrunk" is updated to contain 981, the current revision number. 
+Rev_fromTrunk and Rev_toTrunk are also updated to be 981 on the trunk.
+
+Now the tricky part, additional branch work. If the developer of Branch1 wants 
+to merge in the latest version of the trunk, that developer would call 
+"merge_trunk_to_branch". That script would merge versions 923-981 onto 
+Branch1. At the end, the file "Rev_fromTrunk" would be updated to 981 
+(or maybe 982). Then, the developer would call "merge_branch_to_trunk". 
+Because the value of "Rev_toTrunk" is still 923, it will merge all of its 
+changes from 923 to 981. The new revision on the trunk would be 983 and the 
+trunk would be update so that its "Rev_fromTrunk" and "Rev_toTrunk" 
+would both contain 983. Branch1's "Rev_toTrunk" would also be updated with 983.
+
+When Branch3 is ready to go, it follows the same pattern. Merging in from the 
+trunk would bring in revisions 940-983, since that branch was created at 
+revision 940.
+
+
+RC development will be similar, except that it will also contain 
+the files "Rev_fromRCTrunk" and "Rev_toRCTrunk".  The file Rev_toTrunk will
+be used for the RC to merge into the trunk, but the files Rev_fromRCTrunk
+and Rev_toRCTrunk will be used when merging RC branches to and from the RC
+trunk.
+

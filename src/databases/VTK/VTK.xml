@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+  <Plugin name="VTK" type="database" label="VTK" version="1.0" enabled="true" mdspecificcode="false" onlyengine="false" noengine="false" dbtype="STSD" haswriter="true" hasoptions="true">
+    <FilePatterns>
+      *.vtk
+      *.vts
+      *.vtr 
+      *.vtu
+      *.vti
+      *.vtp
+    </FilePatterns>
+    <Files components="M">
+      avtVTKFileFormat.C
+      avtVTKOptions.C
+    </Files>
+    <Files components="E">
+      avtVTKFileFormat.C
+      avtVTKOptions.C
+      avtVTKWriter.C
+    </Files>
+    <Attribute name="" purpose="" persistent="true">
+    </Attribute>
+  </Plugin>
