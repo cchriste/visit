@@ -38,9 +38,13 @@
 #   Kathleen Bonnell, Wed Jan 05 10:25:13 PST 2010
 #   Add FOLDER property.
 #
+#   Kevin Bensema, Tues Sept 18 12:47 PDT 2012
+#   Added QSignalBlockingFrame.C to the XMLEDIT_SOURCES
+#
 #****************************************************************************/
 
 SET(XMLEDIT_SOURCES
+QSignalBlockingFrame.C
 XMLEditMain.C
 XMLDocument.C
 XMLEdit.C

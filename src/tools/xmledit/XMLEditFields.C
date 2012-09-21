@@ -114,10 +114,13 @@ class QNarrowLineEdit : public QLineEdit
 //    Kathleen Biagas, Thu Aug 25 14:24:11 MST 2011 
 //    Added persistent checkbox.
 //
+//    Kevin Bensema, Wed Sept 12 14:00 PST 2012
+//    Changed base class constructor call from QFrame() to QSignalBlockingFrame()
+//
 // ****************************************************************************
 
 XMLEditFields::XMLEditFields(QWidget *p)
-    : QFrame(p)
+    : QSignalBlockingFrame(p)
 {
     QHBoxLayout *hLayout = new QHBoxLayout(this);
     
@@ -648,50 +651,6 @@ XMLEditFields::UpdateEnablerList()
         if (name->text() != a->fields[i]->name)
             enabler->addItem(a->fields[i]->name);
     }
-}
-
-// ****************************************************************************
-//  Method:  XMLEditFields::BlockAllSignals
-//
-//  Purpose:
-//    Blocks/unblocks signals to the widgets.  This lets them get
-//    updated by changes in state without affecting the state.
-//
-//  Arguments:
-//    block      whether to block (true) or unblock (false) signals
-//
-//  Programmer:  Jeremy Meredith
-//  Creation:    October 17, 2002
-//
-//  Modifications:
-//    Brad Whitlock, Fri Dec 10 10:45:37 PDT 2004
-//    Added variablename type support.
-//
-//    Brad Whitlock, Wed Feb 28 18:49:38 PST 2007
-//    Added access.
-//
-//    Kathleen Biagas, Thu Aug 25 14:24:11 MST 2011 
-//    Added persistent checkbox.
-//
-// ****************************************************************************
-void
-XMLEditFields::BlockAllSignals(bool block)
-{
-    fieldlist->blockSignals(block);
-    name->blockSignals(block);
-    label->blockSignals(block);
-    type->blockSignals(block);
-    subtype->blockSignals(block);
-    length->blockSignals(block);
-    enabler->blockSignals(block);
-    enableval->blockSignals(block);
-    internal->blockSignals(block);
-    persistent->blockSignals(block);
-    ignoreeq->blockSignals(block);
-    varNameButtons->blockSignals(block);
-    init->blockSignals(block);
-    values->blockSignals(block);
-    access->blockSignals(block);
 }
 
 // ----------------------------------------------------------------------------

@@ -54,6 +54,9 @@
 #    I modified the script to return visit-core-support@elist.ornl.gov
 #    if the name is not in the list.
 #
+#    Kevin Bensema, Tues Sept 18 11:50 PDT 2012
+#    Added case for userid 'kbensema'
+#
 # *****************************************************************************
 
 
@@ -154,6 +157,11 @@ case $1 in
     "iuri")
         emaddr=iprilepov@lbl.gov
         ;;
+    # Kevin Bensema, UC Davis & Lawrence Berkeley
+    "kbensema")
+        emaddr=kbensema@ucdavis.edu
+        ;;
+
     *)
         emaddr=visit-core-support@elist.ornl.gov
         ;;

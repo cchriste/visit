@@ -65,10 +65,13 @@
 //
 //    Cyrus Harrison, Thu May 15 16:00:46 PDT 200
 //    First pass at porting to Qt 4.4.0
+//    
+//    Kevin Bensema, Wed Sept 12 15:07 PST 2012
+//    Changed base class ctor call from QFrame to QSignalBlockingFrame
 //
 // ****************************************************************************
 XMLEditIncludes::XMLEditIncludes(QWidget *p)
-    : QFrame(p)
+    : QSignalBlockingFrame(p)
 {
     QHBoxLayout *hLayout = new QHBoxLayout(this);
 
@@ -291,32 +294,6 @@ XMLEditIncludes::UpdateWindowSingleItem()
 
     UpdateWindowSensitivity();
     BlockAllSignals(false);
-}
-
-// ****************************************************************************
-//  Method:  XMLEditIncludes::BlockAllSignals
-//
-//  Purpose:
-//    Blocks/unblocks signals to the widgets.  This lets them get
-//    updated by changes in state without affecting the state.
-//
-//  Arguments:
-//    block      whether to block (true) or unblock (false) signals
-//
-//  Programmer:  Jeremy Meredith
-//  Creation:    October 17, 2002
-//
-//  Modifications:
-//    Brad Whitlock, Thu Mar 6 16:21:32 PST 2008
-//    Added target.
-//
-// ****************************************************************************
-void
-XMLEditIncludes::BlockAllSignals(bool block)
-{
-    includelist->blockSignals(block);
-    target->blockSignals(block);
-    file->blockSignals(block);
 }
 
 // ----------------------------------------------------------------------------

@@ -39,7 +39,7 @@
 #ifndef XMLEDITFIELDS_H
 #define XMLEDITFIELDS_H
 
-#include <QFrame>
+#include <QSignalBlockingFrame.h>
 
 class XMLDocument;
 class QButtonGroup;
@@ -75,15 +75,18 @@ class QPushButton;
 //    Kathleen Biagas, Thu Aug 25 11:28:49 PDT 2011
 //    Added persistent.
 //
+//    Kevin Bensema, Wed Sept 12 13:59 PST 2012
+//    Changed base class to QSignalBlockingFrame for a more general 
+//    BlockAllSignals(bool) call that doesn't need updating when widgets are added.
+//
 // ****************************************************************************
 
-class XMLEditFields : public QFrame
+class XMLEditFields : public QSignalBlockingFrame
 {
     Q_OBJECT
   public:
     XMLEditFields(QWidget *p);
     void SetDocument(XMLDocument *doc) { xmldoc = doc; }
-    void BlockAllSignals(bool);
   public slots:
     void UpdateWindowContents();
     void UpdateWindowSensitivity();

@@ -39,7 +39,7 @@
 #ifndef XMLEDITATTRIBUTE_H
 #define XMLEDITATTRIBUTE_H
 
-#include <QFrame>
+#include <QSignalBlockingFrame.h>
 
 class XMLDocument;
 class QLineEdit;
@@ -65,14 +65,18 @@ class QCheckBox;
 //
 //    Mark C. Miller, Wed Aug 26 11:03:19 PDT 2009
 //    Added support for custom base class for derived state objects.
+//
+//    Kevin Bensema, Wed September 12 13:14 PST 2012
+//    Changed base class to QSignalBlockingFrame and removed specialized version
+//    of BlockAllSignals()
+//
 // ****************************************************************************
-class XMLEditAttribute : public QFrame
+class XMLEditAttribute : public QSignalBlockingFrame
 {
     Q_OBJECT
   public:
     XMLEditAttribute(QWidget *p);
     void SetDocument(XMLDocument *doc) { xmldoc = doc; }
-    void BlockAllSignals(bool);
   public slots:
     void UpdateWindowContents();
     void UpdateWindowSensitivity();

@@ -51,6 +51,7 @@
 
 #include <Plugin.h>
 
+
 // ****************************************************************************
 //  Constructor:  XMLEditPlugin::XMLEditPlugin
 //
@@ -101,7 +102,7 @@
 // ****************************************************************************
 
 XMLEditPlugin::XMLEditPlugin(QWidget *p)
-    : QFrame(p)
+    : QSignalBlockingFrame(p)
 {
     QGridLayout *topLayout = new QGridLayout(this);
     setLayout(topLayout);
@@ -810,73 +811,6 @@ XMLEditPlugin::UpdateWindowSensitivity()
     enabledByDefault->setEnabled(plugin);
     bool val = (op || plot) && (xmldoc->plugin->iconFile.length() > 0);
     iconFile->setEnabled(val);
-}
-
-// ****************************************************************************
-//  Method:  XMLEditPlugin::BlockAllSignals
-//
-//  Purpose:
-//    Blocks/unblocks signals to the widgets.  This lets them get
-//    updated by changes in state without affecting the state.
-//
-//  Arguments:
-//    block      whether to block (true) or unblock (false) signals
-//
-//  Programmer:  Jeremy Meredith
-//  Creation:    October 17, 2002
-//
-//  Modifications:
-//    Brad Whitlock, Thu Mar 13 11:31:39 PDT 2003
-//    Added plugin icon support.
-//
-//    Hank Childs, Fri Aug  1 11:21:18 PDT 2003
-//    Add support for curves.
-//
-//    Jeremy Meredith, Wed Nov  5 13:49:49 PST 2003
-//    Added support for plugins en/disabled by default.
-//
-//    Brad Whitlock, Fri Apr 1 16:08:37 PST 2005
-//    Added label.
-//
-//    Hank Childs, Tue Jul 19 14:08:19 PDT 2005
-//    Added array vars.
-//
-//    Hank Childs, Thu Jan 10 13:56:32 PST 2008
-//    Added the ability to have a plugin only open explicit filenames.
-//
-//    Jeremy Meredith, Tue Dec 29 11:21:30 EST 2009
-//    Replaced "Extensions" and "Filenames" with "FilePatterns".  Removed
-//    specifiedFilenames.  Added filePatternsStrict and opensWholeDirectory.
-//
-// ****************************************************************************
-
-void
-XMLEditPlugin::BlockAllSignals(bool block)
-{
-    name->blockSignals(block);
-    label->blockSignals(block);
-    version->blockSignals(block);
-    pluginType->blockSignals(block);
-    varTypeMesh->blockSignals(block);
-    varTypeScalar->blockSignals(block);
-    varTypeVector->blockSignals(block);
-    varTypeMaterial->blockSignals(block);
-    varTypeSubset->blockSignals(block);
-    varTypeSpecies->blockSignals(block);
-    varTypeCurve->blockSignals(block);
-    varTypeTensor->blockSignals(block);
-    varTypeSymmetricTensor->blockSignals(block);
-    varTypeLabel->blockSignals(block);
-    varTypeArray->blockSignals(block);
-    dbType->blockSignals(block);
-    filePatterns->blockSignals(block);
-    filePatternsStrict->blockSignals(block);
-    opensWholeDirectory->blockSignals(block);
-    hasIcon->blockSignals(block);
-    iconFile->blockSignals(block);
-    hasWriter->blockSignals(block);
-    hasOptions->blockSignals(block);
-    enabledByDefault->blockSignals(block);
 }
 
 // ----------------------------------------------------------------------------

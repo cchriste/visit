@@ -39,7 +39,7 @@
 #ifndef XMLEDITENUMS_H
 #define XMLEDITENUMS_H
 
-#include <QFrame>
+#include <QSignalBlockingFrame.h>
 
 class XMLDocument;
 class QLineEdit;
@@ -63,14 +63,17 @@ class QPushButton;
 //   Cyrus Harrison, Thu May 15 15:04:20 PDT 2008
 //   Ported to Qt 4.4
 //
+//   Kevin Bensema, Wed Sept 12 13:53 PST 2012
+//   Changed base class to QSignalBlockingFrame for a more general 
+//   BlockAllSignals(bool) call that doesn't need updating when widgets are added.
+//
 // ****************************************************************************
-class XMLEditEnums : public QFrame
+class XMLEditEnums : public QSignalBlockingFrame
 {
     Q_OBJECT
   public:
     XMLEditEnums(QWidget *p);
     void SetDocument(XMLDocument *doc) { xmldoc = doc; }
-    void BlockAllSignals(bool);
   public slots:
     void removeEmptyLines();
     void addEmptyLine();

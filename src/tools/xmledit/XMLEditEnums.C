@@ -61,9 +61,12 @@
 //   Cyrus Harrison, Thu May 15 15:04:20 PDT 2008
 //   Ported to Qt 4.4
 //
+//   Kevin Bensema, Wed Sept 12 13:55 PST 2012
+//   Changed base class ctor to new base class (QSignalBlockingFrame)
+//
 // ****************************************************************************
 XMLEditEnums::XMLEditEnums(QWidget *p)
-    : QFrame(p)
+    : QSignalBlockingFrame(p)
 {
     QHBoxLayout *hLayout = new QHBoxLayout(this);
     
@@ -279,28 +282,6 @@ XMLEditEnums::UpdateWindowSingleItem()
     }
     UpdateWindowSensitivity();
     BlockAllSignals(false);
-}
-
-// ****************************************************************************
-//  Method:  XMLEditEnums::BlockAllSignals
-//
-//  Purpose:
-//    Blocks/unblocks signals to the widgets.  This lets them get
-//    updated by changes in state without affecting the state.
-//
-//  Arguments:
-//    block      whether to block (true) or unblock (false) signals
-//
-//  Programmer:  Jeremy Meredith
-//  Creation:    October 17, 2002
-//
-// ****************************************************************************
-void
-XMLEditEnums::BlockAllSignals(bool block)
-{
-    enumlist->blockSignals(block);
-    name->blockSignals(block);
-    valuelist->blockSignals(block);
 }
 
 // ----------------------------------------------------------------------------

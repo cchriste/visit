@@ -36,75 +36,66 @@
 *
 *****************************************************************************/
 
-#ifndef XMLEDITINCLUDES_H
-#define XMLEDITINCLUDES_H
-
 #include <QSignalBlockingFrame.h>
 
-class XMLDocument;
-class QLineEdit;
-class QButtonGroup;
-class QComboBox;
-class QCheckBox;
-class QListWidget;
-class QTextEdit;
-class QRadioButton;
-class QPushButton;
+#include <vector>
+using std::vector;
+// ****************************************************************************
+//  Constructor:  QSignalBlockingFrame::QSignalBlockingFrame
+//
+//  Programmer:  Kevin Bensema
+//  Creation:    September 11, 2012
+//
+// ****************************************************************************
+QSignalBlockingFrame::QSignalBlockingFrame(QWidget* parent)
+  : QFrame(parent) 
+{
+  ;
+}
 
 // ****************************************************************************
-//  Class:  XMLEditIncludes
+//  Method:  QSignalBlockingFrame::BlockAllSignals
 //
 //  Purpose:
-//    Include editing widget for the XML editor.
+//    Blocks/unblocks signals to the widgets.  This lets them get
+//    updated by changes in state without affecting the state.
+//    No modifications are needed to this function when new widgets are added.
+//    Works via depth-first search, and calls blockSignals on all widgets.
 //
-//  Programmer:  Jeremy Meredith
-//  Creation:    October 17, 2002
+//  Arguments:
+//    block      whether to block (true) or unblock (false) signals
+//
+//  Programmer:  Kevin Bensema
+//  Creation:    September 11, 2012
 //
 //  Modifications:
-//    Brad Whitlock, Thu Mar 6 16:20:35 PST 2008
-//    Added target.
-//
-//    Cyrus Harrison, Thu May 15 16:00:46 PDT 200
-//    First pass at porting to Qt 4.4.0
-//
-//    Kevin Bensema, Wed Sept 12 15:01 PST 2012
-//    Changed base class to QSignalBlockingFrame, 
-//    removed specialized BlockAllSignals(bool) function
 //
 // ****************************************************************************
-class XMLEditIncludes : public QSignalBlockingFrame
+void
+QSignalBlockingFrame::BlockAllSignals(bool block)
 {
-    Q_OBJECT
-  public:
-    XMLEditIncludes(QWidget *p);
-    void SetDocument(XMLDocument *doc) { xmldoc = doc; }
-  public slots:
-    void UpdateWindowContents();
-    void UpdateWindowSensitivity();
-    void UpdateWindowSingleItem();
-    void targetTextChanged(const QString&);
-    void includeTextChanged(const QString&);
-    void fileGroupChanged(int);
-    void quotedGroupChanged(int);
-    void includelistNew();
-    void includelistDel();
-  private:
-    int CountIncludes(const QString &) const;
+  vector<QObjectList> recursionStack;
+  recursionStack.push_back(children());
+  while(recursionStack.empty() == false)
+  {
+    QObjectList listOfChildren = recursionStack.back();
+    recursionStack.pop_back();
 
-    XMLDocument    *xmldoc;
+    // iterate over the list of children, calling blockSignals on each.
+    // if a child has children of its own, add them to the stack.
+    for(QObjectList::Iterator iter = listOfChildren.begin();
+        iter != listOfChildren.end(); ++iter)
+    {
+      QObject *object = *iter;
+      object->blockSignals(block);
+      QObjectList newChildren = object->children();
+      if(newChildren.empty() == false)
+      {
+        recursionStack.push_back(newChildren);
+      }
+    }
+  }
 
-    QPushButton    *newButton;
-    QPushButton    *delButton;
+  return;
+}
 
-    QListWidget       *includelist;
-    QRadioButton   *CButton;
-    QRadioButton   *HButton;
-    QRadioButton   *quotesButton;
-    QRadioButton   *bracketsButton;
-    QButtonGroup   *fileGroup;
-    QButtonGroup   *quotedGroup;
-    QLineEdit      *file;
-    QLineEdit      *target;
-};
-
-#endif

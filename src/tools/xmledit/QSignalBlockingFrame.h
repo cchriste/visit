@@ -1,3 +1,6 @@
+#ifndef Q_SIGNAL_BLOCKING_FRAME_H
+#define Q_SIGNAL_BLOCKING_FRAME_H
+
 /*****************************************************************************
 *
 * Copyright (c) 2000 - 2012, Lawrence Livermore National Security, LLC
@@ -36,75 +39,30 @@
 *
 *****************************************************************************/
 
-#ifndef XMLEDITINCLUDES_H
-#define XMLEDITINCLUDES_H
-
-#include <QSignalBlockingFrame.h>
-
-class XMLDocument;
-class QLineEdit;
-class QButtonGroup;
-class QComboBox;
-class QCheckBox;
-class QListWidget;
-class QTextEdit;
-class QRadioButton;
-class QPushButton;
+#include <qframe.h>
 
 // ****************************************************************************
-//  Class:  XMLEditIncludes
+//  Class:  QSignalBlockingFrame
 //
 //  Purpose:
-//    Include editing widget for the XML editor.
+//    Provide a common base class with a generic version of BlockAllSignals(bool)
+//    for the XMLEdit* classes of the xmledit program.
 //
-//  Programmer:  Jeremy Meredith
-//  Creation:    October 17, 2002
+//  Programmer:  Kevin Bensema
+//  Creation:    September 11 2012
 //
 //  Modifications:
-//    Brad Whitlock, Thu Mar 6 16:20:35 PST 2008
-//    Added target.
-//
-//    Cyrus Harrison, Thu May 15 16:00:46 PDT 200
-//    First pass at porting to Qt 4.4.0
-//
-//    Kevin Bensema, Wed Sept 12 15:01 PST 2012
-//    Changed base class to QSignalBlockingFrame, 
-//    removed specialized BlockAllSignals(bool) function
 //
 // ****************************************************************************
-class XMLEditIncludes : public QSignalBlockingFrame
+
+class QSignalBlockingFrame : public QFrame
 {
-    Q_OBJECT
-  public:
-    XMLEditIncludes(QWidget *p);
-    void SetDocument(XMLDocument *doc) { xmldoc = doc; }
-  public slots:
-    void UpdateWindowContents();
-    void UpdateWindowSensitivity();
-    void UpdateWindowSingleItem();
-    void targetTextChanged(const QString&);
-    void includeTextChanged(const QString&);
-    void fileGroupChanged(int);
-    void quotedGroupChanged(int);
-    void includelistNew();
-    void includelistDel();
-  private:
-    int CountIncludes(const QString &) const;
-
-    XMLDocument    *xmldoc;
-
-    QPushButton    *newButton;
-    QPushButton    *delButton;
-
-    QListWidget       *includelist;
-    QRadioButton   *CButton;
-    QRadioButton   *HButton;
-    QRadioButton   *quotesButton;
-    QRadioButton   *bracketsButton;
-    QButtonGroup   *fileGroup;
-    QButtonGroup   *quotedGroup;
-    QLineEdit      *file;
-    QLineEdit      *target;
+public:
+  QSignalBlockingFrame(QWidget* parent = NULL);
+  // sets the signal-blocking flag of *all* widgets that are children of the widget
+  // to the passed value. Operates recursively and genericly.
+  void BlockAllSignals(bool);
 };
 
 #endif
+
