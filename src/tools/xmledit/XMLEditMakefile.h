@@ -39,7 +39,7 @@
 #ifndef XMLEDITMAKEFILE_H
 #define XMLEDITMAKEFILE_H
 
-#include <QSignalBlockingFrame.h>
+#include <QFrame>
 
 class XMLDocument;
 class QLineEdit;
@@ -75,17 +75,14 @@ class QCheckBox;
 //    Jeremy Meredith, Tue Sep  8 15:11:35 EDT 2009
 //    Split custom engine libs into serial and parallel versions.
 //
-//    Kevin Bensema, Wed Sept 12 15:10 PST 2012
-//    Changed base class to QSignalBlockingFrame, 
-//    removed specialized BlockAllSignals(bool) function
-//
 // ****************************************************************************
-class XMLEditMakefile : public QSignalBlockingFrame
+class XMLEditMakefile : public QFrame
 {
     Q_OBJECT
   public:
     XMLEditMakefile(QWidget *p);
     void SetDocument(XMLDocument *doc) { xmldoc = doc; }
+    void BlockAllSignals(bool);
   public slots:
     void UpdateWindowContents();
     void UpdateWindowSensitivity();

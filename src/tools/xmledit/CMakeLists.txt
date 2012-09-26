@@ -44,7 +44,6 @@
 #****************************************************************************/
 
 SET(XMLEDIT_SOURCES
-QSignalBlockingFrame.C
 XMLEditMain.C
 XMLDocument.C
 XMLEdit.C

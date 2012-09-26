@@ -39,7 +39,7 @@
 #ifndef XMLEDITFUNCTIONS_H
 #define XMLEDITFUNCTIONS_H
 
-#include <QSignalBlockingFrame.h>
+#include <QFrame>
 
 class XMLDocument;
 class QLabel;
@@ -71,18 +71,14 @@ class QPushButton;
 //    Cyrus Harrison, Thu May 15 16:00:46 PDT 200
 //    First pass at porting to Qt 4.4.0
 //
-//    Kevin Bensema, Wed Sept 12 14:02 PST 2012
-//    Changed base class to QSignalBlockingFrame for a more general 
-//    BlockAllSignals(bool) call that doesn't need updating when widgets are added.
-//
-//
 // ****************************************************************************
-class XMLEditFunctions : public QSignalBlockingFrame
+class XMLEditFunctions : public QFrame
 {
     Q_OBJECT
   public:
     XMLEditFunctions(QWidget *p);
     void SetDocument(XMLDocument *doc) { xmldoc = doc; }
+    void BlockAllSignals(bool);
   public slots:
     void UpdateWindowContents();
     void UpdateWindowSensitivity();

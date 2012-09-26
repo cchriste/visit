@@ -66,11 +66,10 @@
 //
 //    Mark C. Miller, Wed Aug 26 11:03:19 PDT 2009
 //    Added support for custom base class for derived state objects.
-//
 // ****************************************************************************
 
 XMLEditAttribute::XMLEditAttribute(QWidget *p)
-    : QSignalBlockingFrame(p)
+    : QFrame(p)
 {
     QGridLayout *topLayout = new QGridLayout(this);
     int row = 0;
@@ -216,6 +215,38 @@ XMLEditAttribute::UpdateWindowSensitivity()
     exportInclude->setEnabled(!plugin);
     customBaseClass->setEnabled(!plugin);
     baseClass->setEnabled(!plugin && customBaseClass->isChecked());
+}
+
+// ****************************************************************************
+//  Method:  XMLEditAttribute::BlockAllSignals
+//
+//  Purpose:
+//    Blocks/unblocks signals to the widgets.  This lets them get
+//    updated by changes in state without affecting the state.
+//
+//  Arguments:
+//    block      whether to block (true) or unblock (false) signals
+//
+//  Programmer:  Jeremy Meredith
+//  Creation:    October 17, 2002
+//
+//  Modifications:
+//    Brad Whitlock, Wed Mar 7 16:06:43 PST 2007
+//    Added keyframe.
+//
+// ****************************************************************************
+void
+XMLEditAttribute::BlockAllSignals(bool block)
+{
+    name->blockSignals(block);
+    purpose->blockSignals(block);
+    codefile->blockSignals(block);
+    exportAPI->blockSignals(block);
+    exportInclude->blockSignals(block);
+    persistent->blockSignals(block);
+    keyframe->blockSignals(block);
+    customBaseClass->blockSignals(block);
+    baseClass->blockSignals(block);
 }
 
 // ----------------------------------------------------------------------------

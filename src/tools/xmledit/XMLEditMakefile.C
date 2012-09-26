@@ -77,14 +77,10 @@
 //    Cyrus Harrison, Fri Sep 19 13:58:39 PDT 2008
 //    Added support for custom libs for gui,engine,mdserver, and viewer libs
 //
-//    Kevin Bensema, Wed Sept 12 15:12 PST 2012
-//    Changed ctor from QFrame to QSignalBlockingFrame and removed
-//    specialized version of BlockAllSignals(bool)
-//
 // ****************************************************************************
 
 XMLEditMakefile::XMLEditMakefile(QWidget *p)
-    : QSignalBlockingFrame(p)
+    : QFrame(p)
 {
     QGridLayout *topLayout = new QGridLayout(this);
     
@@ -425,6 +421,70 @@ XMLEditMakefile::UpdateWindowSensitivity()
     engSpecificCode->setEnabled(plugin);
     // only enable for a database plugin
     mdSpecificCode->setEnabled(plugin && xmldoc->plugin->type =="database");
+}
+
+// ****************************************************************************
+//  Method:  XMLEditMakefile::BlockAllSignals
+//
+//  Purpose:
+//    Blocks/unblocks signals to the widgets.  This lets them get
+//    updated by changes in state without affecting the state.
+//
+//  Arguments:
+//    block      whether to block (true) or unblock (false) signals
+//
+//  Programmer:  Jeremy Meredith
+//  Creation:    October 17, 2002
+//
+//  Modifications:
+//    Sean Ahern, Fri Nov 15 15:25:23 PST 2002
+//    Added "widget files" so we can have custom GUI elements.
+//
+//    Jeremy Meredith, Wed Jul  7 17:08:03 PDT 2004
+//    Allow for mdserver-specific code in a plugin's source files.
+//
+//    Brad Whitlock, Fri Feb 23 17:53:03 PST 2007
+//    Added viewer widgets.
+//
+//    Cyrus Harrison, Wed Mar  7 09:07:37 PST 2007
+//    Allow for engine-specific code in a plugin's source files.
+//
+//    Cyrus Harrison, Fri Sep 19 13:58:39 PDT 2008
+//    Added support for custom libs for gui,engine,mdserver, and viewer libs.
+//
+// ****************************************************************************
+void
+XMLEditMakefile::BlockAllSignals(bool block)
+{
+    CXXFLAGS->blockSignals(block);
+    LDFLAGS->blockSignals(block);
+    LIBS->blockSignals(block);
+    GFiles->blockSignals(block);
+    customGFiles->blockSignals(block);
+    GLibs->blockSignals(block);
+    customGLibs->blockSignals(block);
+    SFiles->blockSignals(block);
+    customSFiles->blockSignals(block);
+    VFiles->blockSignals(block);
+    VLibs->blockSignals(block);
+    customVLibs->blockSignals(block);
+    customVFiles->blockSignals(block);
+    MFiles->blockSignals(block);
+    customMFiles->blockSignals(block);
+    MLibs->blockSignals(block);
+    customMLibs->blockSignals(block);
+    EFiles->blockSignals(block);
+    customEFiles->blockSignals(block);
+    ELibsSer->blockSignals(block);
+    customELibsSer->blockSignals(block);
+    ELibsPar->blockSignals(block);
+    customELibsPar->blockSignals(block);
+    WFiles->blockSignals(block);
+    customWFiles->blockSignals(block);
+    VWFiles->blockSignals(block);
+    customVWFiles->blockSignals(block);
+    mdSpecificCode->blockSignals(block);
+    engSpecificCode->blockSignals(block);
 }
 
 // ----------------------------------------------------------------------------

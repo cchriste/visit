@@ -39,7 +39,7 @@
 #ifndef XMLEDITINCLUDES_H
 #define XMLEDITINCLUDES_H
 
-#include <QSignalBlockingFrame.h>
+#include <QFrame>
 
 class XMLDocument;
 class QLineEdit;
@@ -67,17 +67,14 @@ class QPushButton;
 //    Cyrus Harrison, Thu May 15 16:00:46 PDT 200
 //    First pass at porting to Qt 4.4.0
 //
-//    Kevin Bensema, Wed Sept 12 15:01 PST 2012
-//    Changed base class to QSignalBlockingFrame, 
-//    removed specialized BlockAllSignals(bool) function
-//
 // ****************************************************************************
-class XMLEditIncludes : public QSignalBlockingFrame
+class XMLEditIncludes : public QFrame
 {
     Q_OBJECT
   public:
     XMLEditIncludes(QWidget *p);
     void SetDocument(XMLDocument *doc) { xmldoc = doc; }
+    void BlockAllSignals(bool);
   public slots:
     void UpdateWindowContents();
     void UpdateWindowSensitivity();

@@ -39,7 +39,7 @@
 #ifndef XMLEDITPLUGIN_H
 #define XMLEDITPLUGIN_H
 
-#include <QSignalBlockingFrame.h>
+#include <qframe.h>
 
 class XMLDocument;
 class QLabel;
@@ -101,18 +101,15 @@ class QGroupBox;
 //    Add some data members that facilitate greying out operator options when
 //    making non-operators.
 //
-//    Kevin Bensema, Tues Sept 11 16:20 PST 2012
-//    changed the XMLEditPlugin class to inherit from QSignalBlockingFrame instead
-//    of QFrame
-//
 // ****************************************************************************
 
-class XMLEditPlugin : public QSignalBlockingFrame
+class XMLEditPlugin : public QFrame
 {
     Q_OBJECT
   public:
     XMLEditPlugin(QWidget *p);
     void SetDocument(XMLDocument *doc) { xmldoc = doc; }
+    void BlockAllSignals(bool);
   public slots:
     void UpdateWindowContents();
     void UpdateWindowSensitivity();
