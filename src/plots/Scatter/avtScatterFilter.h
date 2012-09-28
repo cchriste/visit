@@ -76,6 +76,10 @@
 //    Kathleen Biagas, Thu Mar  1 14:49:50 MST 2012
 //    Add keepNodeZone and dataArray (origNodes) arg to PointMeshFromVariables.
 //
+//    Kevin Bensema, Thu Sept 27 14:14 PDT 2012
+//    Set x/y/zMin z/y/zMax to the user-specified extents when no log/skew scaling
+//    has been done, so Scale-to-Cube can use these extents.
+//
 // ****************************************************************************
 
 class avtScatterFilter : public avtDataTreeIterator

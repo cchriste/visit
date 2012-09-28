@@ -530,6 +530,10 @@ avtScatterFilter::PostExecute(void)
 //    Kathleen Biagas, Thu Mar  1 14:49:50 MST 2012
 //    Keep track of original node numbers.
 //
+//    Kevin Bensema, Thu Sept 27 14:14 PDT 2012
+//    Set x/y/zMin z/y/zMax to the user-specified extents when no log/skew scaling
+//    has been done, so Scale-to-Cube can use these extents.
+//
 // ****************************************************************************
 
 vtkDataSet *
@@ -914,6 +918,26 @@ avtScatterFilter::PointMeshFromVariables(DataInput *d1,
             EXCEPTION1(InvalidLimitsException, true);
         }
     }
+
+    // If there is no non-linear scaling, and limits are provided, use them.
+    if(d1->scale == 0)
+    {
+      xMin = d1->useMin ? d1min : xMin;
+      xMax = d1->useMax ? d1max : xMax;
+    }
+
+    if(d2->scale == 0)
+    {
+      yMin = d2->useMin ? d2min : yMin;
+      yMax = d2->useMax ? d2max : yMax;
+    }
+
+    if(arr3 != NULL && d3->scale == 0)
+    {
+      zMin = d3->useMin ? d3min : zMin;
+      zMax = d3->useMax ? d3max : zMax;
+    }
+
 
     //
     // Scale the coordinates so they are within a [0,1] cube.
