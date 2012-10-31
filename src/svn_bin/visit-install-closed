@@ -1,0 +1,329 @@
+#!/bin/sh
+#-----------------------------------------------------------------------
+#
+# VISIT-INSTALL-CLOSED - Install the visit distributions on the closed
+#                        network.
+#
+# Author: Eric Brugger
+# Date:   February 12, 2001
+#
+# Usage:
+#    visit-install-closed [-beta | -private | -public] -v <version>
+#
+# Modifications:
+#   Brad Whitlock, Tue Mar 7 14:10:26 PST 2006
+#   I added -b bdivp to the visit-install invokations.
+#
+#   Eric Brugger, Mon Apr  7 13:52:50 PDT 2008
+#   Removed sc install.
+#
+#   Hank Childs, Sat May  2 13:26:51 CDT 2009
+#   Renamed config file to llnl_closed.
+#
+#   Eric Brugger, Fri Nov  5 15:40:02 PDT 2010
+#   Replaced hopi with inca and removed pruple.
+#
+#   Eric Brugger, Wed Jan  5 09:40:00 PST 2011
+#   Added terminator.
+#
+#   Eric Brugger, Fri Mar 25 10:20:49 PDT 2011
+#   Added cielo.
+#
+#   Eric Brugger, Mon Jul 30 10:31:10 PDT 2012
+#   Added gremlin.
+#
+#-----------------------------------------------------------------------
+
+test=no
+
+user=`whoami`
+
+#
+# Parse the execute line, providing default values for error checking.
+#
+termite=true
+terminator=false
+inca=true
+gremlin=true
+cielo=true
+
+ver=undefined
+
+#
+# The loop is executed once for each symbol on the execute line.  This means
+# that $1 may be blank for later executions of the loop if any "shift 2"
+# commands are executed.  The variable abc is not used in the loop.
+#
+for abc
+do
+   case $1 in
+      -none)
+         termite=false
+         terminator=false
+         inca=false
+         gremlin=false
+         cielo=false
+         shift
+         ;;
+      -termite)
+         termite=false
+         shift
+         ;;
+      +termite)
+         termite=true
+         shift
+         ;;
+      -terminator)
+         terminator=false
+         shift
+         ;;
+      +terminator)
+         terminator=true
+         shift
+         ;;
+      -inca)
+         inca=false
+         shift
+         ;;
+      +inca)
+         inca=true
+         shift
+         ;;
+      -gremlin)
+         gremlin=false
+         shift
+         ;;
+      +gremlin)
+         gremlin=true
+         shift
+         ;;
+      -cielo)
+         cielo=false
+         shift
+         ;;
+      +cielo)
+         cielo=true
+         shift
+         ;;
+      -v)
+         ver=$2
+         shift 2
+         ;;
+   esac
+done
+
+#
+# Check that the version was provided.
+#
+if [ $ver = undefined ]
+then
+   echo "Usage: [-none] [-<machine name>] -v <version>"
+   exit
+fi
+
+#
+# Check that the visit install script is present.
+#
+if [ ! -e visit-install ]
+then
+   echo "visit-install is missing."
+   exit
+fi
+
+ver2=`echo $ver | tr "." "_"`
+ver=`echo $ver2 | tr "_" "."`
+
+#
+# Install on termite.
+#
+rm -f termite
+cat <<EOF > termite
+#!/bin/sh
+./visit-install -private -c llnl_closed -g visit -b bdivp -gw -l $ver linux_rhel5 /misc/gapps/visit > installlog 2>&1
+rm -f resultlog
+echo ""                                            > resultlog 2>&1
+echo "        install of visit on termite"         >> resultlog 2>&1
+echo "       -----------------------------"        >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /misc/gapps/visit                            >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /misc/gapps/visit/$ver+/linux-intel/bin      >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /misc/gapps/visit/$ver+/linux-intel/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /misc/gapps/visit/$ver+/linux-intel/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /misc/gapps/visit/$ver+/linux-intel/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /misc/gapps/visit/$ver+/linux-intel/plugins/databases/libI* | sed "s/\/misc\/gapps\/visit\/$ver+\/linux-intel\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mv resultlog resultlog.termite
+EOF
+
+if [ $termite = true ]
+then
+   if [ $test = no ]
+   then
+      scp -P 22 termite:termite/visitbuild/visit$ver2.linux-intel.tar.gz visit$ver2.linux_rhel5.tar.gz
+      scp -P 22 visit$ver2.linux_rhel5.tar.gz termite:
+      scp -P 22 visit-install termite:
+      scp -P 22 termite termite:termite_install
+      ssh -p 22 termite "chmod 750 termite_install;./termite_install"
+   fi
+fi
+
+#
+# Install on terminator.
+#
+rm -f terminator
+cat <<EOF > terminator
+#!/bin/sh
+./visit-install -private -c llnl_closed -g visit -b bdivp -gw -l $ver linux_rhel5 /misc/gapps/visit > installlog 2>&1
+rm -f resultlog
+echo ""                                            > resultlog 2>&1
+echo "        install of visit on terminator"      >> resultlog 2>&1
+echo "       --------------------------------"     >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /misc/gapps/visit                            >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /misc/gapps/visit/$ver+/linux-intel/bin      >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /misc/gapps/visit/$ver+/linux-intel/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /misc/gapps/visit/$ver+/linux-intel/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /misc/gapps/visit/$ver+/linux-intel/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /misc/gapps/visit/$ver+/linux-intel/plugins/databases/libI* | sed "s/\/misc\/gapps\/visit\/$ver+\/linux-intel\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mv resultlog resultlog.terminator
+EOF
+
+if [ $terminator = true ]
+then
+   if [ $test = no ]
+   then
+      scp -P 22 terminator:terminator/visitbuild/visit$ver2.linux-intel.tar.gz visit$ver2.linux_rhel5.tar.gz
+      scp -P 22 visit$ver2.linux_rhel5.tar.gz terminator:
+      scp -P 22 visit-install terminator:
+      scp -P 22 terminator terminator:terminator_install
+      ssh -p 22 terminator "chmod 750 terminator_install;./terminator_install"
+   fi
+fi
+
+#
+# Install on gremlin.
+#
+rm -f gremlin
+cat <<EOF > gremlin
+#!/bin/sh
+./visit-install -private -c llnl_closed -g visit -b bdivp -gw -l $ver linux-x86_64-gremlin /usr/gapps/visit > installlog 2>&1
+mv /usr/gapps/visit/$ver+/linux-x86_64 /usr/gapps/visit/$ver+/linux-x86_64-chaos4
+rm -f resultlog
+echo ""                                               > resultlog 2>&1
+echo "        install of visit on gremlin"            >> resultlog 2>&1
+echo "       -----------------------------"           >> resultlog 2>&1
+echo ""                                               >> resultlog 2>&1
+df -k /usr/gapps/visit                                >> resultlog 2>&1
+echo ""                                               >> resultlog 2>&1
+ls -l /usr/gapps/visit/$ver+/linux-x86_64-chaos4/bin  >> resultlog 2>&1
+echo ""                                               >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/databases/libI* | sed "s/\/usr\/gapps\/visit\/$ver+\/linux-x86_64-chaos4\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mv resultlog resultlog.gremlin
+EOF
+
+if [ $gremlin = true ]
+then
+   if [ $test = no ]
+   then
+      scp gremlin3:/usr/tmp/$user/gremlin/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-x86_64-gremlin.tar.gz
+      scp visit$ver2.linux-x86_64-gremlin.tar.gz gremlin3:
+      scp visit-install gremlin3:
+      scp gremlin gremlin3:gremlin_install
+      ssh gremlin3 "chmod 750 gremlin_install;./gremlin_install"
+   fi
+fi
+
+#
+# Install on inca.
+#
+rm -f inca
+cat <<EOF > inca
+#!/bin/sh
+./visit-install -private -c llnl_closed -g visit -b bdivp -gw -l $ver linux-x86_64-inca /usr/gapps/visit > installlog 2>&1
+rm -f resultlog
+echo ""                                            > resultlog 2>&1
+echo "        install of visit on inca"            >> resultlog 2>&1
+echo "       --------------------------"           >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /usr/gapps/visit                             >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /usr/gapps/visit/$ver+/linux-x86_64/bin      >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/\/usr\/gapps\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mv resultlog resultlog.inca
+EOF
+
+if [ $inca = true ]
+then
+   if [ $test = no ]
+   then
+      scp inca3:/usr/tmp/$user/inca/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-x86_64-inca.tar.gz
+      scp visit$ver2.linux-x86_64-inca.tar.gz inca3:
+      scp visit-install inca3:
+      scp inca inca3:inca_install
+      ssh inca3 "chmod 750 inca_install;./inca_install"
+   fi
+fi
+
+#
+# Install on cielo.
+#
+rm -f cielo
+cat <<EOF > cielo
+#!/bin/sh
+./visit-install -private -c llnl_closed -l $ver linux-x86_64-cielo /usr/projects/views/visit > installlog 2>&1
+rm -f resultlog
+echo ""                                                > resultlog 2>&1
+echo "        install of visit on cielo"               >> resultlog 2>&1
+echo "       ---------------------------"              >> resultlog 2>&1
+echo ""                                                >> resultlog 2>&1
+df -k /usr/projects/views/visit                        >> resultlog 2>&1
+echo ""                                                >> resultlog 2>&1
+ls -l /usr/projects/views/visit/$ver+/linux-x86_64/bin >> resultlog 2>&1
+echo ""                                                >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/projects/views/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/projects/views/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/projects/views/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /usr/projects/views/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/\/usr\/projects\/views\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mv resultlog resultlog.cielo
+EOF
+
+if [ $cielo = true ]
+then
+   if [ $test = no ]
+   then
+      ssh red-fta05.lanl.gov "ssh ci-fe2 'cp /tmp/$user/cielo/visitbuild/visit$ver2.linux-x86_64.tar.gz .'"
+      scp red-fta05.lanl.gov:visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-x86_64-cielo.tar.gz
+      scp visit$ver2.linux-x86_64-cielo.tar.gz red-fta05.lanl.gov:
+      scp visit-install red-fta05.lanl.gov:
+      scp cielo red-fta05.lanl.gov:cielo_install
+      ssh red-fta05.lanl.gov "ssh ci-fe2 'chmod 750 cielo_install;./cielo_install'"
+   fi
+fi
+
+#
+# Clean up.
+#
+if [ $test = no ]
+then
+   rm -f termite terminator inca gremlin cielo
+fi

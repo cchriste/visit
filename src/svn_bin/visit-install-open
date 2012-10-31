@@ -1,0 +1,603 @@
+#!/bin/sh
+#-----------------------------------------------------------------------
+#
+# VISIT-INSTALL-OPEN - Install the visit distributions on the open
+#                      network.
+#
+# Author: Eric Brugger
+# Date:   October 27, 2000
+#
+# Usage:
+#    visit-install-open [-beta | -private | -public] -v <version>
+#
+# Modifications:
+#   Brad Whitlock, Tue Mar 7 14:08:59 PST 2006
+#   Added -b bank to the visit-install invokations.
+#
+#   Hank Childs, Wed Oct 17 16:25:14 PDT 2007
+#   Add a subject line to the status e-mail.
+#
+#   Hank Childs, Sat May  2 13:26:51 CDT 2009
+#   Change config file to "llnl_open".
+#
+#   Eric Brugger, Fri Nov  5 15:22:54 PDT 2010
+#   I replaced yana with aztec.
+#
+#   Eric Brugger, Mon May 16 14:53:23 PDT 2011
+#   I added glory and redsky.
+#
+#   Eric Brugger, Fri Aug  5 09:53:51 PDT 2011
+#   I added kickit.
+#
+#   Eric Brugger, Tue Sep  6 14:13:59 PDT 2011
+#   I added rzzeus.
+#
+#   Brad Whitlock, Wed Oct 12 10:01:07 PDT 2011
+#   Install as llnl_open_cz or llnl_open_rz depending on machine.
+#
+#   Eric Brugger, Mon Jan 23 13:52:00 PST 2012
+#   I added sidious.
+#
+#   Eric Brugger, Thu Mar  1 12:56:56 PST 2012
+#   I added ubuntu1104_64.
+#
+#   Eric Brugger, Thu May  3 08:30:22 PDT 2012
+#   I removed ellipse and xchem.  I modified hoth, kickit, sidious and
+#   aztec for various reasons.  I updated the e-mail addresses.
+#
+#   Eric Brugger, Tue May 15 11:08:05 PDT 2012
+#   I changed the name of the ubuntu 11 executable.
+#
+#   Eric Brugger, Wed Jun 13 08:40:31 PDT 2012
+#   I added atlas and rzthriller.
+#
+#   Eric Brugger, Mon Jul 30 10:21:57 PDT 2012
+#   I replaced atlas with prism.
+#
+#   Eric Brugger, Wed Sep 26 17:11:04 PDT 2012
+#   I deleted prism.
+#
+#-----------------------------------------------------------------------
+
+test=no
+
+user=`whoami`
+
+#
+# Set the user e-mail address.
+#
+emailName=brugger1@llnl.gov
+case $user in
+   biagas2)
+      emailName=biagas2@llnl.gov
+      ;;
+   kbonnell)
+      emailName=biagas2@llnl.gov
+      ;;
+   brugger1)
+      emailName=brugger1@llnl.gov
+      ;;
+   brugger)
+      emailName=brugger1@llnl.gov
+      ;;
+   harrison37)
+      emailName=cyrush@llnl.gov
+      ;;
+   cyrush)
+      emailName=cyrush@llnl.gov
+      ;;
+   mcmiller)
+      emailName=miller86@llnl.gov
+      ;;
+   miller)
+      emailName=miller86@llnl.gov
+      ;;
+   whitlocb)
+      emailName=whitlock2@llnl.gov
+      ;;
+esac
+
+#
+# Parse the execute line, providing default values for error checking.
+#
+hoth=true
+kickit=true
+sidious=true
+ubuntu1104_64=false
+aztec=true
+rzthriller=true
+rzzeus=true
+euclid=true
+glory=false
+redsky=false
+
+ver=undefined
+
+#
+# The loop is executed once for each symbol on the execute line.  This means
+# that $1 may be blank for later executions of the loop if any "shift 2"
+# commands are executed.  The variable abc is not used in the loop.
+#
+for abc
+do
+   case $1 in
+      -none)
+         hoth=false
+         kickit=false
+         sidious=false
+         ubuntu1104_64=false
+         aztec=false
+         rzthriller=false
+         rzzeus=false
+         euclid=false
+         glory=false
+         redsky=false
+         shift
+         ;;
+      -hoth)
+         hoth=false
+         shift
+         ;;
+      +hoth)
+         hoth=true
+         shift
+         ;;
+      -kickit)
+         kickit=false
+         shift
+         ;;
+      +kickit)
+         kickit=true
+         shift
+         ;;
+      -sidious)
+         sidious=false
+         shift
+         ;;
+      +sidious)
+         sidious=true
+         shift
+         ;;
+      -ubuntu1104_64)
+         ubuntu1104_64=false
+         shift
+         ;;
+      +ubuntu1104_64)
+         ubuntu1104_64=true
+         shift
+         ;;
+      -aztec)
+         aztec=false
+         shift
+         ;;
+      +aztec)
+         aztec=true
+         shift
+         ;;
+      -rzthriller)
+         rzthriller=false
+         shift
+         ;;
+      +rzthriller)
+         rzthriller=true
+         shift
+         ;;
+      -rzzeus)
+         rzzeus=false
+         shift
+         ;;
+      +rzzeus)
+         rzzeus=true
+         shift
+         ;;
+      -euclid)
+         euclid=false
+         shift
+         ;;
+      +euclid)
+         euclid=true
+         shift
+         ;;
+      -glory)
+         glory=false
+         shift
+         ;;
+      +glory)
+         glory=true
+         shift
+         ;;
+      -redsky)
+         redsky=false
+         shift
+         ;;
+      +redsky)
+         redsky=true
+         shift
+         ;;
+      -v)
+         ver=$2
+         shift 2
+         ;;
+   esac
+done
+
+#
+# Check that the version was provided.
+#
+if [ $ver = undefined ]
+then
+   echo "Usage: [-none] [-<machine name>] -v <version>"
+   exit
+fi
+
+#
+# Check that the visit install script is present.
+#
+if [ ! -e visit-install ]
+then
+   echo "visit-install is missing."
+   exit
+fi
+
+ver2=`echo $ver | tr "." "_"`
+ver=`echo $ver2 | tr "_" "."`
+
+#
+# Install on hoth.
+#
+rm -f hoth
+cat <<EOF > hoth
+#!/bin/sh
+./visit-install -private -c llnl_open -g visit -b bdivp -gw -l $ver linux-x86_64-rhel6 /data/$user/visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on hoth"            > resultlog 2>&1
+echo "       --------------------------"           >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /data/$user/visit                            >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /data/$user/visit/$ver+/linux-x86_64/bin     >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /data/$user/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /data/$user/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /data/$user/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /data/$user/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/\/data\/$user\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail -s "VisIt install ($ver): hoth" $emailName < resultlog
+EOF
+
+if [ $hoth = true ]
+then
+   if [ $test = no ]
+   then
+      scp hoth:/data/$user/hoth/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-x86_64-rhel6.tar.gz
+      scp visit$ver2.linux-x86_64-rhel6.tar.gz hoth:visit$ver2.linux-x86_64-rhel6.tar.gz
+      scp visit-install hoth:
+      scp hoth hoth:hoth_install
+      ssh hoth "chmod 750 hoth_install;./hoth_install"
+   fi
+fi
+
+#
+# Install on kickit.
+#
+rm -f kickit
+cat <<EOF > kickit
+#!/bin/sh
+./visit-install -private -c llnl_open -g visit -b bdivp -gw -l $ver linux-rhel5 /usr/gapps/visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on kickit"          > resultlog 2>&1
+echo "       ----------------------------"         >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /usr/gapps/visit                             >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /usr/gapps/visit/$ver+/linux-intel/bin       >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/gapps/visit/$ver+/linux-intel/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/gapps/visit/$ver+/linux-intel/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/gapps/visit/$ver+/linux-intel/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /usr/gapps/visit/$ver+/linux-intel/plugins/databases/libI* | sed "s/\/usr\/gapps\/visit\/$ver+\/linux-intel\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $kickit = true ]
+then
+   if [ $test = no ]
+   then
+      scp kickit:/scratch/$user/kickit/visitbuild/visit$ver2.linux-intel.tar.gz visit$ver2.linux-rhel5.tar.gz
+      scp visit$ver2.linux-rhel5.tar.gz kickit:visit$ver2.linux-rhel5.tar.gz
+      scp visit-install kickit:
+      scp kickit kickit:kickit_install
+      ssh kickit "chmod 750 kickit_install;./kickit_install"
+   fi
+fi
+
+#
+# Install on sidious.
+#
+rm -f sidious
+cat <<EOF > sidious
+#!/bin/sh
+./visit-install -private -c llnl_open -g visit -b bdivp -gw -l $ver linux-x86_64-rhel5 /usr/gapps/visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on sidious"         > resultlog 2>&1
+echo "       -----------------------------"        >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /usr/gapps/visit                             >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /usr/gapps/visit/$ver+/linux-x86_64/bin      >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/\/usr\/gapps\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $sidious = true ]
+then
+   if [ $test = no ]
+   then
+      scp sidious:/tmp/$user/sidious/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-x86_64-rhel5.tar.gz
+      scp visit$ver2.linux-x86_64-rhel5.tar.gz sidious:visit$ver2.linux-x86_64-rhel5.tar.gz
+      scp visit-install sidious:
+      scp sidious sidious:sidious_install
+      ssh sidious "chmod 750 sidious_install;./sidious_install"
+   fi
+fi
+
+#
+# Install on ubuntu1104_64.
+#
+rm -f ubuntu1104_64
+cat <<EOF > ubuntu1104_64
+#!/bin/sh
+./visit-install -private -c llnl_open -g visit -b bdivp -gw -l $ver linux-x86_64-ubuntu11 /home/visit/visit > installlog 2>&1
+rm -f resultlog
+echo "      install of visit on ubuntu1104_64"      > resultlog 2>&1
+echo "     -----------------------------------"    >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /home/visit/visit                            >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /home/visit/visit/$ver+/linux-x86_64/bin     >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /home/visit/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /home/visit/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /home/visit/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /home/visit/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/\/home\/visit\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $ubuntu1104_64 = true ]
+then
+   if [ $test = no ]
+   then
+      cp /home/visit/ubuntu1104_64/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-x86_64-ubuntu11.tar.gz
+      scp ubuntu1104_64 ubuntu1104_64_install
+      chmod 750 ubuntu1104_64_install;./ubuntu1104_64_install
+   fi
+fi
+
+#
+# Install on aztec.
+#
+rm -f aztec
+cat <<EOF > aztec
+#!/bin/sh
+./visit-install -private -c llnl_open_cz -g visit -b bdivp -gw -l $ver linux-aztec /usr/gapps/visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on aztec"           > resultlog 2>&1
+echo "       ---------------------------"          >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /usr/gapps/visit                             >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /usr/gapps/visit/$ver+/linux-x86_64/bin      >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/\/usr\/gapps\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail -s "VisIt install ($ver): aztec" $emailName < resultlog
+EOF
+
+if [ $aztec = true ]
+then
+   if [ $test = no ]
+   then
+      scp aztec3:/usr/tmp/$user/aztec/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-aztec.tar.gz
+      scp visit$ver2.linux-aztec.tar.gz aztec:
+      scp visit-install aztec:
+      scp aztec aztec:aztec_install
+      ssh aztec "chmod 750 aztec_install;./aztec_install"
+   fi
+fi
+
+#
+# Install on rzthriller.
+#
+rm -f rzthriller
+cat <<EOF > rzthriller
+#!/bin/sh
+./visit-install -private -c llnl_open_rz -g visit -b bdivp -gw -l $ver linux-rzthriller /usr/gapps/visit > installlog 2>&1
+mv /usr/gapps/visit/$ver+/linux-x86_64 /usr/gapps/visit/$ver+/linux-x86_64-chaos4
+rm -f resultlog
+echo "        install of visit on rzthriller"         > resultlog 2>&1
+echo "       --------------------------------"        >> resultlog 2>&1
+echo ""                                               >> resultlog 2>&1
+df -k /usr/gapps/visit                                >> resultlog 2>&1
+echo ""                                               >> resultlog 2>&1
+ls -l /usr/gapps/visit/$ver+/linux-x86_64-chaos4/bin  >> resultlog 2>&1
+echo ""                                               >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                               >> resultlog 2>&1
+echo "The database plugins:"                          >> resultlog 2>&1
+ls /usr/gapps/visit/$ver+/linux-x86_64-chaos4/plugins/databases/libI* | sed "s/\/usr\/gapps\/visit\/$ver+\/linux-x86_64-chaos4\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail -s "VisIt install ($ver): rzthriller" $emailName < resultlog
+EOF
+
+if [ $rzthriller = true ]
+then
+   if [ $test = no ]
+   then
+      scp rzthriller:/usr/tmp/$user/rzthriller/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-rzthriller.tar.gz
+      scp visit$ver2.linux-rzthriller.tar.gz rzthriller:
+      scp visit-install rzthriller:
+      scp rzthriller rzthriller:rzthriller_install
+      ssh rzthriller "chmod 750 rzthriller_install;./rzthriller_install"
+   fi
+fi
+
+#
+# Install on rzzeus.
+#
+rm -f rzzeus
+cat <<EOF > rzzeus
+#!/bin/sh
+./visit-install -private -c llnl_open_rz -g visit -b bdivp -gw -l $ver linux-rzzeus /usr/gapps/visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on rzzeus"          > resultlog 2>&1
+echo "       ----------------------------"         >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /usr/gapps/visit                             >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /usr/gapps/visit/$ver+/linux-x86_64/bin      >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /usr/gapps/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/\/usr\/gapps\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail -s "VisIt install ($ver): rzzeus" $emailName < resultlog
+EOF
+
+if [ $rzzeus = true ]
+then
+   if [ $test = no ]
+   then
+      scp rzzeus286:/usr/tmp/$user/rzzeus/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-rzzeus.tar.gz
+      scp visit$ver2.linux-rzzeus.tar.gz rzzeus:
+      scp visit-install rzzeus:
+      scp rzzeus rzzeus:rzzeus_install
+      ssh rzzeus "chmod 750 rzzeus_install;./rzzeus_install"
+   fi
+fi
+
+#
+# Install on euclid.
+#
+rm -f euclid
+cat <<EOF > euclid
+#!/bin/sh
+./visit-install -private -c nersc -b bdivp $ver linux-euclid visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on euclid"          > resultlog 2>&1
+echo "       ----------------------------"         >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k visit                                        >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l visit/$ver+/linux-x86_64/bin                 >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail -s "VisIt install ($ver): euclid " $emailName < resultlog
+EOF
+
+if [ $euclid = true ]
+then
+   if [ $test = no ]
+   then
+      scp euclid.nersc.gov:/usr/tmp/$user/euclid/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-euclid.tar.gz
+      scp visit$ver2.linux-euclid.tar.gz euclid.nersc.gov:
+      scp visit-install euclid.nersc.gov:
+      scp euclid euclid.nersc.gov:euclid_install
+      ssh euclid.nersc.gov "chmod 750 euclid_install;./euclid_install"
+   fi
+fi
+
+#
+# Install on glory.
+#
+rm -f glory
+cat <<EOF > glory
+#!/bin/sh
+./visit-install -private -c sandia -l $ver linux-glory /projects/visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on glory"           > resultlog 2>&1
+echo "       ---------------------------"          >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /projects/visit                              >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /projects/visit/$ver+/linux-x86_64/bin       >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /projects/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /projects/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /projects/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /projects/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/projects\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail -s "VisIt install ($ver): glory" $emailName < resultlog
+EOF
+
+if [ $glory = true ]
+then
+   if [ $test = no ]
+   then
+      cp /usr/tmp/$user/glory/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-glory.tar.gz
+      cp glory glory_install
+      chmod 750 glory_install;./glory_install
+   fi
+fi
+
+#
+# Install on redsky.
+#
+rm -f redsky
+cat <<EOF > redsky
+#!/bin/sh
+./visit-install -private -c sandia -l $ver linux-redsky /projects/visit > installlog 2>&1
+rm -f resultlog
+echo "        install of visit on redsky"          > resultlog 2>&1
+echo "       ----------------------------"         >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+df -k /projects/visit                              >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+ls -l /projects/visit/$ver+/linux-x86_64/bin       >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "number of database plugins = "\`ls /projects/visit/$ver+/linux-x86_64/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls /projects/visit/$ver+/linux-x86_64/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls /projects/visit/$ver+/linux-x86_64/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                            >> resultlog 2>&1
+echo "The database plugins:"                       >> resultlog 2>&1
+ls /projects/visit/$ver+/linux-x86_64/plugins/databases/libI* | sed "s/projects\/visit\/$ver+\/linux-x86_64\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail -s "VisIt install ($ver): redsky" $emailName < resultlog
+EOF
+
+if [ $redsky = true ]
+then
+   if [ $test = no ]
+   then
+      cp /usr/tmp/$user/redsky/visitbuild/visit$ver2.linux-x86_64.tar.gz visit$ver2.linux-redsky.tar.gz
+      cp redsky redsky_install
+      chmod 750 redsky_install;./redsky_install
+   fi
+fi
+
+#
+# Clean up.
+#
+if [ $test = no ]
+then
+   rm -f hoth kickit sidious ubuntu1104_64 aztec rzthriller rzzeus euclid glory redsky
+fi

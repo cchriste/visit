@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+  <Plugin name="PeaksOverThreshold" type="operator" label="PeaksOverThreshold" version="1.0" enabled="true" mdspecificcode="false" engspecificcode="false" onlyengine="false" noengine="false" createExpression="true" exprInType="scalar" exprOutType="scalar">
+    <Attribute name="PeaksOverThresholdAttributes" purpose="Attributes for PeaksOverThreshold operator" persistent="true" keyframe="true" exportAPI="" exportInclude="">
+      <Enum name="AggregationType">
+        ANNUAL
+        SEASONAL
+        MONTHLY
+      </Enum>
+      <Enum name="SeasonType">
+        WINTER
+        SPRING
+        SUMMER
+        FALL
+      </Enum>
+      <Enum name="MonthType">
+        JAN
+        FEB
+        MAR
+        APR
+        MAY
+        JUN
+        JUL
+        AUG
+        SEP
+        OCT
+        NOV
+        DEC
+      </Enum>
+      <Field name="aggregation" label="Aggregation" type="enum" subtype="AggregationType">
+        ANNUAL
+      </Field>
+      <Field name="annualPercentile" label="Annual Percentile" type="double" enabler="aggregation:ANNUAL">
+        0.900000
+      </Field>
+      <Field name="seasonalPercentile" label="Seasonal Percentile" type="doubleArray" length="4" enabler="aggregation:SEASONAL">
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+      </Field>
+      <Field name="monthlyPercentile" label="Monthly Percentile" type="doubleArray" length="12" enabler="aggregation:MONTHLY">
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+        0.900000
+      </Field>
+      <Field name="displaySeason" label="Display Season" type="enum" subtype="SeasonType" enabler="aggregation:SEASONAL">
+        WINTER
+      </Field>
+      <Field name="displayMonth" label="Display Month" type="enum" subtype="MonthType" enabler="aggregation:MONTHLY">
+        JAN
+      </Field>
+      <Field name="cutoff" label="Cutoff" type="float">
+        0.000000
+      </Field>
+      <Field name="computeParamValues" label="Output parameter values" type="bool">
+        false
+      </Field>
+      <Field name="computeCovariates" label="Compute covariates" type="bool">
+        false
+      </Field>
+      <Field name="covariateReturnYears" label="Covariate return years" type="intVector" enabler="computeCovariates:true">
+        1
+      </Field>
+      <Field name="covariateModelLocation" label="Covariate Location Model" type="bool" enabler="computeCovariates:true">
+        false
+      </Field>
+      <Field name="covariateModelShape" label="Covariate Shape Model" type="bool" enabler="computeCovariates:true">
+        false
+      </Field>
+      <Field name="covariateModelScale" label="Covariate Scale Model" type="bool" enabler="computeCovariates:true">
+        false
+      </Field>
+      <Field name="computeRVDifferences" label="Compute RV differences" type="bool" enabler="computeCovariates:true">
+        false
+      </Field>
+      <Field name="rvDifferences" label="RV Differences" type="intArray" length="2" enabler="computeRVDifferences:true">
+        0
+        0
+      </Field>
+      <Field name="dataScaling" label="Data Scaling" type="double">
+        86500.000000
+      </Field>
+      <Field name="dumpData" label="Dump Data" type="bool">
+        false
+      </Field>
+    </Attribute>
+  </Plugin>

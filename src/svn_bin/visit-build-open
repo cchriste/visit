@@ -1,0 +1,832 @@
+#!/bin/sh
+#-----------------------------------------------------------------------
+#
+# VISIT-BUILD-OPEN - Build the visit distributions on the open network.
+#
+# Author: Eric Brugger
+# Date:   October 27, 2000
+#
+# Usage:
+#    visit-build-open -d <distribution>
+#
+# Modifications:
+#   Brad Whitlock, Fri Dec 15 09:51:55 PDT 2006
+#   Added --enable-visitmodule for some platforms.
+#
+#   Hank Childs, Mon Oct 15 09:04:12 PDT 2007
+#   Add some print statements for usability.  Also make sure that 
+#   /usr/bin/X11 is in the path for yana and prism.  If you are a ksh
+#   user, your environment will not get sourced and xmkmf will not be
+#   found, leading configure to not find the right X libraries, which 
+#   will lead to a compile error.
+#
+#   Hank Childs, Wed Oct 17 14:28:48 PDT 2007
+#   Add support for ksh users on sunspot.  (Default environment
+#   inherited by "sh" is not enough to do a compile.)
+#
+#   Hank Childs, Wed Oct 17 16:25:14 PDT 2007
+#   Add a subject line to the status e-mails.  Also workaround problem
+#   with quad mailing out.
+#
+#   Hank Childs, Mon Oct 22 09:25:47 PDT 2007
+#   More ksh sunspot fixes.
+#
+#   Hank Childs, Sat Feb  9 14:18:54 PST 2008
+#   Change clearcase_bin to svn_bin.
+#
+#   Brad Whitlock, Fri Oct 10 15:25:27 PST 2008
+#   Added --enable-slivr to some of the Linux targets.
+#
+#   Brad Whitlock, Tue Dec  2 13:49:50 PST 2008
+#   Add --prefix for Linux targets so we can use -rpath for the engine
+#   wrapper library. I commented out sunspot since Qt4 does not build
+#   there.
+#
+#   Brad Whitlock, Fri May 14 10:23:41 PDT 2010
+#   I removed double builds and made the the packages always include
+#   the 3rd party libs since the size difference isn't worth the
+#   extra build time IMHO.
+#
+#   Cyrus Harrison, Thu Oct 14 09:59:13 PDT 2010
+#   Added cyrush@llnl.gov to the email list & fixed problem with
+#   creating proper config-site.cmake on alastor.
+#
+#   Eric Brugger, Fri Nov  5 15:21:42 PDT 2010
+#   I replaced yana with aztec.
+#
+#   Eric Brugger, Fri Nov  5 16:06:28 PDT 2010
+#   I removed up.
+#
+#   Cyrus Harrison, Tue Jan 11 11:42:58 PST 2011
+#   Pass types on command line for cmake vars:
+#      CMAKE_BUILD_TYPE & VISIT_THIRD_PARTY_INSTALL
+#
+#   Eric Brugger, Mon May 16 14:51:39 PDT 2011
+#   I added glory and redsky.
+#
+#   Eric Brugger, Fri Jun 10 13:24:20 PDT 2011
+#   I added -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON to the cmake command
+#   for ellipse.
+#
+#   Eric Brugger, Fri Aug  5 09:48:13 PDT 2011
+#   I added kickit.
+#
+#   Eric Brugger, Tue Sep  6 13:58:32 PDT 2011
+#   I added rzzeus.
+#
+#   Eric Brugger, Mon Jan 23 11:59:40 PST 2012
+#   I added sidious.
+#
+#   Eric Brugger, Wed Feb 29 12:15:34 PST 2012
+#   I added ubuntu1104_64.
+#
+#   Eric Brugger, Thu Mar  1 07:57:45 PST 2012
+#   I modified the builds on hoth and sidious to use the serial config
+#   site files.
+#
+#   Eric Brugger, Wed May  2 08:45:05 PDT 2012
+#   I removed ellipse and xchem.  I modified hoth since it is now an x86_64
+#   rhel6 system instead of an x86 rhel3 system.  I updated the e-mail
+#   addresses.
+#
+#   Eric Brugger, Wed Jun 13 08:38:15 PDT 2012
+#   I added atlas and rzthriller.
+#
+#   Eric Brugger, Thu Jun 21 16:17:04 PDT 2012
+#   I modified many of the builds to use cmake 2.8.8.
+#
+#   Eric Brugger, Wed Jun 27 11:40:14 PDT 2012
+#   I deleted alastor.
+#
+#   Eric Brugger, Mon Jul 30 10:13:05 PDT 2012
+#   I replaced atlas with prism.
+#
+#   Eric Brugger, Wed Sep 26 17:09:04 PDT 2012
+#   I deleted prism.
+#
+#-----------------------------------------------------------------------
+
+test=no
+
+user=`whoami`
+
+#
+# Set the user e-mail address.
+#
+emailName=brugger1@llnl.gov
+case $user in
+   biagas2)
+      emailName=biagas2@llnl.gov
+      ;; 
+   kbonnell)
+      emailName=biagas2@llnl.gov
+      ;; 
+   brugger1)
+      emailName=brugger1@llnl.gov
+      ;;
+   brugger)
+      emailName=brugger1@llnl.gov
+      ;;
+   harrison37)
+      emailName=cyrush@llnl.gov
+      ;;
+   cyrush)
+      emailName=cyrush@llnl.gov
+      ;;
+   mcmiller)
+      emailName=miller86@llnl.gov
+      ;;
+   miller)
+      emailName=miller86@llnl.gov
+      ;;
+   whitlocb)
+      emailName=whitlock2@llnl.gov
+      ;;
+esac
+
+#
+# Parse the execute line, providing default values for error checking.
+#
+hoth=true
+kickit=true
+sidious=true
+ubuntu1104_64=false
+aztec=true
+rzthriller=true
+rzzeus=true
+euclid=true
+glory=false
+redsky=false
+
+dist=undefined
+
+#
+# The loop is executed once for each symbol on the execute line.  This means
+# that $1 may be blank for later executions of the loop if any "shift 2"
+# commands are executed.  The variable abc is not used in the loop.  
+#
+for abc
+do
+   case $1 in
+      -none)
+         hoth=false
+         kickit=false
+         sidious=false
+         ubuntu1104_64=false
+         aztec=false
+         rzthriller=false
+         rzzeus=false
+         euclid=false
+         glory=false
+         redsky=false
+         shift
+         ;;
+      -hoth)
+         hoth=false
+         shift
+         ;;
+      +hoth)
+         hoth=true
+         shift
+         ;;
+      -kickit)
+         kickit=false
+         shift
+         ;;
+      +kickit)
+         kickit=true
+         shift
+         ;;
+      -sidious)
+         sidious=false
+         shift
+         ;;
+      +sidious)
+         sidious=true
+         shift
+         ;;
+      -ubuntu1104_64)
+         ubuntu1104_64=false
+         shift
+         ;;
+      +ubuntu1104_64)
+         ubuntu1104_64=true
+         shift
+         ;;
+      -aztec)
+         aztec=false
+         shift
+         ;;
+      +aztec)
+         aztec=true
+         shift
+         ;;
+      -rzthriller)
+         rzthriller=false
+         shift
+         ;;
+      +rzthriller)
+         rzthriller=true
+         shift
+         ;;
+      -rzzeus)
+         rzzeus=false
+         shift
+         ;;
+      +rzzeus)
+         rzzeus=true
+         shift
+         ;;
+      -euclid)
+         euclid=false
+         shift
+         ;;
+      +euclid)
+         euclid=true
+         shift
+         ;;
+      -glory)
+         glory=false
+         shift
+         ;;
+      +glory)
+         glory=true
+         shift
+         ;;
+      -redsky)
+         redsky=false
+         shift
+         ;;
+      +redsky)
+         redsky=true
+         shift
+         ;;
+      -d)
+         dist=$2
+         shift 2
+         ;;
+   esac
+done
+
+#
+# Check that the distribution name was provided.
+#
+if [ $dist = undefined ]
+then
+   echo "Usage: [-none] [-<machine name>] -d <distribution>"
+   echo "Valid machine names:"
+   echo "    hoth (B-Div, Linux),"
+   echo "    kickit (B-Div, Linux),"
+   echo "    sidious(B-Div, Linux),"
+   echo "    Ubunut1104-64(B-Div, Linux),"
+   echo "    aztec (LC, Linux, x86_64),"
+   echo "    rzthriller (LC, Linux, x86_64),"
+   echo "    rzzeus (LC, Linux, x86_64),"
+   echo "    euclid (LBNL, Linux, x86_64),"
+   echo "    glory (Sandia, Linux)"
+   echo "    redsky (Sandia, Linux)"
+   exit
+fi
+
+#
+# Check that the distribution exists.
+#
+distfile=$dist.tar.gz
+if [ ! -f $distfile ]
+then
+   echo "Distribution file doesn't exist."
+   exit
+fi
+
+#
+# Build on hoth.
+#
+rm -f hoth
+cat <<EOF > hoth
+#!/bin/sh
+if test ! -e /data/$user ; then
+   mkdir /data/$user
+fi
+if test ! -e /data/$user/hoth ; then
+   mkdir /data/$user/hoth
+fi
+rm -rf /data/$user/hoth/visitbuild
+mkdir /data/$user/hoth/visitbuild
+mv hoth_$dist.tar.gz /data/$user/hoth/visitbuild/$dist.tar.gz
+cd /data/$user/hoth/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+cd config-site
+mv hoth.cmake hoth.parallel.cmake
+mv hoth.serial.cmake hoth.cmake
+cd ..
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/usr/gapps/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.4/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 4 >> ../../buildlog 2>&1
+make -j 4 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on hoth"         > resultlog 2>&1
+echo "       ------------------------"        >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail  -s "VisIt build ($dist): hoth" $emailName < resultlog
+EOF
+
+if [ $hoth = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on hoth"
+      scp hoth hoth:hoth_buildit
+      scp $dist.tar.gz hoth:hoth_$dist.tar.gz
+      ssh hoth "chmod 750 hoth_buildit;./hoth_buildit" &
+   fi
+fi
+
+#
+# Build on kickit.
+#
+rm -f kickit
+cat <<EOF > kickit
+#!/bin/sh
+if test ! -e /scratch/$user ; then
+   mkdir /scratch/$user
+fi
+if test ! -e /scratch/$user/kickit ; then
+   mkdir /scratch/$user/kickit
+fi
+rm -rf /scratch/$user/kickit/visitbuild
+mkdir /scratch/$user/kickit/visitbuild
+mv kickit_$dist.tar.gz /scratch/$user/kickit/visitbuild/$dist.tar.gz
+cd /scratch/$user/kickit/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/usr/gapps/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-i686_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 4 >> ../../buildlog 2>&1
+make -j 4 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-intel.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on kickit"       > resultlog 2>&1
+echo "       --------------------------"      >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $kickit = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on kickit"
+      scp kickit kickit:kickit_buildit
+      scp $dist.tar.gz kickit:kickit_$dist.tar.gz
+      ssh kickit "chmod 750 kickit_buildit;./kickit_buildit" &
+   fi
+fi
+
+#
+# Build on sidious.
+#
+rm -f sidious
+cat <<EOF > sidious
+#!/bin/sh
+if test ! -e /tmp/$user ; then
+   mkdir /tmp/$user
+fi
+if test ! -e /tmp/$user/sidious ; then
+   mkdir /tmp/$user/sidious
+fi
+rm -rf /tmp/$user/sidious/visitbuild
+mkdir /tmp/$user/sidious/visitbuild
+mv sidious_$dist.tar.gz /tmp/$user/sidious/visitbuild/$dist.tar.gz
+cd /tmp/$user/sidious/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+cd config-site
+mv sidious.llnl.gov.cmake sidious.llnl.gov.parallel.cmake
+mv sidious.llnl.gov.serial.cmake sidious.llnl.gov.cmake
+cd ..
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/usr/gapps/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 4 >> ../../buildlog 2>&1
+make -j 4 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on sidious"      > resultlog 2>&1
+echo "       ---------------------------"     >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $sidious = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on sidious"
+      scp sidious sidious:sidious_buildit
+      scp $dist.tar.gz sidious:sidious_$dist.tar.gz
+      ssh sidious "chmod 750 sidious_buildit;./sidious_buildit" &
+   fi
+fi
+
+#
+# Build on ubuntu1104_64.
+#
+rm -f ubuntu1104_64
+cat <<EOF > ubuntu1104_64
+#!/bin/sh
+if test ! -e /home/visit/ubuntu1104_64; then
+   mkdir /home/visit/ubuntu1104_64
+fi
+rm -rf /home/visit/ubuntu1104_64/visitbuild
+mkdir /home/visit/ubuntu1104_64/visitbuild
+mv ubuntu1104_64_$dist.tar.gz /home/visit/ubuntu1104_64/visitbuild/$dist.tar.gz
+cd /home/visit/ubuntu1104_64/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/home/visit/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.5/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 2 >> ../../buildlog 2>&1
+make -j 2 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "     build of visit on ubuntu1104_64"    > resultlog 2>&1
+echo "    ---------------------------------"  >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+EOF
+
+if [ $ubuntu1104_64 = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on ubuntu1104_64"
+      cp ubuntu1104_64 ubuntu1104_64_buildit
+      cp $dist.tar.gz ubuntu1104_64_$dist.tar.gz
+      chmod 750 ubuntu1104_64_buildit;./ubuntu1104_64_buildit &
+   fi
+fi
+
+#
+# Build on aztec.
+#
+rm -f aztec
+cat <<EOF > aztec
+#!/bin/sh
+if test ! -d /usr/tmp/$user ; then
+   mkdir /usr/tmp/$user
+fi
+if test ! -d /usr/tmp/$user/aztec ; then
+   mkdir /usr/tmp/$user/aztec
+fi
+rm -rf /usr/tmp/$user/aztec/visitbuild
+mkdir /usr/tmp/$user/aztec/visitbuild
+mv aztec_$dist.tar.gz /usr/tmp/$user/aztec/visitbuild/$dist.tar.gz
+cd /usr/tmp/$user/aztec/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+export PATH=\$PATH:/usr/bin/X11
+/usr/gapps/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.4/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 6 >> ../../buildlog 2>&1
+make -j 6 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on aztec"        > resultlog 2>&1
+echo "       -------------------------"       >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail  -s "VisIt build ($dist): aztec" $emailName < resultlog
+EOF
+
+if [ $aztec = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on aztec"
+      scp aztec aztec:aztec_buildit
+      scp $dist.tar.gz aztec:aztec_$dist.tar.gz
+      ssh aztec3 "chmod 750 aztec_buildit;./aztec_buildit" &
+   fi
+fi
+
+#
+# Build on rzthriller.
+#
+rm -f rzthriller
+cat <<EOF > rzthriller
+#!/bin/sh
+if test ! -d /usr/tmp/$user ; then
+   mkdir /usr/tmp/$user
+fi
+if test ! -d /usr/tmp/$user/rzthriller ; then
+   mkdir /usr/tmp/$user/rzthriller
+fi
+rm -rf /usr/tmp/$user/rzthriller/visitbuild
+mkdir /usr/tmp/$user/rzthriller/visitbuild
+mv rzthriller_$dist.tar.gz /usr/tmp/$user/rzthriller/visitbuild/$dist.tar.gz
+cd /usr/tmp/$user/rzthriller/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+export PATH=\$PATH:/usr/bin/X11
+/usr/gapps/visit/cmake/2.8.8/linux-x86_64_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 6 >> ../../buildlog 2>&1
+#
+# cpack for cmake 2.8.8 crashes on rzthriller so I am using the 2.8.3 version.
+#
+/usr/gapps/visit/cmake/2.8.3/linux-x86_64_gcc-4.1/bin/cpack --config ./CPackConfig.cmake >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on rzthriller"   > resultlog 2>&1
+echo "       ------------------------------"  >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail  -s "VisIt build ($dist): rzthriller" $emailName < resultlog
+EOF
+
+if [ $rzthriller = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on rzthriller"
+      scp rzthriller rzthriller:rzthriller_buildit
+      scp $dist.tar.gz rzthriller:rzthriller_$dist.tar.gz
+      ssh rzthriller "chmod 750 rzthriller_buildit;./rzthriller_buildit" &
+   fi
+fi
+
+#
+# Build on rzzeus.
+#
+rm -f rzzeus
+cat <<EOF > rzzeus
+#!/bin/sh
+if test ! -d /usr/tmp/$user ; then
+   mkdir /usr/tmp/$user
+fi
+if test ! -d /usr/tmp/$user/rzzeus ; then
+   mkdir /usr/tmp/$user/rzzeus
+fi
+rm -rf /usr/tmp/$user/rzzeus/visitbuild
+mkdir /usr/tmp/$user/rzzeus/visitbuild
+mv rzzeus_$dist.tar.gz /usr/tmp/$user/rzzeus/visitbuild/$dist.tar.gz
+cd /usr/tmp/$user/rzzeus/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+export PATH=\$PATH:/usr/bin/X11
+/usr/gapps/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.4/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 6 >> ../../buildlog 2>&1
+make -j 6 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on rzzeus"       > resultlog 2>&1
+echo "       --------------------------"      >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail  -s "VisIt build ($dist): rzzeus" $emailName < resultlog
+EOF
+
+if [ $rzzeus = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on rzzeus"
+      scp rzzeus rzzeus:rzzeus_buildit
+      scp $dist.tar.gz rzzeus:rzzeus_$dist.tar.gz
+      ssh rzzeus286 "chmod 750 rzzeus_buildit;./rzzeus_buildit" &
+   fi
+fi
+
+#
+# Build on euclid.
+#
+rm -f euclid
+cat <<EOF > euclid
+#!/bin/sh
+if test ! -d /usr/tmp/$user ; then
+   mkdir /usr/tmp/$user
+fi
+if test ! -d /usr/tmp/$user/euclid; then
+   mkdir /usr/tmp/$user/euclid
+fi
+rm -rf /usr/tmp/$user/euclid/visitbuild
+mkdir /usr/tmp/$user/euclid/visitbuild
+mv euclid_$dist.tar.gz /usr/tmp/$user/euclid/visitbuild/$dist.tar.gz
+cd /usr/tmp/$user/euclid/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/project/projectdirs/visit/visit_3rdparty/euclid_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release -DVISIT_INSTALL_THIRD_PARTY:BOOL=ON >> ../../buildlog 2>&1
+make -j 4 >> ../../buildlog 2>&1
+make -j 4 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on euclid"       > resultlog 2>&1
+echo "       --------------------------"      >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail  -s "VisIt build ($dist): euclid" $emailName < resultlog
+EOF
+
+if [ $euclid = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on euclid"
+      scp euclid euclid.nersc.gov:euclid_buildit
+      scp $dist.tar.gz euclid.nersc.gov:euclid_$dist.tar.gz
+      ssh euclid.nersc.gov "chmod 750 euclid_buildit;./euclid_buildit" &
+   fi
+fi
+
+#
+# Build on glory.
+#
+rm -f glory
+cat <<EOF > glory
+#!/bin/sh
+module load compilers/gcc-4.3.4
+if test ! -d /usr/tmp ; then
+   mkdir /usr/tmp
+fi
+if test ! -d /usr/tmp/$user ; then
+   mkdir /usr/tmp/$user
+fi
+if test ! -d /usr/tmp/$user/glory; then
+   mkdir /usr/tmp/$user/glory
+fi
+rm -rf /usr/tmp/$user/glory/visitbuild
+mkdir /usr/tmp/$user/glory/visitbuild
+mv glory_$dist.tar.gz /usr/tmp/$user/glory/visitbuild/$dist.tar.gz
+cd /usr/tmp/$user/glory/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/projects/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.3/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release >> ../../buildlog 2>&1
+make -j 2 >> ../../buildlog 2>&1
+make -j 2 package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on glory"        > resultlog 2>&1
+echo "       -------------------------"       >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail  -s "VisIt build ($dist): glory" $emailName < resultlog
+EOF
+
+if [ $glory = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on glory"
+      cp glory glory_buildit
+      cp $dist.tar.gz glory_$dist.tar.gz
+      chmod 750 glory_buildit;./glory_buildit &
+   fi
+fi
+
+#
+# Build on redsky.
+#
+rm -f redsky
+cat <<EOF > redsky
+#!/bin/sh
+if test ! -d /usr/tmp ; then
+   mkdir /usr/tmp
+fi
+if test ! -d /usr/tmp/$user ; then
+   mkdir /usr/tmp/$user
+fi
+if test ! -d /usr/tmp/$user/redsky; then
+   mkdir /usr/tmp/$user/redsky
+fi
+rm -rf /usr/tmp/$user/redsky/visitbuild
+mkdir /usr/tmp/$user/redsky/visitbuild
+mv redsky_$dist.tar.gz /usr/tmp/$user/redsky/visitbuild/$dist.tar.gz
+cd /usr/tmp/$user/redsky/visitbuild
+gunzip -c $dist.tar.gz | tar xvf - > buildlog 2>&1
+cd $dist/src
+ver=\`cat VERSION\`
+ver2=\`echo \$ver | tr "." "_"\`
+/projects/visit/thirdparty_shared_2_5_1/cmake/2.8.8/linux-x86_64_gcc-4.1/bin/cmake . -DCMAKE_BUILD_TYPE:STRING=Release >> ../../buildlog 2>&1
+make >> ../../buildlog 2>&1
+make package >> ../../buildlog 2>&1
+mv visit\$ver2.linux-x86_64.tar.gz ../..
+cd ../..
+rm -f resultlog
+echo "        build of visit on redsky"       > resultlog 2>&1
+echo "       --------------------------"      >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+ls -l                                         >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "number of database plugins = "\`ls $dist/src/plugins/databases/libI* | wc -l\` >> resultlog 2>&1
+echo "number of operator plugins = "\`ls $dist/src/plugins/operators/libI* | wc -l\` >> resultlog 2>&1
+echo "number of plot plugins = "\`ls $dist/src/plugins/plots/libI* | wc -l\` >> resultlog 2>&1
+echo ""                                       >> resultlog 2>&1
+echo "The database plugins:"                  >> resultlog 2>&1
+ls $dist/src/plugins/databases/libI* | sed "s/$dist\/src\/plugins\/databases\/libI//" | sed "s/Database.so//" >> resultlog 2>&1
+mail  -s "VisIt build ($dist): redsky" $emailName < resultlog
+EOF
+
+if [ $redsky = true ]
+then
+   if [ $test = no ]
+   then
+      echo "Building on redsky"
+      cp redsky redsky_buildit
+      cp $dist.tar.gz redsky_$dist.tar.gz
+      chmod 750 redsky_buildit;./redsky_buildit &
+   fi
+fi
+
+#
+# Clean up.
+#
+if [ $test = no ]
+then
+   rm -f hoth kickit sidious ubuntu1104_64 aztec rzthriller rzzeus euclid glory redsky
+fi

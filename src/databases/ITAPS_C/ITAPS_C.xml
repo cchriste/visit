@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+  <Plugin name="ITAPS_C" type="database" label="ITAPS_C" version="1.0" enabled="true" mdspecificcode="true" engspecificcode="false" onlyengine="false" noengine="false" dbtype="STMD" haswriter="true" hasoptions="true" filePatternsStrict="false">
+    <FilePatterns>
+       *.cub 
+    </FilePatterns>
+    <CXXFLAGS>
+       -DITAPS_C
+       ${ITAPS_C_INCLUDE_DIR}
+    </CXXFLAGS>
+    <LDFLAGS>
+       ${ITAPS_C_LIBRARY_DIR}
+    </LDFLAGS>
+    <LIBS>
+       $(ITAPS_C_LIB)
+    </LIBS>
+    <Files components="M">
+      avtITAPS_CFileFormat.C
+      avtITAPS_CUtility.C
+      avtITAPS_CWriter.C
+      avtITAPS_COptions.C
+    </Files>
+    <Files components="E">
+      avtITAPS_CFileFormat.C
+      avtITAPS_CUtility.C
+      avtITAPS_CWriter.C
+      avtITAPS_COptions.C
+    </Files>
+    <Attribute name="" purpose="" persistent="false" keyframe="true">
+    </Attribute>
+  </Plugin>

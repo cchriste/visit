@@ -1,0 +1,100 @@
+
+
+                       Installation instructions for VisIt
+                      =====================================
+
+This document contains instructions for installing VisIt on Windows, MacOS X,
+and Unix systems.  The Windows and MacOS X installation instructions are first,
+followed by the Unix installation instructions.
+
+* Note that VisIt can be installed in 2 different ways on MacOS X: as an 
+  application bundle and as a gzipped tar file, as on Unix installations.
+
+
+Windows:
+========
+
+1.  Copy the visit2.5.2.exe or visit2.5.2_x64.exe installer program to your desktop.
+
+2.  Double click on the installer program icon to run the installer.
+
+3.  Follow the directions provided by the installer.
+
+
+MacOS X (application bundle):
+==============================
+
+Downloads:
+* VisIt-2.5.2-i386-installer.dmg    : 32-bit Mac
+* VisIt-2.5.2-x86_64-installer.dmg  : 64-bit Mac and runs on Mac 10.6 or later
+
+1. Download the appropriate file and copy it to the desktop.
+
+2. Double click on the file to open it. This will cause MacOS to mount the
+   disk image and open it in Finder.
+
+3. Once the disk image is open in Finder, copy the VisIt application to
+   the desktop.
+
+4. Eject the disk image in Finder.
+
+5. Double click on the VisIt application to run VisIt.
+
+
+Unix and MacOS X (gzipped tar file):
+=====================================
+
+1.  Run the visit-install script to install visit.  If you have built your
+    own visit binary distribution, you can find the visit-install script
+    in the svn_bin directory.  The visit-install script can create a new
+    distribution directory or update an existing distribution.  This is
+    handled automatically.
+
+        chmod 755 visit-install2_5_2
+        ./visit-install2_5_2 "version" "platform" "directory"
+
+    where
+
+        "version" will be 2.5.2 for the current distribution.
+
+        "platform" will be one of the following:  linux-rhel5, linux-rhel6,
+        linux-x86_64-ubuntu11, linux-x86_64, linux-x86_64-euclid, darwin-i386
+        or darwin-x86_64 depending on the machine.  The one you use should
+        match the name of the accompanying distribution file.
+
+        "directory" is the directory you wish to install visit into.
+        If the directory doesn't exist the script will create it.
+
+    For example
+
+        chmod 755 visit-install2_5_2
+        ./visit-install2_5_2 2.5.2 linux-rhel5 /usr/local/visit
+
+    will install the linux-rhel5, 2.5.2 version of visit in the directory
+    "/usr/local/visit".  Note that you will need to have the file
+    "visit2_5_2.linux-rhel5.tar.gz" present in the current directory for this
+    to function properly.  You can install multiple binaries into the
+    same directory.  For example, you could then execute
+
+        chmod 755 visit-install2_5_2
+        ./visit-install2_5_2 2.5.2 linux-x86_64 /usr/local/visit
+
+    to add a linux x86_64, 2.5.2 version of visit to the same directory.
+
+2.  Add the bin directory below the installation directory
+    (/usr/local/visit/bin in our example) to each user's search path.
+    The best way to do this is to add it to the user's .cshrc file.
+    The bin directory contains the visit script which starts VisIt.
+    It can be run on many machines.  The script determines the type of
+    machine it is running on and starts the appropriate executable.
+    If visit were installed in the directory "/usr/local/visit",
+    then the following commands would set your search path
+    appropriately.
+
+        cd
+        echo "set path = ($path /usr/local/visit/bin)" >> .cshrc
+
+    This completes the installation process for VisIt.
+
+3.  If you are installing VisIt on a Linux system with an NVidia graphics
+    card, we recommend using the latest driver.

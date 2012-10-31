@@ -1,0 +1,292 @@
+#!/bin/bash
+
+# *****************************************************************************
+#   Script: build_visit
+#
+#   Purpose:
+#       A script that performs a complete build of VisIt and its support
+#       libraries.  The script will detect if support libraries have already
+#       been built and, if so, use those pre-built libraries.
+#
+#   Warning:
+#       This script is only expected to work for Linux, and Darwin systems.
+#       If you need to build VisIt for another platform, you should consult
+#       the BUILD_NOTES that come with the VisIt source.  That document
+#       contains instructions on how to build VisIt and its third party
+#       libraries.
+#
+#   This script has been tested and is known to work with the following OS/
+#   compiler combinations:
+#
+#	OS	Hardware	Compiler	Machine
+#	-----	--------	--------	-------
+#       RHEL3, 	x86,		GCC 3.2.3	hoth.llnl.gov
+#       CHAOS, 	x86_64,		GCC 4.1.2	aztec.llnl.gov
+#       SuSE,   x86_64,		GCC 4.0.2	antares.lbl.gov
+#       SuSE,   x86_64,		GCC 4.1.0	octagon.lbl.gov
+#       MacOSX  i386,		GCC 4.0.1	corellia.llnl.gov
+#       MacOSX  x86_64          GCC 4.2.1       galvatron.llnl.gov
+#       MacOSX  ppc,		GCC 4.0.1	snailbait.llnl.gov
+#
+#   It is believed that this script will also work with other Linux variations.
+#   Please send feedback to visit-users@ornl.gov if you run into problems
+#   so that this script can be improved in the future.  If you have built
+#   VisIt using this script on an OS/hardware/compiler combination not listed
+#   above, please send a note to visit-users@ornl.gov, so we can add that
+#   information to the script.
+#
+
+# To create your own modular file these 7 functions need to be implemented..
+#filename: bv_<module>.sh
+#bv_<module>_initialize : Initialize any variables you may want to export
+#bv_<module>_enable : Enables the module 
+#bv_<module>_disable : Disables the module
+#bv_<module>_info : Where to get the module, the version, etc...
+#bv_<module>_ensure : Ensure the module has been downloaded and extracted properly. Set and check variables here..
+#bv_<module>_depends_on : What other modules does this module depend on. Example "adios" returns string "mxml"
+#bv_<module>_build : build the module
+
+#order of execution
+#1. bv_<module>_initialize anything to intialize the module
+#2. bv_<module>_info runs to setup download locations,directories,etc..
+#3. bv_<module>_[enable|disable] runs next to enable or disable the module
+#4. bv_<module>_ensure runs to ensure module is setup properly and variables are initialized
+#5  bv_<module>_depends_on [not implemented yet], also may be removed in favor of xml structure
+#6. bv_<module>_build builds the module
+
+#state = "disabled", "enabled", "installed"
+declare -a reqlibs
+declare -a reqlibs_state
+declare -a optlibs
+declare -a optlibs_state
+declare -a grouplibs_name
+declare -a grouplibs_deps
+declare -a grouplibs_comment
+declare -a grouplibs_enabled
+
+
+INITIAL_PWD=$PWD
+
+#First step download the support directory from svn repository..
+bv_PATH=`dirname $0`
+
+bv_PREFIX=$bv_PATH/bv_support/
+
+function configure_support_files
+{
+    if [ ! -d $bv_PREFIX ]; then 
+        #check current directory
+        bv_PREFIX=$PWD/bv_support/
+
+        if [ ! -d $bv_PREFIX ]; then 
+
+            for choice in `echo "curl wget svn"`
+            do
+                echo "Trying to fetch support files using: $choice"
+
+                #if choice successful then exit, else try next..
+                webaddr="http://portal.nersc.gov/svn/visit/trunk/src/svn_bin/bv_support/"
+                tmp_choice=`which $choice`
+
+                if [ $? != 0 ]; then
+                    continue
+                fi
+                if [[ $choice == "curl" ]]; then
+                    tmp_curl=`curl -s ${webaddr}/ | grep 'sh\|xml' | grep li|sed s/.*bv_/bv_/g | sed -e s/\.sh.*/\.sh/g | sed -e s/.*href\=\"//g;`
+
+                    if [ $? != 0 ]; then 
+                        continue
+                    fi
+
+                    mkdir -p bv_support_tmp
+                    is_successful=1
+                    #fetch each file..
+                    for curl_files in `echo $tmp_curl`
+                    do 
+                        curl -s ${webaddr}/${curl_files} -o bv_support_tmp/$curl_files 
+                        if [ $? != 0 ]; then
+                            is_successful=0
+                            break
+                        fi
+                    done
+
+                    #if not successful cleanup and try next option..
+                    if [ $is_successful == 0 ]; then 
+                        rm -fR bv_support_tmp
+                    else
+                        mv bv_support_tmp bv_support
+                    fi
+                elif [[ $choice == "wget" ]]; then
+                    wget -r -nH --cut-dirs=5 --no-parent --reject="index.html" -q ${webaddr}
+                else
+                    svn co ${webaddr} bv_support
+                fi
+
+                if [ ! -d $bv_PREFIX ]; then
+                    echo "$choice failed to retrieve support files"
+                else
+                    echo "Success. downloaded support, continuing"
+                    break
+                fi
+            done
+        fi
+
+        if [ ! -d $bv_PREFIX ]; then
+            echo "Failed to detect or fetch support files, please contact visit-users mailing list with error. Quitting..."
+            exit 2
+        fi
+    fi
+}
+
+
+#configure the support files if needed..
+configure_support_files
+
+#import initialize and run functions..
+. $bv_PREFIX/bv_main.sh
+
+#import helper functions..
+. $bv_PREFIX/helper_funcs.sh
+
+#import visit
+. $bv_PREFIX/bv_visit.sh
+
+#handle -h or --help arg early to avoid delays
+for arg in "$@";
+do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+        usage
+        exit 2
+    fi
+done
+
+#These options can be read from a file..
+. $bv_PREFIX/bv_xml_parser.sh
+
+#read in the module file..
+readXmlModuleFile $bv_PREFIX/modules.xml
+
+if [[ $? == 0 ]] ; then
+    echo "Module file not read in properly"
+    exit 1
+fi
+
+defaultLicense=$(xmlp_get_license "$@")
+info "Selected $defaultLicense license."
+
+#read in contents for this license
+parseXmlModuleContents $defaultLicense
+
+
+#import functions that that install required visit libraries
+for (( i = 0; i < ${#reqlibs[*]}; ++i ))
+do
+    . "${bv_PREFIX}/bv_${reqlibs[$i]}.sh" 
+    verify_required_module_exists ${reqlibs[$i]}
+done
+
+
+#import functions that support optional visit dependencies
+#import functions that that install required visit libraries
+for (( i = 0; i < ${#optlibs[*]}; ++i ))
+do
+    . "${bv_PREFIX}/bv_${optlibs[$i]}.sh"
+    verify_optional_module_exists ${optlibs[$i]}
+done
+
+###################### Grouping libraries
+# The arrays listed below help group VisIt's set of libraries.
+# For example: --all-io uses the iolibs array to determine which modules to enable
+#options = no change, enable, disable
+for (( bv_i=0; bv_i < ${#grouplibs_name[*]}; ++bv_i ))
+do
+    group_name=${grouplibs_name[$bv_i]}
+
+    for group_dep in `echo ${grouplibs_deps[$bv_i]}`;
+    do
+        #echo "checking $group_name and $group_dep"
+        if [[ "$group_dep" == no-* ]]; then
+            group_dep=${group_dep/no-}
+        fi
+        declare -F "bv_${group_dep}_enable" &>/dev/null
+
+        if [[ $? != 0 ]] ; then
+            error "library ${group_dep} in ${group_name} not valid"
+        fi
+
+        declare -F "bv_${group_dep}_disable" &>/dev/null
+
+        if [[ $? != 0 ]] ; then
+            error "library ${group_dep} in ${group_name} not valid"
+        fi
+    done
+
+done
+
+function bv_write_unified_file
+{
+    OUTPUT_bv_FILE=$@
+
+    echo "Writing to File: $OUTPUT_bv_FILE"
+    #go up one directory so that if $bv_PREFIX was set to relative path it will work again..
+    if [[ $OUTPUT_bv_FILE == "" ]]; then
+        echo "Output file not given or proper. No "
+        return
+    fi
+
+    OLDPWD=$PWD
+    cd $INITIAL_PWD
+
+    echo "#!/bin/bash" > $OUTPUT_bv_FILE
+    echo "declare -a reqlibs" >> $OUTPUT_bv_FILE
+    echo "declare -a optlibs" >> $OUTPUT_bv_FILE
+    echo "declare -a grouplibs_name" >> $OUTPUT_bv_FILE
+    echo "declare -a grouplibs_deps" >> $OUTPUT_bv_FILE
+    echo "declare -a grouplibs_comment" >> $OUTPUT_bv_FILE
+    echo "declare -a grouplibs_enabled" >> $OUTPUT_bv_FILE
+
+    cat $bv_PREFIX/bv_main.sh >> $OUTPUT_bv_FILE
+    cat $bv_PREFIX/helper_funcs.sh >> $OUTPUT_bv_FILE
+    cat ${bv_PREFIX}/bv_xml_parser.sh >> $OUTPUT_bv_FILE
+    cat ${bv_PREFIX}/bv_visit.sh >> $OUTPUT_bv_FILE
+
+    for (( i = 0; i < ${#xmlp_alllibs[*]}; ++i ))
+    do
+        cat "${bv_PREFIX}/bv_${xmlp_alllibs[$i]}.sh" >> $OUTPUT_bv_FILE
+    done
+
+    for (( i = 0; i < ${#xmlp_filecontents[*]}; ++i ))
+    do
+        echo "xmlp_filecontents[$i]=\"${xmlp_filecontents[$i]//\"/\\\"}\"" >> $OUTPUT_bv_FILE
+    done
+
+    for (( i = 0; i < ${#xmlp_licenses[*]}; ++i ))
+    do
+        echo "xmlp_licenses[$i]=\"${xmlp_licenses[$i]//\|/\\\|}\"" >> $OUTPUT_bv_FILE
+        echo "xmlp_licenses_range[$i]=\"${xmlp_licenses_range[$i]}\"" >> $OUTPUT_bv_FILE
+    done
+
+    echo "defaultLicense=\$(xmlp_get_license \"\$@\")"  >> $OUTPUT_bv_FILE
+    echo "info \"Selected \$defaultLicense license.\"" >> $OUTPUT_bv_FILE
+
+    echo "parseXmlModuleContents \$defaultLicense"  >> $OUTPUT_bv_FILE
+
+    echo "function bv_write_unified_file" >> $OUTPUT_bv_FILE
+    echo "{" >> $OUTPUT_bv_FILE
+    echo "cat \$0 > \$@" >> $OUTPUT_bv_FILE
+    echo "chmod 755 \$@" >> $OUTPUT_bv_FILE
+    echo "}" >> $OUTPUT_bv_FILE
+
+    #write command to run and execute VisIt
+    echo "initialize_build_visit" >> $OUTPUT_bv_FILE
+    echo "run_build_visit \"\$@\"" >> $OUTPUT_bv_FILE
+    chmod 755 $OUTPUT_bv_FILE
+    cd $OLDPWD
+}
+
+#initialize all build visit variables
+initialize_build_visit
+
+#run all build visit 
+run_build_visit "$@"
+
