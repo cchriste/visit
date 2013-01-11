@@ -1,0 +1,64 @@
+###############################################################################
+# Class: JobSubmitter_qsub_LLNL
+#
+# Purpose:    Custom "qsub" job submitter for LLNL.
+#
+# Programmer: Brad Whitlock
+# Date:       Thu May 17 14:22:04 PDT 2012
+#
+# Modifications:
+#
+###############################################################################
+
+class JobSubmitter_qsub_LLNL(JobSubmitter_qsub):
+    def __init__(self, launcher):
+        super(JobSubmitter_qsub_LLNL, self).__init__(launcher)
+        self.usettc = self.sectorname() in ("aztec", "rzalastor")
+
+    def IsRunningOnXchem(self):
+        return self.sectorname() == "xchem"
+
+    def mpiexec(self):
+        if self.IsRunningOnXchem():
+            return ["/opt/mpiexec/bin/mpiexec"]
+        return super(JobSubmitter_qsub_LLNL, self).mpiexec()
+
+###############################################################################
+# Class: LLNLLauncher
+#
+# Purpose:    Custom launcher for LLNL
+#
+# Programmer: Brad Whitlock
+# Date:       Thu May 17 14:22:04 PDT 2012
+#
+# Modifications:
+#   Eric Brugger, Tue Nov 20 11:25:07 PST 2012
+#   I removed the DetermineArchitecture method, which launched a chaos 4
+#   version on some machines. Those machines are either retired or have been
+#   upgraded to chaos 5.
+#
+###############################################################################
+
+class LLNLLauncher(MainLauncher):
+    def __init__(self):
+        super(LLNLLauncher, self).__init__()
+
+    def Customize(self):
+        # ----
+        # Hoth @ LLNL
+        # ----
+        if self.nodename() == "hoth" and self.domainname() == "llnl.gov":
+            SETENV("LIBGL_ALWAYS_INDIRECT", "1")
+
+    #
+    # Override the JobSubmitterFactory method so the custom job submitter can
+    # be returned.
+    #
+    def JobSubmitterFactory(self, launch):
+        if launch[:4] == "qsub" or launch[:4] == "msub":
+            return JobSubmitter_qsub_LLNL(self)
+        return super(LLNLLauncher, self).JobSubmitterFactory(launch)
+
+# Launcher creation function
+def createlauncher():
+    return LLNLLauncher()

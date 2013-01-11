@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+  <Plugin name="AMRStitchCell" type="operator" label="AMR Dual Grid and Stitch Cells" version="1.0" enabled="false" mdspecificcode="false" engspecificcode="false" onlyengine="false" noengine="false" iconFile="AMRStitchCell.xpm" category="Geometry">
+    <CXXFLAGS>
+      ${VISIT_INCLUDE_DIR}/avt/Database/Ghost
+    </CXXFLAGS>
+    <Files components="E">
+      avtAMRStitchCellFilter.C
+      AMRStitchCellTesselations3D.C
+      AMRStitchCellTesselations2D.C
+    </Files>
+    <Attribute name="AMRStitchCellAttributes" purpose="Attributes for Stitch Cell Operator" persistent="true" keyframe="true" exportAPI="" exportInclude="" codefile="AMRStitchCellAttributes.code">
+      <Enum name="CreateType">
+        DualGridAndStitchCells
+        DualGrid
+        StitchCells
+      </Enum>
+      <Field name="CreateCellsOfType" label="Create cells of type" type="enum" subtype="CreateType">
+      </Field>
+      <Field name="AddCaseNo" label="Add case number" type="bool">
+      </Field>
+      <Field name="OnlyProcessListedDomains" label="Only process listed domains" type="bool">
+      </Field>
+      <Field name="Domains" label="Domains" type="intVector">
+      </Field>
+      <Field name="OnlyProcessLevel" label="Only process level" type="bool">
+      </Field>
+      <Field name="Level" label="Level" type="int">
+      </Field>
+    </Attribute>
+  </Plugin>
