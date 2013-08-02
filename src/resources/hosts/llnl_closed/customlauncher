@@ -1,0 +1,56 @@
+###############################################################################
+# Class: JobSubmitter_qsub_LLNL
+#
+# Purpose:    Custom "qsub" job submitter for LLNL.
+#
+# Programmer: Brad Whitlock
+# Date:       Thu May 17 14:22:04 PDT 2012
+#
+# Modifications:
+#
+###############################################################################
+
+class JobSubmitter_qsub_LLNL(JobSubmitter_qsub):
+    def __init__(self, launcher):
+        super(JobSubmitter_qsub_LLNL, self).__init__(launcher)
+        self.usettc = self.sectorname() == "inca"
+        self.useppn = self.sectorname() == "graph"
+
+
+###############################################################################
+# Class: LLNLLauncher
+#
+# Purpose:    Custom launcher for LLNL
+#
+# Programmer: Brad Whitlock
+# Date:       Thu May 17 14:22:04 PDT 2012
+#
+# Modifications:
+#   Eric Brugger, Mon Nov 19 12:04:57 PST 2012
+#   I modified the script to add some paths to the LD_LIBRARY_PATH if running
+#   on cielo.
+#
+###############################################################################
+
+class LLNLLauncher(MainLauncher):
+    def __init__(self):
+        super(LLNLLauncher, self).__init__()
+
+    def Customize(self):
+        if self.sectorname() == "ci-fe":
+            ld_library_paths = self.splitpaths(GETENV("LD_LIBRARY_PATH"))
+            added_ld_library_paths = ["/opt/cray/mpt/5.6.0/gni/mpich2-gnu/47/lib", "/opt/gcc/mpc/0.8.1/lib", "/opt/gcc/mpfr/2.4.2/lib", "/opt/gcc/gmp/4.3.2/lib", "/opt/gcc/4.7.2/snos/lib64", "/opt/cray/atp/1.4.1/lib"]
+            SETENV("LD_LIBRARY_PATH", self.joinpaths(added_ld_library_paths + ld_library_paths))
+
+    #
+    # Override the JobSubmitterFactory method so the custom job submitter can
+    # be returned.
+    #
+    def JobSubmitterFactory(self, launch):
+        if launch[:4] == "qsub" or launch[:4] == "msub":
+            return JobSubmitter_qsub_LLNL(self)
+        return super(LLNLLauncher, self).JobSubmitterFactory(launch)
+
+# Launcher creation function
+def createlauncher():
+    return LLNLLauncher()
