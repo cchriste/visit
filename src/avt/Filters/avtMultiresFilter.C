@@ -48,6 +48,7 @@
 #include <avtMeshMetaData.h>
 #include <avtMetaData.h>
 #include <avtResolutionSelection.h>
+#include <avtFrustumSelection.h>
 #include <avtStructuredDomainNesting.h>
 #include <DebugStream.h>
 
@@ -70,11 +71,14 @@
 //
 // ****************************************************************************
 
-avtMultiresFilter::avtMultiresFilter(double *frust, double size)
+avtMultiresFilter::avtMultiresFilter(double *frust2d, double size, double *frust3d)
 {
     nDims = 3;
     for (int i = 0; i < 6; i++)
-        frustum[i] = frust[i];
+    {
+        frustum2d[i] = frust2d[i];
+        frustum3d[i] = frust3d[i];
+    }
     smallestCellSize = size;
 }
 
@@ -115,7 +119,7 @@ avtMultiresFilter::Execute(void)
     // Set the multires extents.
     //
     avtExtents multiresExtents(nDims);
-    multiresExtents.Set(frustum);
+    multiresExtents.Set(frustum2d);
     dataAtts.SetMultiresExtents(&multiresExtents);
 
     //
@@ -149,22 +153,32 @@ avtContract_p avtMultiresFilter::ModifyContract(avtContract_p contract)
     //
     avtMetaData *md = GetMetaData();
     avtDataAttributes &dataAtts = GetInput()->GetInfo().GetAttributes();
-    nDims = dataAtts.GetSpatialDimension();
+    nDims = dataAtts.GetSpatialDimension(); //<ctc> will this return 2 for a slice of 3d data?
     double extents[6];
     dataAtts.GetOriginalSpatialExtents()->CopyTo(extents);
 
     //
     // If the frustum is invalid, set it from the extents.
     //
-    if (frustum[0] == DBL_MAX && frustum[1] == -DBL_MAX)
+    if (frustum2d[0] == DBL_MAX && frustum2d[1] == -DBL_MAX)
     {
         for (int i = 0; i < 6; i++)
-            frustum[i] = extents[i];
+            frustum2d[i] = extents[i];
     }
 
+    cerr<<"avtMultiresFilter::ModifyContract\n";
+    cerr<<"Extents: "<<extents[0]<<","<<extents[1]<<","<<extents[2]<<","<<extents[3]<<","<<extents[4]<<","<<extents[5]<<endl;
+    cerr<<"Frustum2d: "<<frustum2d[0]<<","<<frustum2d[1]<<","<<frustum2d[2]<<","<<frustum2d[3]<<","<<frustum2d[4]<<","<<frustum2d[5]<<endl;
+    cerr<<"Frustum3d: "<<frustum3d[0]<<","<<frustum3d[1]<<","<<frustum3d[2]<<","<<frustum3d[3]<<","<<frustum3d[4]<<","<<frustum3d[5]<<endl;
+
     //
-    // Currently we are only implemented for 2d, so return if not 2d.
+    // For 2d and 3d add a frustumSelector. For 2D modify this contract by restricting domains to be considered.
     //
+    if (nDims == 2 || nDims == 3)
+    {
+      contract->GetDataRequest()->AddDataSelection(new avtFrustumSelection(frustum2d, frustum3d));
+    }
+
     if (nDims != 2)
         return contract;
 
@@ -237,12 +251,12 @@ avtContract_p avtMultiresFilter::ModifyContract(avtContract_p contract)
         {
             patchDx = (extents[i*2+1] - extents[i*2]) / (topLogicalWidth[i] * ratios[i]);
             patchDiag += patchDx * patchDx;
-            frustumDx = (frustum[i*2+1] - frustum[i*2]);
+            frustumDx = (frustum2d[i*2+1] - frustum2d[i*2]);
             frustumDiag += frustumDx * frustumDx;
             double min, max;
             min = double(logicalExtents[i]) * patchDx;
             max = (double(logicalExtents[i+3]) + 1.) * patchDx;
-            if (max < frustum[i*2] || min > frustum[i*2+1])
+            if (max < frustum2d[i*2] || min > frustum2d[i*2+1])
                 visible = false;
         }
         patchDiag = sqrt(patchDiag);
@@ -267,6 +281,8 @@ avtContract_p avtMultiresFilter::ModifyContract(avtContract_p contract)
         }
     }
     cellSize = maxPatchDiag;
+
+    cerr<<"avtMultiresFilter::ModifyContract: modifying contract to restrict domain list.\n";
 
     contract->GetDataRequest()->GetRestriction()->RestrictDomains(domain_list);
 

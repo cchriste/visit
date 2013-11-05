@@ -67,6 +67,47 @@ avtView3D::avtView3D()
 }
 
 // ****************************************************************************
+//  Method: avtView3D copy constructor
+//
+//  Programmer: Cameron Christensen
+//  Creation:   November 04, 2013
+//
+// ****************************************************************************
+
+avtView3D::avtView3D(const avtView3D &vi)
+{
+    normal[0]           = vi.normal[0];
+    normal[1]           = vi.normal[1];
+    normal[2]           = vi.normal[2];
+    focus[0]            = vi.focus[0];
+    focus[1]            = vi.focus[1];
+    focus[2]            = vi.focus[2];
+    viewUp[0]           = vi.viewUp[0];
+    viewUp[1]           = vi.viewUp[1];
+    viewUp[2]           = vi.viewUp[2];
+    viewAngle           = vi.viewAngle;
+    parallelScale       = vi.parallelScale;
+    nearPlane           = vi.nearPlane;
+    farPlane            = vi.farPlane;
+    imagePan[0]         = vi.imagePan[0];
+    imagePan[1]         = vi.imagePan[1];
+    imageZoom           = vi.imageZoom;
+    perspective         = vi.perspective;
+    eyeAngle            = vi.eyeAngle;
+    centerOfRotationSet = vi.centerOfRotationSet;
+    centerOfRotation[0] = vi.centerOfRotation[0];
+    centerOfRotation[1] = vi.centerOfRotation[1];
+    centerOfRotation[2] = vi.centerOfRotation[2];
+    axis3DScaleFlag     = vi.axis3DScaleFlag;
+    axis3DScales[0]     = vi.axis3DScales[0];
+    axis3DScales[1]     = vi.axis3DScales[1];
+    axis3DScales[2]     = vi.axis3DScales[2];
+    shear[0]            = vi.shear[0];
+    shear[1]            = vi.shear[1];
+    shear[2]            = vi.shear[2];
+}
+
+// ****************************************************************************
 //  Method: avtView3D operator =
 //
 //  Arguments:

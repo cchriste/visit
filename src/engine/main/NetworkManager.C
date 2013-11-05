@@ -1127,25 +1127,36 @@ NetworkManager::StartNetwork(const std::string &format,
     VisWindow *visWin = viswinMap[windowID].viswin;
     if (visWin->GetMultiresolutionMode())
     {
-        double frustum[6];
+        cerr<<"creating avtMultiresFilter...\n";
+        double frustum2d[6];
+        const avtView3D view3D = visWin->GetView3D();
         const avtView2D view2D = visWin->GetView2D();
         if (!view2D.windowValid)
         {
-            frustum[0] = DBL_MAX;
-            frustum[1] = -DBL_MAX;
-            frustum[2] = DBL_MAX;
-            frustum[3] = -DBL_MAX;
+            frustum2d[0] = DBL_MAX;
+            frustum2d[1] = -DBL_MAX;
+            frustum2d[2] = DBL_MAX;
+            frustum2d[3] = -DBL_MAX;
         }
         else
         {
-            frustum[0] = view2D.window[0];
-            frustum[1] = view2D.window[1];
-            frustum[2] = view2D.window[2];
-            frustum[3] = view2D.window[3];
+            frustum2d[0] = view2D.window[0];
+            frustum2d[1] = view2D.window[1];
+            frustum2d[2] = view2D.window[2];
+            frustum2d[3] = view2D.window[3];
         }
         double cellSize = visWin->GetMultiresolutionCellSize();
 
-        avtMultiresFilter *f2 = new avtMultiresFilter(frustum, cellSize);
+        //Need to pass 3D frustum as well. Just calculate it here (todo).
+        double frustum3d[6];
+        frustum3d[0]=-100;
+        frustum3d[1]= 100;
+        frustum3d[2]=-100;
+        frustum3d[3]= 100;
+        frustum3d[4]=view3D.nearPlane;
+        frustum3d[5]=view3D.farPlane;
+
+        avtMultiresFilter *f2 = new avtMultiresFilter(frustum2d, cellSize, frustum3d);
         filt = new NetnodeFilter(f2, "MultiresFilter");
         filt->GetInputNodes().push_back(input);
         workingNet->AddNode(filt);

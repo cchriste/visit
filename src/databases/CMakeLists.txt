@@ -341,6 +341,7 @@ Xmdv
 lata
 volimage
 unv
+idx_plugin
 )
 
 IF(TARGET vtkIOEnSight)

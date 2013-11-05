@@ -650,6 +650,7 @@ avtH5PartFileFormat::RegisterDataSelections(
                     // Check if the according variable name is available
                     avtDataRangeSelection *dr = (avtDataRangeSelection *) *(selList[i]);
                     std::string varName = dr->GetVariable();       
+                    cerr<<"avtH5PartFileFormat::RegisterDataSelection, avtDataRangeSelection varName="<<varName<<endl;
  
                     bool available = particleVarNameToTypeMap.find(varName) !=
                         particleVarNameToTypeMap.end();
@@ -1100,6 +1101,9 @@ avtH5PartFileFormat::GetParticleMesh(int timestate)
         }
         else
         {
+            cerr<<(int)coordValType<<": ==H5PART_INT32? "<<(coordValType==H5PART_INT32)<<endl;
+            cerr<<(int)coordValType<<": ==H5PART_CHAR? "<<(coordValType==H5PART_CHAR)<<endl;
+            cerr<<(int)coordValType<<": ==H5PART_STRING? "<<(coordValType==H5PART_STRING)<<endl;
             EXCEPTION2(NonCompliantFileException, "H5Part GetParticleMesh",
                     "Unsupported value type for coordinates. "
                     "(Supported tyes are FLOAT64, FLOAT32 and INT64.)");
@@ -1171,6 +1175,9 @@ avtH5PartFileFormat::GetParticleMesh(int timestate)
     }
     else
     {
+        cerr<<(int)coordValType<<": ==H5PART_INT32? "<<(coordValType==H5PART_INT32)<<endl;
+        cerr<<(int)coordValType<<": ==H5PART_CHAR? "<<(coordValType==H5PART_CHAR)<<endl;
+        cerr<<(int)coordValType<<": ==H5PART_STRING? "<<(coordValType==H5PART_STRING)<<endl;
         EXCEPTION2(NonCompliantFileException, "H5Part GetParticleMesh",
                 "Unsupported value type for coordinates. "
                 "(Supported types are FLOAT64. FLOAT32 and INT64.)");
@@ -2449,6 +2456,8 @@ avtH5PartFileFormat::ConstructIdentifiersFromDataRangeSelection(
                 delete[] idList;
             }
         }
+        else 
+            cerr<<it->second<<": ==H5PART_INT32? "<<(it->second==H5PART_INT32)<<endl;
         // FIXME: Possibly handle other data types for id variable (INT32?)
     }
     else

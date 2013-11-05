@@ -102,6 +102,7 @@ struct AVTVIEW_API avtView3D
 
   public:
                     avtView3D();
+                    avtView3D(const avtView3D &);
     avtView3D     & operator=(const avtView3D &);
     bool            operator==(const avtView3D &);
     void            SetToDefault(void);

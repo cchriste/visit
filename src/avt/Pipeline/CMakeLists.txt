@@ -80,6 +80,7 @@ Data/avtExtents.C
 Data/avtExtractor.C
 Data/avtFacelist.C
 Data/avtFlatLighting.C
+Data/avtFrustumSelection.C
 Data/avtHexahedronExtractor.C
 Data/avtHexahedron20Extractor.C
 Data/avtHexahedron27Extractor.C

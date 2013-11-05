@@ -64,6 +64,7 @@
 #include <avtNamedSelection.h>
 #include <avtStructuredMeshChunker.h>
 #include <avtDataRangeSelection.h>
+#include <avtFrustumSelection.h>
 
 #include <DebugStream.h>
 #include <ImproperUseException.h>
@@ -1133,6 +1134,9 @@ avtThresholdFilter::ModifyContract(avtContract_p in_spec)
             );
 
         debug1 << "Added variable " << curVar
+            << " as Data Selection with range ("
+            << lowerBound << ", " << upperBound << ")" << endl;
+        cerr << "avtThresholdFilter::ModifyContract: Added variable " << curVar
             << " as Data Selection with range ("
             << lowerBound << ", " << upperBound << ")" << endl;
     }
