@@ -1070,6 +1070,32 @@ NetworkManager::StartNetwork(const std::string &format,
     Netnode *input = netDB;
     NetnodeFilter *filt  = NULL;
 
+#if 1
+    //Set globally-accessible Frustum
+    //avtCallback::SetView3D(visWin->GetView3D());
+    //avtCallback::SetView2D(visWin->GetView2D());
+    VisWindow *viswin = viswinMap[windowID].viswin;
+    //avtCallback::SetViewport(visWin->GetCanvas()->GetSize());
+    
+    cerr<<"*** forcing update of the WindowAttributes...\n";
+    //force update WindowAttributes
+    WindowAttributes watts(avtCallback::GetCurrentWindowAtts());
+    const avtView3D view3D = viswin->GetView3D();
+    View3DAttributes v3Datts;
+    view3D.SetToView3DAttributes(&v3Datts);
+    watts.SetView3D(v3Datts);
+    int sz[2];
+    viswin->GetSize(sz[0],sz[1]);
+    watts.SetSize(sz);
+    avtCallback::SetCurrentWindowAtts(watts);
+
+    //test to see if we can get data into the reader before the pipeline asks for it
+    int IDXRES=avtCallback::idx_get_resolution_hack();
+    IDXRES++; if (IDXRES>5) IDXRES=2;
+    avtCallback::idx_set_resolution_hack(IDXRES);
+    cerr<<"hack: setting resolution to "<<IDXRES<<" from NetworkManager\n";
+#endif
+
     // Add missing data filter to handle missing data that come up the pipe.
     // It must precede the expressions filter so we have all of the variables
     // needed to produce the missing data mask.

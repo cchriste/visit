@@ -47,6 +47,28 @@
 
 #include <vector>
 
+#include <visuscpp/appkit/visus_appkit.h>
+
+///////////////////////////////////////////////////////////////////////////////
+class avtIDXFileFormat;
+class avtIDXQueryNode : public Visus::QueryNode
+{
+public:
+    
+    //constructor
+    avtIDXQueryNode(avtIDXFileFormat *node_):node(node_) {VisusAssert(node)}
+    
+    //destructor
+    ~avtIDXQueryNode() {}
+
+    //publish
+    virtual bool publish(const Visus::DictObject& evt);
+
+private:
+
+    avtIDXFileFormat *node;
+
+};
 
 // ****************************************************************************
 //  Class: avtIDXFileFormat
@@ -60,8 +82,10 @@
 // ****************************************************************************
 
 class avtView3D;
-class avtIDXFileFormat : public avtMTMDFileFormat
+class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
 {
+    friend class avtIDXQueryNode;
+
   public:
                        avtIDXFileFormat(const char *);
     virtual           ~avtIDXFileFormat();
@@ -95,23 +119,50 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual void           RegisterDataSelections(
                              const std::vector<avtDataSelection_p>&,
                              std::vector<bool>* applied);
+    virtual bool          CanCacheVariable(const char *) { return false; }
+    virtual bool          HasInvariantMetaData(void) const { return false; }
 
   protected:
     // DATA MEMBERS
 
-    virtual void           PopulateDatabaseMetaData(avtDatabaseMetaData *, int);
 
     // update resolution using RegisterDataSelections (reads MultiresControl and frustumSelection)
-    size_t                 resolution;
     std::vector<avtDataSelection_p> selList;
     std::vector<bool>     *selsApplied; // can't mark selection as applied until we actually load the updated data.
     
+
+
     double                 frustum2d[6];
     double                 frustum3d[6];
 
     int                    nblocks;
     int                    rank;
-};
 
+    bool haveData;
+    int bounds[3]; 
+    double extents[6];
+
+    virtual void           PopulateDatabaseMetaData(avtDatabaseMetaData *, int);
+
+    static int num_instances;
+    UniquePtr<Visus::Application> app;
+    UniquePtr<Visus::Dataflow>     dataflow;
+    void              onDataflowInput(Visus::DataflowNode* dnode);
+    // bool connect(Visus::DataflowPortPtr oport,Visus::DataflowPortPtr iport);
+    // bool connect(Visus::DataflowNodePtr from,Visus::String oport,Visus::String iport,Visus::DataflowNodePtr to);
+
+    SharedPtr<Visus::Dataset> dataset;
+    SharedPtr<Visus::DatasetNode> dataflow_dataset;
+
+    avtIDXQueryNode *query; //<ctc> memory?
+
+    SharedPtr<Visus::Array> data;
+
+    int resolution;
+
+    // Visus::KDataflowNodePtr  K                      (Visus::ObjectPtr value,Visus::String oport="value") {return dataflow->K(value,oport);}
+
+    VISUS_DECLARE_BINDABLE(avtIDXFileFormat);
+};
 
 #endif

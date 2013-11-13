@@ -172,7 +172,7 @@ public:
         ID__LAST
     };
 
-private:
+    //private:
     double viewNormal[3];
     double focus[3];
     double viewUp[3];

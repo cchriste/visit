@@ -2208,6 +2208,8 @@ VisWindow::HasPlots(bool b)
 void
 VisWindow::MotionBegin(void)
 {
+    avtCallback::SetInMotion(true);
+
     std::vector< VisWinColleague * >::iterator it;
     for (it = colleagues.begin() ; it != colleagues.end() ; it++)
     {
@@ -2230,6 +2232,8 @@ VisWindow::MotionBegin(void)
 void
 VisWindow::MotionEnd(void)
 {
+    avtCallback::SetInMotion(false);
+
     std::vector< VisWinColleague * >::iterator it;
     for (it = colleagues.begin() ; it != colleagues.end() ; it++)
     {

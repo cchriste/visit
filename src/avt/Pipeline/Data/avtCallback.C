@@ -51,6 +51,9 @@
 using std::string;
 
 
+int avtCallback::IDXRES=3;
+bool avtCallback::inMotion=false;
+
 WarningCallback               avtCallback::warningCallback = NULL;
 void                         *avtCallback::warningCallbackArgs = NULL;
 

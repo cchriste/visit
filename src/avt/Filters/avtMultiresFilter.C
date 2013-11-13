@@ -51,6 +51,7 @@
 #include <avtFrustumSelection.h>
 #include <avtStructuredDomainNesting.h>
 #include <DebugStream.h>
+#include <avtCallback.h>
 
 #include <float.h>
 #include <limits.h>

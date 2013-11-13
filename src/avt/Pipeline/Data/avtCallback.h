@@ -173,6 +173,25 @@ class PIPELINE_API avtCallback
     static void                  SetAuxSessionKey(const std::string &k)
                                                   { auxSessionKey = k; };
 
+    //static avtView2D view2d;
+    //static avtView3D view3d;
+    //static const avtView2D& GetView2D() { return view2d; }
+    //static const avtView3D& GetView3D() { return view3d; }
+    //static void SetView2D(const avtView2D &view) { view2d=view; }
+    //static void SetView3D(const avtView3D &view) { view3d=view; }
+
+    //static int viewport[2];
+    //void GetViewport(int &w,int &h) { w=viewport[0]; h=viewport[1]; }
+    //void SetViewport(int sz[2]) { viewport[0]=sz[0]; viewport[1]=sz[1]; }
+
+    static bool inMotion;
+    static bool GetInMotion() { return inMotion; }
+    static void SetInMotion(bool enable) { inMotion=enable; }
+
+    static int IDXRES;
+    static int idx_get_resolution_hack() { return IDXRES; }
+    static void idx_set_resolution_hack(int r) { IDXRES=r; }
+
   protected:
     static WarningCallback       warningCallback;
     static void                 *warningCallbackArgs;

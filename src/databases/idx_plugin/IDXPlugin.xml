@@ -1,16 +1,18 @@
 <?xml version="1.0"?>
   <Plugin name="IDX" type="database" label="ViSUS-style IDX files" version="1.0" enabled="true" mdspecificcode="false" engspecificcode="false" onlyengine="false" noengine="false" dbtype="MTMD" haswriter="false" hasoptions="false" filePatternsStrict="true" opensWholeDirectory="false">
     <CXXFLAGS>
-      -I/Users/cam/code/nvisus/build/for-visit/include
+      -I/Users/cam/code/nvisus/build/latest/develop/include -I${VISIT_INCLUDE_DIR}/avt/View
+      <!-- -I/Users/cam/code/nvisus/build/for-visit/include -->
     </CXXFLAGS>
     <LDFLAGS>
-      -L/Users/cam/code/nvisus/build/for-visit/lib
+      -L/Users/cam/code/nvisus/build/latest/develop/lib
+      <!-- -L/Users/cam/code/nvisus/build/for-visit/lib -->
     </LDFLAGS>
     <LIBS>
-      visuskernel visusidx visusdb tinyxml curl FreeImage libz
+      avtfilters avtview visuskernel visusidx visusgui visusdb visusdataflow visusscenegraph Juce visusappkit tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto /System/Library/Frameworks/CoreMidi.framework /System/Library/Frameworks/CoreAudio.framework /System/Library/Frameworks/CoreFoundation.framework /System/Library/Frameworks/QuartzCore.framework /System/Library/Frameworks/Cocoa.framework /System/Library/Frameworks/IoKit.framework
     </LIBS>
     <FilePatterns>
-      *.idx
+      *.idx *.urlidx
     </FilePatterns>
     <Attribute name="" purpose="" persistent="true" keyframe="true" exportAPI="" exportInclude="">
     </Attribute>

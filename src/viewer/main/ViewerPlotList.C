@@ -10060,7 +10060,8 @@ ViewerPlotList::ShouldRefineData(double smallestCellSize) const
     else if (window->GetWindowMode() == WINMODE_3D)
     {
         const avtView3D &view3D = window->GetView3D();
-        return false;
+        return !avtCallback::GetInMotion();
+        //return false;
     }
     else
     {
