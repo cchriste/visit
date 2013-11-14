@@ -153,17 +153,18 @@ class DummyNode : public DataflowNode , public IContentHolder
 ///////////////////////////////////////////////////////////
 bool avtIDXQueryNode::publish(const DictObject &evt)
 {
-    SharedPtr<Array> data=DynamicPointerCast<Array>(evt.getattr("data"));
+    SharedPtr<Array> data  =DynamicPointerCast<Array>   (evt.getattr("data"));
+    SharedPtr<Position>dims=DynamicPointerCast<Position>(evt.getattr("dims"));
     SharedPtr<Position> pos=DynamicPointerCast<Position>(evt.getattr("position"));
 
     if (pos)
     {
         VisusInfo()<<"avtIDXQueryNode::publish: got position: "<<pos->box.toString();
-        node->bounds[0] = pos->box.p2.x-pos->box.p1.x+1;
-        node->bounds[1] = pos->box.p2.y-pos->box.p1.y+1;
-        node->bounds[2] = pos->box.p2.z-pos->box.p1.z+1;
+        VisusInfo()<<"                          got dims:     "<<dims->box.toString();
+        node->bounds[0] = dims->box.p2.x - dims->box.p1.x;
+        node->bounds[1] = dims->box.p2.y - dims->box.p1.y;
+        node->bounds[2] = dims->box.p2.z - dims->box.p1.z;
 
-        //<ctc> I think this has to change too, but it should be relative to original extents... these are in [0,1]^3 
         // node->extents[0] = pos->box.p1.x;
         // node->extents[1] = pos->box.p2.x;
         // node->extents[2] = pos->box.p1.y;
@@ -650,47 +651,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     //cerr<<"resolution is at "<<resolution<<endl;
 
     VisusInfo() << "avtIDXFileFormat::GetMesh: timestate("<<timestate<<") domain("<<domain<<") meshname("<<meshname<<") resolution("<<resolution<<")";
-    //
-    // Determine the reduced grid size taking into account the multi-res
-    // reduction.
-    //
-    int res = resolution;
-    int resReduction = 1 << res;
-    int reducedBounds[3];
 
-    reducedBounds[0] = bounds[0] % resReduction == 0 ?
-        bounds[0] / resReduction : bounds[0] / resReduction + 1;
-    reducedBounds[1] = bounds[1] % resReduction == 0 ?
-        bounds[1] / resReduction : bounds[1] / resReduction + 1;
-    reducedBounds[2] = bounds[2] % resReduction == 0 ?
-        bounds[2] / resReduction : bounds[2] / resReduction + 1;
-
-    //
-    // Partition into slices along the Z direction. Assumes cell centered
-    // data. This may fail if there are not enough cells to populate the
-    // last block.
-    //
-    int zWidth = reducedBounds[2] % nblocks == 0 ?
-        reducedBounds[2] / nblocks : reducedBounds[2] / nblocks + 1;
-    if(reducedBounds[2] % nblocks == 0)
-    {
-        slice_box.from[2] = zWidth * resReduction * domain;
-        slice_box.to[2]   = slice_box.from[2] + zWidth * resReduction - 1;
-    }
-    else
-    {
-        if(domain == nblocks - 1)
-        {
-            slice_box.from[2] = zWidth * resReduction * domain;
-            slice_box.to[2]   = slice_box.to[2];
-        }
-        else
-        {       
-            slice_box.from[2] = zWidth * resReduction * domain;
-            slice_box.to[2]   = slice_box.from[2] + zWidth * resReduction - 1;
-        }
-    }
-    
     //
     // Create the mesh.
     //

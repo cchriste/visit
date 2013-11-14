@@ -167,10 +167,12 @@ avtContract_p avtMultiresFilter::ModifyContract(avtContract_p contract)
             frustum2d[i] = extents[i];
     }
 
+#if 0
     cerr<<"avtMultiresFilter::ModifyContract\n";
     cerr<<"Extents: "<<extents[0]<<","<<extents[1]<<","<<extents[2]<<","<<extents[3]<<","<<extents[4]<<","<<extents[5]<<endl;
     cerr<<"Frustum2d: "<<frustum2d[0]<<","<<frustum2d[1]<<","<<frustum2d[2]<<","<<frustum2d[3]<<","<<frustum2d[4]<<","<<frustum2d[5]<<endl;
     cerr<<"Frustum3d: "<<frustum3d[0]<<","<<frustum3d[1]<<","<<frustum3d[2]<<","<<frustum3d[3]<<","<<frustum3d[4]<<","<<frustum3d[5]<<endl;
+#endif
 
     //
     // For 2d and 3d add a frustumSelector. For 2D modify this contract by restricting domains to be considered.

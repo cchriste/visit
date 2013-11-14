@@ -2232,13 +2232,18 @@ VisWindow::MotionBegin(void)
 void
 VisWindow::MotionEnd(void)
 {
-    avtCallback::SetInMotion(false);
-
     std::vector< VisWinColleague * >::iterator it;
     for (it = colleagues.begin() ; it != colleagues.end() ; it++)
     {
         (*it)->MotionEnd();
     }
+
+    avtCallback::SetInMotion(false);
+
+    //we still have to update since we turned it off while in motion (3d only)
+    if (this->GetWindowMode() == WINMODE_3D)
+        if (performViewChangedCallback != 0)
+            (*performViewChangedCallback)(performViewChangedCallbackData);
 }
 
 

@@ -365,10 +365,12 @@ Navigate3D::EndMiddleButtonAction()
 void
 Navigate3D::OnMouseWheelForward()
 {
+#if 0
     StartZoom();
     ZoomImage3D(MotionFactor * 0.2 * this->MouseWheelMotionFactor);
     EndZoom();
     IssueViewCallback(true);
+#endif
 }
 
 
@@ -395,10 +397,12 @@ Navigate3D::OnMouseWheelForward()
 void
 Navigate3D::OnMouseWheelBackward()
 {
+#if 0
     StartZoom();
     ZoomImage3D(MotionFactor * -0.2 * this->MouseWheelMotionFactor);
     EndZoom();
     IssueViewCallback(true);
+#endif
 }
 
 // ****************************************************************************
