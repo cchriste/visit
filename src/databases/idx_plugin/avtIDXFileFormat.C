@@ -165,12 +165,15 @@ bool avtIDXQueryNode::publish(const DictObject &evt)
         node->bounds[1] = dims->box.p2.y - dims->box.p1.y;
         node->bounds[2] = dims->box.p2.z - dims->box.p1.z;
 
-        // node->extents[0] = pos->box.p1.x;
-        // node->extents[1] = pos->box.p2.x;
-        // node->extents[2] = pos->box.p1.y;
-        // node->extents[3] = pos->box.p2.y;
-        // node->extents[4] = pos->box.p1.z;
-        // node->extents[5] = pos->box.p2.z;
+        if (node->resolution==1) //<ctc> use this to control whether or not to read new position (first few positions are very bad due to camera not being setup properly)
+        {
+            node->extents[0] = pos->box.p1.x;
+            node->extents[1] = pos->box.p2.x;
+            node->extents[2] = pos->box.p1.y;
+            node->extents[3] = pos->box.p2.y;
+            node->extents[4] = pos->box.p1.z;
+            node->extents[5] = pos->box.p2.z;
+        }
     }
     else if (data)
     {
@@ -298,12 +301,12 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename)
     bounds[2] = dataset->logic_box.to.z-dataset->logic_box.from.z+1;
 
     Box physic_box=dataflow_dataset->getContentPhysicPosition().toAABB();
-    extents[0] = physic_box.p1.x;
-    extents[1] = physic_box.p2.x;
-    extents[2] = physic_box.p1.y;
-    extents[3] = physic_box.p2.y;
-    extents[4] = physic_box.p1.z;
-    extents[5] = physic_box.p2.z;
+    fullextents[0] = extents[0] = physic_box.p1.x;
+    fullextents[1] = extents[1] = physic_box.p2.x;
+    fullextents[2] = extents[2] = physic_box.p1.y;
+    fullextents[3] = extents[3] = physic_box.p2.y;
+    fullextents[4] = extents[4] = physic_box.p1.z;
+    fullextents[5] = extents[5] = physic_box.p2.z;
     
     NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
     NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
@@ -564,6 +567,13 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     int topological_dimension = 3;
     int ndtype;
 
+        <ctc> see if I can break in this function when I create a
+    //    pseudocolor plot. Maybe there's a way to do this without
+    //    resampling. Currently pseudocolor doesn't work, never calls
+    //    PopulateDatabaseMetaData again, but where does it call it
+    //    the first time? Maybe I can force it to call again...
+
+
     //
     // dynamic decomposition
     //
@@ -589,8 +599,8 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     //VisusInfo()<<"now we should have the bounds and extents of the data!";
     NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
     NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
-    VisusInfo()<<"bounds:  "<<dims.toString();
-    VisusInfo()<<"extents: "<<exts.toString();
+    VisusInfo()<<"PopulateDatabaseMetaData: bounds:  "<<dims.toString();
+    VisusInfo()<<"PopulateDatabaseMetaData: extents: "<<exts.toString();
 
     // Add the mesh, scalars and vectors.
     AddMeshToMetaData(md, mesh_for_this_var, mt, extents, metadata_nblocks, block_origin, spatial_dimension, topological_dimension, bounds);
@@ -667,9 +677,18 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     dims[0] = bounds[0]+1; //visit is so weird... if I have a x by y array, it wants me to say it's x+1 by y+1 :P
     dims[1] = bounds[1]+1;
     dims[2] = bounds[2]+1;
-    // dims[0] = (slice_box.to[0] - slice_box.from[0] + 1) / resReduction + 1;
-    // dims[1] = (slice_box.to[1] - slice_box.from[1] + 1) / resReduction + 1;
-    // dims[2] = (slice_box.to[2] - slice_box.from[2] + 1) / resReduction + 1;
+
+    {
+        NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
+        NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
+        VisusInfo()<<"GetMesh: bounds:  "<<dims.toString();
+        VisusInfo()<<"GetMesh: extents: "<<exts.toString();
+    }
+
+    // Point3d spacing((fullextents[1]-fullextents[0]+1)/bounds[0],(fullextents[3]-fullextents[2]+1)/bounds[1],(fullextents[5]-fullextents[4]+1)/bounds[2]);
+    // if (resolution==1) //see note in publish above
+    Point3d spacing((extents[1]-extents[0]+1)/bounds[0],(extents[3]-extents[2]+1)/bounds[1],(extents[5]-extents[4]+1)/bounds[2]);
+
     rgrid->SetDimensions(dims[0], dims[1], dims[2]);
     VisusInfo()<<"avtIDXFileFormat::GetMesh() returning <"<<dims[0]<<"x"<<dims[1]<<"x"<<dims[2]<<"> mesh";//for resolution "<<resolution<<" (resReduction="<<resReduction<<")";
 
@@ -678,7 +697,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     arrayX = (float *) coordsX->GetVoidPointer(0);
     for (int i = 0; i < dims[0]; i++)
         //arrayX[i] = i * resReduction;
-        arrayX[i] = i;
+        arrayX[i] = (extents[0]+i)*spacing.x;
     //arrayX[dims[0]-1] = slice_box.to[0] + 1.; //<ctc> maybe still need something like this
     rgrid->SetXCoordinates(coordsX);
 
@@ -687,7 +706,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     arrayY = (float *) coordsY->GetVoidPointer(0);
     for (int i = 0; i < dims[1]; i++)
         //arrayY[i] = i * resReduction;
-        arrayY[i] = i;
+        arrayY[i] = (extents[2]+i)*spacing.y;
     //arrayY[dims[1]-1] = slice_box.to[1] + 1.; //<ctc> maybe still need something like this
     rgrid->SetYCoordinates(coordsY);
 
@@ -696,7 +715,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     arrayZ = (float *) coordsZ->GetVoidPointer(0);
     for (int i = 0; i < dims[2]; i++)
         //arrayZ[i] = slice_box.from[2] + i * resReduction;
-        arrayZ[i] = i;
+        arrayZ[i] = (extents[4]+i)*spacing.z;
     //arrayZ[dims[2]-1] = slice_box.to[2] + 1.; //<ctc> maybe still need something like this
     rgrid->SetZCoordinates(coordsZ);
 
@@ -899,7 +918,7 @@ avtIDXFileFormat::RegisterDataSelections(
         if(strcmp(sels[i]->GetType(), "avtResolutionSelection") == 0)
         {
             const avtResolutionSelection* sel = static_cast<const avtResolutionSelection*>(*sels[i]);
-            //VisusInfo()<<"new resolution: "<<sel->resolution()<<", (old resolution: "<<resolution<<")";
+            VisusInfo()<<"new resolution: "<<sel->resolution()<<", (old resolution: "<<resolution<<")";
             if (resolution!=sel->resolution())
             {
                 ;

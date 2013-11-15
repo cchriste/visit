@@ -56,7 +56,7 @@ class avtIDXQueryNode : public Visus::QueryNode
 public:
     
     //constructor
-    avtIDXQueryNode(avtIDXFileFormat *node_):node(node_) {VisusAssert(node)}
+    avtIDXQueryNode(avtIDXFileFormat *node_):node(node_) {VisusAssert(node);}
     
     //destructor
     ~avtIDXQueryNode() {}
@@ -141,6 +141,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
     bool haveData;
     int bounds[3]; 
     double extents[6];
+    double fullextents[6];
 
     virtual void           PopulateDatabaseMetaData(avtDatabaseMetaData *, int);
 
