@@ -81,6 +81,7 @@ private:
 //
 // ****************************************************************************
 
+class DummyNode;
 class avtView3D;
 class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
 {

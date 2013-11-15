@@ -72,7 +72,7 @@
 
 #include <InvalidVariableException.h>
 
-#include <visuscpp/appkit/visus_appkit.h>
+#include <visuscpp/db/visus_db.h>
 
 #ifdef PARALLEL
 #include <mpi.h>
@@ -88,15 +88,14 @@ class DummyNode : public DataflowNode , public IContentHolder
  public:
 
     //constructor
-    DummyNode(String name="") : DataflowNode(name)//,avtIDXFileFormat *node_=NULL) : DataflowNode(name),node(node_)
+    DummyNode(String name="") : DataflowNode(name)
     {
-        //VisusAssert(node);
         addInputPort("data");
         addOutputPort("data"); //if you do not need the original data, simply do not connect it!
     }
 
     //destructor
-    ~DummyNode()
+    virtual ~DummyNode()
     {}
 
     //getContentPhysicPosition (from IContentHolder class)
@@ -134,18 +133,10 @@ class DummyNode : public DataflowNode , public IContentHolder
         return true;
     }
 
-    //writeToObjectStream
-    virtual bool writeToObjectStream(ObjectStream& ostream) {return false;}
-
-    //readFromObjectStream
-    virtual bool readFromObjectStream (ObjectStream& istream){return false;}
-
-
  private:
 
-    //avtIDXFileFormat           *node;
-
     VISUS_DECLARE_NON_COPYABLE(DummyNode);
+
 
 };
 
@@ -229,7 +220,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename)
     {
         app.reset(new Application);
         app->setCommandLine(0,NULL);
-        ENABLE_VISUS_APPKIT();
+        ENABLE_VISUS_DB();
     }
 
     //dataflow
@@ -762,6 +753,9 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 
     VisusInfo()<<"query started, waiting for data...";
     Clock t0(Clock::now());
+
+    //Ack! What if the onDataflowInput that calls query->processInput returns false?!
+    // need to fail gracefully or... should that never happen?
 
     //wait for the data to arrive.
     haveData=false;
