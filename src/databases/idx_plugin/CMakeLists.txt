@@ -26,7 +26,8 @@ avtIDXFileFormat.C
 
 INCLUDE_DIRECTORIES(
 ${CMAKE_CURRENT_SOURCE_DIR}
-/Users/cam/code/nvisus/build/latest/develop/include
+/home/sci/cam/code/nvisus-visit-plugin/build/clx-visit-plugin/include
+${VISIT_INCLUDE_DIR}/avt/View
 ${VISIT_COMMON_INCLUDES}
 ${VISIT_INCLUDE_DIR}/avt/DBAtts/MetaData
 ${VISIT_INCLUDE_DIR}/avt/DBAtts/SIL
@@ -45,14 +46,13 @@ ${VISIT_INCLUDE_DIR}/avt/Pipeline/Pipeline
 ${VISIT_INCLUDE_DIR}/avt/Pipeline/Sinks
 ${VISIT_INCLUDE_DIR}/avt/Pipeline/Sources
 ${VISIT_INCLUDE_DIR}/avt/VisWindow/VisWindow
-${VISIT_INCLUDE_DIR}/avt/View
 ${VISIT_INCLUDE_DIR}/visit_vtk/full
 ${VISIT_INCLUDE_DIR}/visit_vtk/lightweight
 ${VTK_INCLUDE_DIRS} 
 )
 
 
-LINK_DIRECTORIES(${VISIT_LIBRARY_DIR} ${VTK_LIBRARY_DIRS} /Users/cam/code/nvisus/build/latest/develop/lib )
+LINK_DIRECTORIES(${VISIT_LIBRARY_DIR} ${VTK_LIBRARY_DIRS} /home/sci/cam/code/nvisus-visit-plugin/build/clx-visit-plugin/lib )
 
 ADD_LIBRARY(IIDXDatabase ${LIBI_SOURCES})
 TARGET_LINK_LIBRARIES(IIDXDatabase visitcommon)
@@ -60,19 +60,31 @@ SET(INSTALLTARGETS IIDXDatabase)
 
 IF(NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
     ADD_LIBRARY(MIDXDatabase ${LIBM_SOURCES}    )
-    TARGET_LINK_LIBRARIES(MIDXDatabase visitcommon avtdbatts avtdatabase_ser avtview avtfilters_ser visuskernel visusidx visusgui visusdb visusdataflow visusscenegraph Juce visusappkit tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto /System/Library/Frameworks/CoreMidi.framework /System/Library/Frameworks/CoreAudio.framework /System/Library/Frameworks/CoreFoundation.framework /System/Library/Frameworks/QuartzCore.framework /System/Library/Frameworks/Cocoa.framework /System/Library/Frameworks/IoKit.framework )
+    TARGET_LINK_LIBRARIES(MIDXDatabase visitcommon avtdbatts avtdatabase_ser avtfilters_ser avtview
+-Wl,--whole-archive -lvisuskernel -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusidx -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusdb -Wl,--no-whole-archive  
+-Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
+-Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
+tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
     ADD_TARGET_DEFINITIONS(MIDXDatabase MDSERVER)
     SET(INSTALLTARGETS ${INSTALLTARGETS} MIDXDatabase)
 ENDIF(NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
 
 ADD_LIBRARY(EIDXDatabase_ser ${LIBE_SOURCES})
-TARGET_LINK_LIBRARIES(EIDXDatabase_ser visitcommon avtdatabase_ser avtpipeline_ser avtview avtfilters_ser visuskernel visusidx visusgui visusdb visusdataflow visusscenegraph Juce visusappkit tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto /System/Library/Frameworks/CoreMidi.framework /System/Library/Frameworks/CoreAudio.framework /System/Library/Frameworks/CoreFoundation.framework /System/Library/Frameworks/QuartzCore.framework /System/Library/Frameworks/Cocoa.framework /System/Library/Frameworks/IoKit.framework )
+TARGET_LINK_LIBRARIES(EIDXDatabase_ser visitcommon avtdatabase_ser avtpipeline_ser avtfilters_ser avtview 
+-Wl,--whole-archive -lvisuskernel -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusidx -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusdb -Wl,--no-whole-archive  
+-Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
+-Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
+tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
 ADD_TARGET_DEFINITIONS(EIDXDatabase_ser ENGINE)
 SET(INSTALLTARGETS ${INSTALLTARGETS} EIDXDatabase_ser)
 
 IF(VISIT_PARALLEL)
     ADD_PARALLEL_LIBRARY(EIDXDatabase_par ${LIBE_SOURCES})
-    TARGET_LINK_LIBRARIES(EIDXDatabase_par visitcommon avtdatabase_par avtpipeline_par avtview avtfilters_par visuskernel visusidx visusgui visusdb visusdataflow visusscenegraph Juce visusappkit tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto /System/Library/Frameworks/CoreMidi.framework /System/Library/Frameworks/CoreAudio.framework /System/Library/Frameworks/CoreFoundation.framework /System/Library/Frameworks/QuartzCore.framework /System/Library/Frameworks/Cocoa.framework /System/Library/Frameworks/IoKit.framework )
+    TARGET_LINK_LIBRARIES(EIDXDatabase_par visitcommon avtdatabase_par avtpipeline_par avtfilters_par avtview libvisuskernel.a visusidx visusdb visusdataflow visusscenegraph tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
     ADD_TARGET_DEFINITIONS(EIDXDatabase_par ENGINE)
     SET(INSTALLTARGETS ${INSTALLTARGETS} EIDXDatabase_par)
 ENDIF(VISIT_PARALLEL)

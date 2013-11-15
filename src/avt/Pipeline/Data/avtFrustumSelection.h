@@ -42,6 +42,7 @@
 #ifndef _AVT_FRUSTUM_SELECTION_H_
 #define _AVT_FRUSTUM_SELECTION_H_
 
+#include <cstdlib>
 #include "avtDataSelection.h"
 
 // ****************************************************************************

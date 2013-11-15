@@ -558,7 +558,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     int topological_dimension = 3;
     int ndtype;
 
-        <ctc> see if I can break in this function when I create a
+    //    <ctc> see if I can break in this function when I create a
     //    pseudocolor plot. Maybe there's a way to do this without
     //    resampling. Currently pseudocolor doesn't work, never calls
     //    PopulateDatabaseMetaData again, but where does it call it
