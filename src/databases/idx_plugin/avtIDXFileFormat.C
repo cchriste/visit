@@ -221,6 +221,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename)
         app.reset(new Application);
         app->setCommandLine(0,NULL);
         ENABLE_VISUS_DB();
+        ENABLE_VISUS_IDX();
     }
 
     //dataflow
