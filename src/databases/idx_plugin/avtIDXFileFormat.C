@@ -491,8 +491,8 @@ Frustum* calcFrustum()
 
     //get window attributes, then use avtViewInfo because it's a more direct mapping
     const View3DAttributes &atts3d=avtCallback::GetCurrentWindowAtts().GetView3D();
-    avtView3D v3d;  v3d.SetFromView3DAttributes(&atts3d); //ugh, can't include this either
-    avtViewInfo vi; v3d.SetViewInfoFromView(vi); //ugh, can't include it. 
+    avtView3D v3d;  v3d.SetFromView3DAttributes(&atts3d);
+    avtViewInfo vi; v3d.SetViewInfoFromView(vi);
     //ViewInfo vi; vi.SetFromView3D(atts3d);
 
     double scale[3] = {1,1,1};
@@ -531,6 +531,12 @@ Frustum* calcFrustum()
     return frustum.release();
 }
 
+bool avtIDXFileFormat::CanCacheVariable(const char *var)
+{
+  VisusInfo()<<"avtIDXFileFormat::CanCacheVariable("<<var<<")";
+  return false;
+  //return std::string(var)!="CC_Mesh";
+}
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::PopulateDatabaseMetaData
@@ -582,11 +588,24 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     query->getInputPort("viewdep")->writeValue(frustum);
     query->getInputPort("time")->writeValue(SharedPtr<IntObject>(new IntObject(timestate)));
 
-    //need to get the size of the target volume here, but don't fetch data (we don't know the varname yet!)
-    query->getInputPort("position_only")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
+    Int64 max_size=128*128*128; // 2mb but visit always casts to double --> 16mb!
+    bool fits=false;
+    int count=0; //just in case query->processInput returns 0 (it shouldn't, but it still happens and I'm not sure why. bad viewport?)
+    int quality=0;
+    while (!fits && count<10)
+    {
+      count++;
+      query->getInputPort("quality")->writeValue(SharedPtr<IntObject>(new IntObject(--quality)));
 
-    this->dataflow->dispatchPublishedMessages(); //<ctc> have to dispatch this time to propagate dataflow_dataset->query connection. It's basically a no-op after the first callde
-    this->dataflow->oninput.emitSignal(query);   //<ctc> still need to do this since after the first propagation it will no longer call onInput for the downstream nodes.
+      //need to get the size of the target volume here, but don't fetch data (we don't know the varname yet!)
+      query->getInputPort("position_only")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
+
+      this->dataflow->dispatchPublishedMessages(); //<ctc> have to dispatch this time to propagate dataflow_dataset->query connection. It's basically a no-op after the first callde
+      this->dataflow->oninput.emitSignal(query);   //<ctc> still need to do this since after the first propagation it will no longer call onInput for the downstream nodes.
+
+      NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
+      fits=dims.innerProduct()<=max_size;
+    }
 
     //VisusInfo()<<"now we should have the bounds and extents of the data!";
     NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);

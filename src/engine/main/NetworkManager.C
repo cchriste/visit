@@ -1083,10 +1083,20 @@ NetworkManager::StartNetwork(const std::string &format,
     const avtView3D view3D = viswin->GetView3D();
     View3DAttributes v3Datts;
     view3D.SetToView3DAttributes(&v3Datts);
-    watts.SetView3D(v3Datts);
     int sz[2];
     viswin->GetSize(sz[0],sz[1]);
     watts.SetSize(sz);
+
+    //<ctc> not sure this worked... initial frustum is still crap
+    static bool firsttime=true;
+    if (firsttime)
+    {
+      double extents[6]={-100,100,-100,100,-100,100};
+      v3Datts.ResetView(extents);
+      firsttime=false;
+    }
+
+    watts.SetView3D(v3Datts);
     avtCallback::SetCurrentWindowAtts(watts);
 
     //test to see if we can get data into the reader before the pipeline asks for it

@@ -120,7 +120,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
     virtual void           RegisterDataSelections(
                              const std::vector<avtDataSelection_p>&,
                              std::vector<bool>* applied);
-    virtual bool          CanCacheVariable(const char *) { return false; }
+    virtual bool          CanCacheVariable(const char *);
     virtual bool          HasInvariantMetaData(void) const { return false; }
 
   protected:
