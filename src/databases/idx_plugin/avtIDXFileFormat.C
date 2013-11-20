@@ -228,9 +228,14 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename)
     this->dataflow.reset(new Dataflow);
     this->dataflow->oninput.connect(bind(&avtIDXFileFormat::onDataflowInput,this));
 
-    string name(filename);
+    string name(Path(filename).getFileNameWithoutExtension());
 
-    //name="http://atlantis.sci.utah.edu/mod_visus?dataset=MRI_0901"; //<ctc> works!
+    // name="http://atlantis.sci.utah.edu/mod_visus?dataset=MRI_0901"; //<ctc> works!
+    // name="http://atlantis.sci.utah.edu/mod_visus?dataset=rabbit3d"; //<ctc> works!
+    // name="http://atlantis.sci.utah.edu/mod_visus?dataset=rb2_84"; //<ctc> works!
+
+    name="http://atlantis.sci.utah.edu/mod_visus?dataset="+name; //<ctc> works!
+    
 
     //<ctc> todo: add http:// url to ".urlidx" file and read it, or just open selected file directly
     //try to open a dataset
@@ -506,6 +511,7 @@ Frustum* calcFrustum()
     frustum->loadProjection(Matrix((double*)(&transform->Element[0])));
     frustum->loadModelview(Matrix::identity());
 
+    Point3d pan(vi.imagePan[0]*sz[0],vi.imagePan[1]*sz[1],0);
     Point3d pos(vi.camera[0],vi.camera[2],vi.camera[2]);
     Point3d la(vi.focus[0],vi.focus[1],vi.focus[2]);
     Point3d vup(vi.viewUp[0],vi.viewUp[1],vi.viewUp[2]);
@@ -522,7 +528,11 @@ Frustum* calcFrustum()
     VisusInfo()<<"\tcamera.pos: "<<pos;
     VisusInfo()<<"\tcamera.la:  "<<la;
     VisusInfo()<<"\tcamera.vup: "<<vup;
+    VisusInfo()<<"\tpan*window: "<<pan;
     VisusInfo()<<"\tcamera.fov  "<<vi.viewAngle;
+    VisusInfo()<<"\taspect      "<<aspect;
+    VisusInfo()<<"\tcamera.pan: "<<vi.imagePan[0]<<","<<vi.imagePan[1];
+    VisusInfo()<<"\tcamera.zoom:"<<vi.imageZoom;
     VisusInfo()<<"\twindow.w:   "<<sz[0];
     VisusInfo()<<"\twindow.h:   "<<sz[1];
     VisusInfo()<<"\tnearPlane:  "<<vi.nearPlane;
