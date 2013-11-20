@@ -779,9 +779,15 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 
     //wait for the data to arrive.
     haveData=false;
-    while (!haveData) ;//wait
+    while (!haveData && t0.msec()<5000) ;//wait
 
     Clock::timestamp_t msec=t0.msec();
+    if (!haveData)
+    {
+      VisusInfo()<<msec<<"ms passed without getting any data. Returning NULL";
+      return NULL;//vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
+    }
+
     VisusInfo()<<msec<<"ms to fetch data, now send it to VisIt.";
     
     Field field = dataset->getFieldByName(varname);
