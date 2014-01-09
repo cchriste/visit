@@ -353,6 +353,7 @@ Xmdv
 lata
 volimage
 unv
+IDX
 )
 
 IF(TARGET vtkIOEnSight)
