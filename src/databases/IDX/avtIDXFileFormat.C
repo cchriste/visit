@@ -102,35 +102,13 @@ class DummyNode : public DataflowNode , public IContentHolder
     //getContentPhysicPosition (from IContentHolder class)
     virtual Position getContentPhysicPosition()
     {
-        //if (!this->data)
-            return Position::invalid();
-        // else
-        //     return Position(data->logic_to_physic,Box(Point3d(0,0,0),Point3d(data->dims.x,data->dims.y,data->dims.z)));
+        return Position::invalid();
     }
 
     //from dataflow interface
     virtual bool processInput()
     {
         VisusAssert(false); //this really shouldn't be called anymore!
-        //VisusInfo()<<"DummyNode::processInput... I guess we have some data. Ignore it (should get copied from publish)";
-        // VisusAssert(node);
-
-        // SharedPtr<Array> data=DynamicPointerCast<Array>(readInput("data"));
-
-        // if (!data)
-        // {
-        //     VisusWarning()<<"Error: unable to read data";
-        //     return false;
-        // }
-        // else
-        // {
-        //     VisusInfo()<<"YAY!!! read data of resolution <"<<data->dims.x<<","<<data->dims.y<<","<<data->dims.z<<">";
-        //     node->bounds[0]=data->dims.x;
-        //     node->bounds[1]=data->dims.y;
-        //     node->bounds[2]=data->dims.z;
-        //     node->data=(data);
-        // }
-
         return true;
     }
 
@@ -157,7 +135,7 @@ bool avtIDXQueryNode::publish(const DictObject &evt)
         node->bounds[1] = dims->box.p2.y - dims->box.p1.y;
         node->bounds[2] = dims->box.p2.z - dims->box.p1.z;
 
-        if (node->resolution==1) //<ctc> use this to control whether or not to read new position (first few positions are very bad due to camera not being setup properly)
+        //if (node->resolution==1) //<ctc> use this to control whether or not to read new position (first few positions are very bad due to camera not being setup properly)
         {
             node->extents[0] = pos->box.p1.x;
             node->extents[1] = pos->box.p2.x;
@@ -393,103 +371,13 @@ avtIDXFileFormat::FreeUpResources(void)
     //<ctc> todo... something (is destructor also called?)
 }
 
-#if 0
-///////////////////////////////////////////////////////////
-struct ViewInfo
-{
-    double   camera[3];
-    double   focus[3];
-    double   viewUp[3];
-    double   viewAngle;
-    double   eyeAngle;
-    double   parallelScale;
-    bool     setScale;
-    double   nearPlane;
-    double   farPlane;
-    double   imagePan[2];
-    double   imageZoom;
-    bool     orthographic;
-    double   shear[3];
-
-
-    ///////////////////////////////////////////////////////////
-    void SetFromView3D(const View3DAttributes &view)
-    {
-        double    distance;
-        double    normal2[3];
-
-        //
-        // Calculate a unit length normal.
-        //
-        distance = sqrt(view.viewNormal[0] * view.viewNormal[0] + view.viewNormal[1] * view.viewNormal[1] +
-                        view.viewNormal[2] * view.viewNormal[2]);
-        distance = (distance != 0) ? distance : 1.;
-        normal2[0] = view.viewNormal[0] / distance;
-        normal2[1] = view.viewNormal[1] / distance;
-        normal2[2] = view.viewNormal[2] / distance;
-
-        //
-        // The view up vector and focal point are the same.  The distance from the
-        // camera to the focal point can be calculated from the parallel scale and
-        // view angle.  The camera position is then found by moving along the view
-        // plane normal from the focal point by the distance.
-        //
-        viewUp[0] = view.viewUp[0];
-        viewUp[1] = view.viewUp[1];
-        viewUp[2] = view.viewUp[2];
-
-        focus[0] = view.focus[0];
-        focus[1] = view.focus[1];
-        focus[2] = view.focus[2];
-
-        eyeAngle = view.eyeAngle;
-
-        distance = view.parallelScale / tan(view.viewAngle * 3.1415926535 / 360.);
-        camera[0] = view.focus[0] + normal2[0] * distance;
-        camera[1] = view.focus[1] + normal2[1] * distance;
-        camera[2] = view.focus[2] + normal2[2] * distance;
-
-        //
-        // Orthographic is the opposite of perspective, setScale is always true.
-        // It forces vtk to use the parallel scale.
-        //
-        orthographic  = !view.perspective;
-        setScale      = true;
-        parallelScale = view.parallelScale;
-        viewAngle     = view.viewAngle;
-
-        //
-        // The minimum near clipping distance must be adaptive to make good use
-        // of the zbuffer.  The distance between the near and far planes seemed
-        // like a good choice, another possibility could have been the distance
-        // between the camera and focus.  The 5000. is a magic number.  The
-        // number should be as large as possible.  10000 would probably also
-        // work, but 100000 would start showing z buffering artifacts.
-        //
-        nearPlane = std::max(view.nearPlane + distance, (view.farPlane - view.nearPlane) / 5000.);
-        farPlane = view.farPlane + distance;
-
-        //
-        // Set the image pan and image zoom.
-        //
-        imagePan[0] = -view.imagePan[0];
-        imagePan[1] = -view.imagePan[1];
-        imageZoom   = view.imageZoom;
-
-        //
-        // Set the vew shear.
-        //
-        shear[0] = view.shear[0];
-        shear[1] = view.shear[1];
-        shear[2] = view.shear[2];
-    }
-};
-#endif
 
 ///////////////////////////////////////////////////////////
 Frustum* calcFrustum(double tileXmin, double tileXmax,
                      double tileYmin, double tileYmax,int dim)
 {
+    VisusInfo()<<"Calculating local frustum based on world frustum of <L,R,B,T>=<"<<tileXmin<<","<<tileXmax<<","<<tileYmin<<","<<tileYmax<<">";
+
     UniquePtr<Frustum> frustum(new Frustum);
     if (dim==2)
     {
@@ -499,12 +387,15 @@ Frustum* calcFrustum(double tileXmin, double tileXmax,
         GLOrthoParams params(tileXmin,tileXmax,tileYmin,tileYmax,-10,10);
         camera.setOrthoParams(params);
         frustum.reset(new Frustum(camera.getFrustum()));
+
+        const GLOrthoParams& orthoParams(camera.getOrthoParams());
+        VisusInfo()<<"local (ortho) frustum is <L,R,B,T>=<"<<orthoParams.left<<","<<orthoParams.right<<","<<orthoParams.bottom<<","<<orthoParams.top<<">";
     }
     else if (dim==3)
     {
         //<ctc> todo: handle 3d
     }
-    
+
 #if 0
     //get window attributes, then use avtViewInfo because it's a more direct mapping
     const View3DAttributes &atts3d=avtCallback::GetCurrentWindowAtts().GetView3D();
@@ -590,13 +481,26 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     int dim=2;//<ctc> todo: handle 3D
     mesh->spatialDimension = dim;     
     mesh->topologicalDimension = dim;
+
+    {
+        NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
+        NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
+        VisusInfo()<<"PopulateDatabaseMetaData: bounds:  "<<dims.toString();
+        VisusInfo()<<"PopulateDatabaseMetaData: extents: "<<exts.toString();
+    }
+
+    mesh->SetBounds(bounds);
+    mesh->hasLogicalBounds = true;
+
+    mesh->SetExtents(extents);
+    mesh->hasSpatialExtents = true;
+
     md->Add(mesh);
 
     // dynamic decomposition and multires (<ctc> are both needed or only multires?)
     md->SetFormatCanDoDomainDecomposition(true);
     md->SetFormatCanDoMultires(true);
 
-    //md->Add(new avtScalarMetaData("Mandlebrot", "Mesh", AVT_ZONECENT));
     std::vector<string> &fieldnames = dataset->fieldnames;
     int ndtype;
     for (int i = 0; i < (int) fieldnames.size(); i++)
@@ -621,79 +525,6 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     //query->getInputPort("quality")->writeValue(resolution-8);
 
     return;
-
-#if 0
-
-    // avtMeshType mt = AVT_RECTILINEAR_MESH;
-    // string mesh_for_this_var;
-    // mesh_for_this_var.assign("CC_Mesh");
-    // int block_origin = 0;
-    // int spatial_dimension = 3;
-    // int topological_dimension = 3;
-    int ndtype;
-
-    //    <ctc> see if I can break in this function when I create a
-    //    pseudocolor plot. Maybe there's a way to do this without
-    //    resampling. Currently pseudocolor doesn't work, never calls
-    //    PopulateDatabaseMetaData again, but where does it call it
-    //    the first time? Maybe I can force it to call again...
-
-
-
-    //
-    // Add the mesh. For formats that do their own decomposition, VisIt
-    // expects we only advertise a single block.
-    //
-    //int metadata_nblocks = 1;
-
-    //set frustum for view dependent read
-    SharedPtr<Frustum> frustum(calcFrustum());
-    query->getInputPort("viewdep")->writeValue(frustum);
-    query->getInputPort("time")->writeValue(SharedPtr<IntObject>(new IntObject(timestate)));
-
-    Int64 max_size=128*128*128; // 2mb but visit always casts to double --> 16mb!
-    bool fits=false;
-    int count=0; //just in case query->processInput returns 0 (it shouldn't, but it still happens and I'm not sure why. bad viewport?)
-    int quality=0;
-    while (!fits && count<10)
-    {
-      count++;
-      query->getInputPort("quality")->writeValue(SharedPtr<IntObject>(new IntObject(--quality)));
-
-      //need to get the size of the target volume here, but don't fetch data (we don't know the varname yet!)
-      query->getInputPort("position_only")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
-
-      this->dataflow->dispatchPublishedMessages(); //<ctc> have to dispatch this time to propagate dataflow_dataset->query connection. It's basically a no-op after the first callde
-      this->dataflow->oninput.emitSignal(query);   //<ctc> still need to do this since after the first propagation it will no longer call onInput for the downstream nodes.
-
-      NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
-      fits=dims.innerProduct()<=max_size;
-    }
-
-    //VisusInfo()<<"now we should have the bounds and extents of the data!";
-    NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
-    NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
-    VisusInfo()<<"PopulateDatabaseMetaData: bounds:  "<<dims.toString();
-    VisusInfo()<<"PopulateDatabaseMetaData: extents: "<<exts.toString();
-
-    // Add the mesh, scalars and vectors.
-    AddMeshToMetaData(md, mesh_for_this_var, mt, extents, metadata_nblocks, block_origin, spatial_dimension, topological_dimension, bounds);
-    std::vector<string> &fieldnames = dataset->fieldnames;
-    
-    for (int i = 0; i < (int) fieldnames.size(); i++)
-    {
-        Field field = dataset->getFieldByName(fieldnames[i]);
-        avtCentering cent = AVT_ZONECENT;
-        ndtype=1;
-        if (field.dtype.isVector())
-            ndtype=field.dtype.ncomponents();
-        if (ndtype == 1)
-            AddScalarVarToMetaData(md, fieldnames[i], mesh_for_this_var, cent);
-        else
-            AddVectorVarToMetaData(md, fieldnames[i], mesh_for_this_var, cent, ndtype);
-    }
-
-#endif
 }
 
 
@@ -1101,8 +932,8 @@ avtIDXFileFormat::CalculateMesh(double &tileXmin, double &tileXmax,
     //VisusInfo()<<"now we should have the bounds and extents of the data!";
     NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
     NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
-    VisusInfo()<<"PopulateDatabaseMetaData: bounds:  "<<dims.toString();
-    VisusInfo()<<"PopulateDatabaseMetaData: extents: "<<exts.toString();
+    VisusInfo()<<"CalculateMesh: bounds:  "<<dims.toString();
+    VisusInfo()<<"CalculateMesh: extents: "<<exts.toString();
 
 
     //
@@ -1110,483 +941,17 @@ avtIDXFileFormat::CalculateMesh(double &tileXmin, double &tileXmax,
     //
     if (selection != NULL)
     {
-        // frustum[0] = tileXmin;
-        // frustum[1] = tileXmax;
-        // frustum[2] = tileYmin;
-        // frustum[3] = tileYmax;
-        // frustum[4] = 0.;
-        // frustum[5] = 0.;
-
-        // double xDelta, yDelta;
-        // xDelta = (tileXmax - tileXmin) / nx;
-        // yDelta = (tileYmax - tileYmin) / ny;
-
-        // cellSize = sqrt(xDelta * xDelta + yDelta * yDelta);
-        cellSize = sqrt(dims.x * dims.x + dims.y * dims.y);
-        selection->SetActualFrustum(frustum);  //<ctc> same as given frustum???
-        selection->SetActualCellSize(cellSize);//<ctc> at least this changes.
-    }
-}
-
-#if 0
-#include <avtMRTestFileFormat.h>
-
-#include <vtkFloatArray.h>
-#include <vtkRectilinearGrid.h>
-
-#include <avtDatabaseMetaData.h>
-#include <avtMultiresSelection.h>
-
-#include <vector>
-
-using     std::string;
-using     std::vector;
-
-// ****************************************************************************
-//  Code to calculate the patch values.
-// ****************************************************************************
-
-class complex
-{
-  public:
-    complex() : a(0.), b(0.) { }
-    complex(float A, float B) : a(A), b(B) { }
-    complex(const complex &obj) : a(obj.a), b(obj.b) { }
-    complex operator = (const complex &obj) { a = obj.a; b = obj.b; return *this;}
-    complex operator + (const complex &obj) const
-    {
-        return complex(a + obj.a, b + obj.b);
-    }
-    complex operator * (const complex &obj) const
-    {
-        return complex(a * obj.a - b * obj.b, a * obj.b + b * obj.a);
-    }
-    float mag2() const
-    {
-        return a*a + b*b;
-    }
-    float mag() const
-    {
-        return sqrt(a*a + b*b);
-    }
-  private:
-    float a,b;
-};
-
-#define MAXIT 30
-
-static float
-mandelbrot(const complex &c)
-{
-    complex z;
-    for (int zit = 0; zit < MAXIT; zit++)
-    {
-        z = (z * z) + c;
-        if (z.mag2() > 4.)
-            return float(zit+1);
-    }
-    return 0;
-}
-
-
-// ****************************************************************************
-//  Method: avtMRTestFileFormat constructor
-//
-//  Programmer: Eric Brugger
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-//  Modifications:
-//
-// ****************************************************************************
-
-avtMRTestFileFormat::avtMRTestFileFormat(const char *fname)
-    : avtSTMDFileFormat(&fname, 1)
-{
-    filename = fname;
-
-    meshNx = 4096, meshNy = 4096;
-    meshXmin = 0., meshXmax = 4096., meshYmin = 0., meshYmax = 4096.;
-    coarseNx = 64, coarseNy = 64;
-}
-
-
-// ****************************************************************************
-//  Method: avtMRTestFileFormat destructor
-//
-//  Programmer: Eric Brugger
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-//  Modifications:
-//
-// ****************************************************************************
-
-avtMRTestFileFormat::~avtMRTestFileFormat()
-{
-}
-
-
-// ****************************************************************************
-//  Method: avtMRFileFormat::CanCacheVariable
-//
-//  Purpose:
-//    We can't have VisIt caching chunks of the mesh and variables above it.
-//
-//  Programmer: Eric Brugger
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-// ****************************************************************************
-
-bool
-avtMRTestFileFormat::CanCacheVariable(const char *var)
-{
-    return false;
-}
-
-
-// ****************************************************************************
-//  Method: avtMRFileFormat::RegisterDataSelections
-//
-//  Purpose:
-//    The MR format can handle multi resolution data selections. So, we
-//    implement this method here to access the data selections.
-//
-//  Programmer: Eric Brugger
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-// ****************************************************************************
-
-void
-avtMRTestFileFormat::RegisterDataSelections(
-    const vector<avtDataSelection_p> &sels,
-    vector<bool> *selectionsApplied)
-{
-    selectionsList    = sels;
-    selectionsApplied = selectionsApplied;
-}
-
-
-// ****************************************************************************
-//  Method: avtMRTestFileFormat::PopulateDatabaseMetaData
-//
-//  Purpose:
-//    This database meta-data object is like a table of contents for the
-//    file.  By populating it, you are telling the rest of VisIt what
-//    information it can request from you.
-//
-//  Programmer: brugger -- generated by xml2avt
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-//  Modifications:
-//
-// ****************************************************************************
-
-void
-avtMRTestFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md)
-{
-    avtMeshMetaData *mesh = new avtMeshMetaData;
-    mesh->name = "Mesh";
-    mesh->meshType = AVT_RECTILINEAR_MESH;
-    mesh->numBlocks = 1;
-    mesh->blockOrigin = 0;
-    mesh->spatialDimension = 2;
-    mesh->topologicalDimension = 2;
-    md->Add(mesh);
-
-    md->SetFormatCanDoMultires(true);
-
-    md->Add(new avtScalarMetaData("Mandelbrot", "Mesh", AVT_ZONECENT));
-}
-
-
-// ****************************************************************************
-//  Method: avtMRTestFileFormat::GetMesh
-//
-//  Purpose:
-//    Gets the mesh associated with this file.  The mesh is returned as a
-//    derived type of vtkDataSet (ie vtkRectilinearGrid, vtkStructuredGrid,
-//    vtkUnstructuredGrid, etc).
-//
-//  Arguments:
-//    domain      The index of the domain.  If there are NDomains, this
-//                value is guaranteed to be between 0 and NDomains-1,
-//                regardless of block origin.
-//    meshname    The name of the mesh of interest.  This can be ignored if
-//                there is only one mesh.
-//
-//  Programmer: Eric Brugger
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-//  Modifications:
-//
-// ****************************************************************************
-
-vtkDataSet *
-avtMRTestFileFormat::GetMesh(int domain, const char *meshname)
-{
-    //
-    // Determine the mesh starting location and size of each cell.
-    //
-    double tileXmin, tileXmax, tileYmin, tileYmax;
-    int nx, ny;
-
-    CalculateMesh(tileXmin, tileXmax, tileYmin, tileYmax, nx, ny);
-
-    double xStart, yStart;
-    double xDelta, yDelta;
-
-    xStart = tileXmin;
-    yStart = tileYmin;
-    xDelta = (tileXmax - tileXmin) / nx;
-    yDelta = (tileYmax - tileYmin) / ny;
-
-    //
-    // Create the grid.
-    //
-    int dims[3];
-    dims[0] = nx + 1;
-    dims[1] = ny + 1;
-    dims[2] = 1;
-
-    vtkRectilinearGrid *rg = vtkRectilinearGrid::New();
-    rg->SetDimensions(dims);
-
-    vtkFloatArray  *xcoord = vtkFloatArray::New();
-    vtkFloatArray  *ycoord = vtkFloatArray::New();
-    vtkFloatArray  *zcoord = vtkFloatArray::New();
-
-    xcoord->SetNumberOfTuples(dims[0]);
-    ycoord->SetNumberOfTuples(dims[1]);
-    zcoord->SetNumberOfTuples(dims[2]);
-
-    float *ptr = xcoord->GetPointer(0);
-    for (int i = 0; i < nx + 1; i++)
-        ptr[i] = xStart + double(i) * xDelta;
-    ptr = ycoord->GetPointer(0);
-    for (int i = 0; i < ny + 1; i++)
-        ptr[i] = yStart + double(i) * yDelta;
-    ptr = zcoord->GetPointer(0);
-    ptr[0] = 0.;
-
-    rg->SetXCoordinates(xcoord);
-    rg->SetYCoordinates(ycoord);
-    rg->SetZCoordinates(zcoord);
-
-    xcoord->Delete();
-    ycoord->Delete();
-    zcoord->Delete();
-
-    return rg;
-}
-
-
-// ****************************************************************************
-//  Method: avtMRTestFileFormat::GetVar
-//
-//  Purpose:
-//    Gets a scalar variable associated with this file.  Although VTK has
-//    support for many different types, the best bet is vtkFloatArray, since
-//    that is supported everywhere through VisIt.
-//
-//  Arguments:
-//    domain     The index of the domain.  If there are NDomains, this
-//               value is guaranteed to be between 0 and NDomains-1,
-//               regardless of block origin.
-//    varname    The name of the variable requested.
-//
-//  Programmer: Eric Brugger
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-//  Modifications:
-//
-// ****************************************************************************
-
-vtkDataArray *
-avtMRTestFileFormat::GetVar(int domain, const char *varname)
-{
-    //
-    // Determine the mesh starting location and size of each cell.
-    //
-    double tileXmin, tileXmax, tileYmin, tileYmax;
-    int nx, ny;
-
-    CalculateMesh(tileXmin, tileXmax, tileYmin, tileYmax, nx, ny);
-
-    double xStart, yStart;
-    double xDelta, yDelta;
-
-    xStart = 4. * (tileXmin - meshXmin) / (meshXmax - meshXmin);
-    yStart = 4. * (tileYmin - meshYmin) / (meshYmax - meshYmin);
-
-    xDelta = (tileXmax - tileXmin) / nx;
-    yDelta = (tileYmax - tileYmin) / ny;
-    xDelta = xDelta / ((meshXmax - meshXmin) / 4.);
-    yDelta = yDelta / ((meshYmax - meshYmin) / 4.);
-
-    //
-    // Create the variable.
-    //
-    vtkFloatArray *scalars = vtkFloatArray::New();
-    scalars->SetNumberOfTuples(nx*ny);
-    float *ptr = (float*)scalars->GetVoidPointer(0);
-    for (int i = 0; i < nx; i++)
-    {
-        for (int j = 0; j < ny; j++)
-        {
-            double x = (xStart + (double(i) + 0.5) * xDelta) - 2.;
-            double y = (yStart + (double(j) + 0.5) * yDelta) - 2.;
-            ptr[j*nx+i] = mandelbrot(complex(x, y));
-        }
-    }
-
-    return scalars;
-}
-
-
-// ****************************************************************************
-//  Method: avtMRTestFileFormat::CalculateMesh
-//
-//  Purpose:
-//    Calculates the parameters defining the mesh for the current multi
-//    resolution data selection.
-//
-//  Arguments:
-//    tileXmin  The tile aligned minimum X value of the mesh.
-//    tileXmax  The tile aligned maximum X value of the mesh.
-//    tileYmin  The tile aligned minimum Y value of the mesh.
-//    tileYmax  The tile aligned maximum Y value of the mesh.
-//    nx        The number of zones in the X direction.
-//    ny        The number of zones in the Y direction.
-//
-//  Programmer: Eric Brugger
-//  Creation:   Fri Dec 20 12:20:07 PDT 2013
-//
-//  Modifications:
-//
-// ****************************************************************************
-
-void
-avtMRTestFileFormat::CalculateMesh(double &tileXmin, double &tileXmax,
-    double &tileYmin, double &tileYmax, int &nx, int &ny)
-{
-    //
-    // Get the multi resolution data selection.
-    //
-    double frustum[6] = {meshXmin, meshXmax, meshYmin, meshYmax, 0., 0.};
-    double cellSize = .002;
-
-    avtMultiresSelection *selection = NULL;
-    for (int i = 0; i < selectionsList.size(); i++)
-    {
-        if (string(selectionsList[i]->GetType()) == "Multi Resolution Data Selection")
-        {
-            selection = (avtMultiresSelection *) *(selectionsList[i]);
-            selection->GetDesiredFrustum(frustum);
-            cellSize = selection->GetDesiredCellSize();
-
-            (*selectionsApplied)[i] = true;
-        }
-    }
-    if (frustum[0] == DBL_MAX && frustum[1] == -DBL_MAX)
-    {
-        frustum[0] = meshXmin;
-        frustum[1] = meshXmax;
-        frustum[2] = meshYmin;
-        frustum[3] = meshYmax;
-    }
-
-    //
-    // Calculate the extents of the mesh, with the extents aligning with
-    // tile boundaries.
-    //
-    double xRange = frustum[1] - frustum[0];
-    double yRange = frustum[3] - frustum[2];
-    double maxRange = std::max(xRange, yRange);
-    double diag = sqrt(2.) * maxRange;
-
-    double meshXRange = meshXmax - meshXmin;
-    double meshYRange = meshYmax - meshYmin;
-
-    double meshMaxRange = std::max(meshXRange, meshYRange);
-    double meshDiag = sqrt(2.) * meshMaxRange;
-    double coarseDiag = meshDiag / coarseNx;
-    double cellDiag = diag * cellSize;
-    int level = std::max(0, int(ceil(log(coarseDiag / cellDiag) / log(2.))));
-
-    double tileXRange = meshXRange / pow(2., level); 
-    double tileYRange = meshYRange / pow(2., level);
-
-    int iTile = std::max(0., floor((frustum[0] - meshXmin) / tileXRange));
-    tileXmin = meshXmin + iTile * tileXRange;
-    iTile = std::min(pow(2., level), ceil((frustum[1] - meshXmin) / tileXRange));
-    tileXmax = meshXmin + iTile * tileXRange;
-
-    iTile = std::max(0., floor((frustum[2] - meshYmin) / tileYRange));
-    tileYmin = meshYmin + iTile * tileYRange;
-    iTile = std::min(pow(2., level), ceil((frustum[3] - meshYmin) / tileYRange));
-    tileYmax = meshYmin + iTile * tileYRange;
-
-    //
-    // Handle the cases where we end up with a mesh with zero or negative
-    // extents in one or both directions.
-    //
-    if (tileXmin <= meshXmin && tileXmax <= meshXmin)
-    {
-        //
-        // We have gone off the right edge.
-        //
-        tileXmin = meshXmin;
-        tileXmax = meshXmin + tileXRange;
-    }
-    else if (tileXmin >= meshXmax && tileXmax >= meshXmax)
-    {
-        //
-        // We have gone off the left edge.
-        //
-        tileXmin = meshXmax - tileXRange;
-        tileXmax = meshXmax;
-    }
-    if (tileYmin <= meshYmin && tileYmax <= meshYmin)
-    {
-        //
-        // We have gone off the top edge.
-        //
-        tileYmin = meshYmin;
-        tileYmax = meshYmin + tileYRange;
-    }
-    else if (tileYmin >= meshYmax && tileYmax >= meshYmax)
-    {
-        //
-        // We have gone off the bottom edge.
-        //
-        tileYmin = meshYmax - tileYRange;
-        tileYmax = meshYmax;
-    }
-
-    //
-    // Determine the number of zones in each direction.
-    //
-    nx = int((tileXmax - tileXmin) / tileXRange) * coarseNx;
-    ny = int((tileYmax - tileYmin) / tileYRange) * coarseNy;
-
-    //
-    // Set the actual multi resolution selection back into the selection.
-    //
-    if (selection != NULL)
-    {
-        frustum[0] = tileXmin;
-        frustum[1] = tileXmax;
-        frustum[2] = tileYmin;
-        frustum[3] = tileYmax;
+        frustum[0] = extents[0];
+        frustum[1] = extents[1];
+        frustum[2] = extents[2];
+        frustum[3] = extents[3];
         frustum[4] = 0.;
         frustum[5] = 0.;
 
-        double xDelta, yDelta;
-        xDelta = (tileXmax - tileXmin) / nx;
-        yDelta = (tileYmax - tileYmin) / ny;
-
-        cellSize = sqrt(xDelta * xDelta + yDelta * yDelta);
+        //cellSize = sqrt(dims.x * dims.x + dims.y * dims.y);
+        cellSize = std::min(dims.x,dims.y); //try to return the smallest cell
         selection->SetActualFrustum(frustum);
         selection->SetActualCellSize(cellSize);
     }
 }
-#endif
+
