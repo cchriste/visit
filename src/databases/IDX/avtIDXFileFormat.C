@@ -448,9 +448,9 @@ Frustum* calcFrustum(double tileXmin, double tileXmax,
 
 bool avtIDXFileFormat::CanCacheVariable(const char *var)
 {
-  VisusInfo()<<"avtIDXFileFormat::CanCacheVariable("<<var<<")";
-  return false;
-  //return std::string(var)!="CC_Mesh";
+    //VisusInfo()<<"avtIDXFileFormat::CanCacheVariable("<<var<<")";
+    return false;
+    //return std::string(var)!="CC_Mesh";
 }
 
 // ****************************************************************************
@@ -470,7 +470,7 @@ void
 avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     int timestate) 
 {
-    VisusInfo()<<"avtIDXFileFormat::PopulateDatabaseMetaData, timestate("<<timestate<<")";
+    VisusInfo()<<"avtIDXFileFormat::PopulateDatabaseMetaData(timestate("<<timestate<<"))";
 
     avtMeshMetaData *mesh = new avtMeshMetaData;
     mesh->name = "Mesh";
@@ -558,15 +558,15 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     //resolution=avtCallback::idx_get_resolution_hack();
     //cerr<<"resolution is at "<<resolution<<endl;
 
-    VisusInfo() << "avtIDXFileFormat::GetMesh: timestate("<<timestate<<") domain("<<domain<<") meshname("<<meshname<<") resolution("<<resolution<<")";
+    VisusInfo() << "avtIDXFileFormat::GetMesh(timestate("<<timestate<<") domain("<<domain<<") meshname("<<meshname<<") resolution("<<resolution<<"))";
 
     //
     // Determine the mesh starting location and size of each cell.
     //
-    double tileXmin, tileXmax, tileYmin, tileYmax;
-    int nx, ny;
+    // double tileXmin, tileXmax, tileYmin, tileYmax;
+    // int nx, ny;
 
-    CalculateMesh(tileXmin, tileXmax, tileYmin, tileYmax,timestate);
+    CalculateMesh(timestate);//tileXmin, tileXmax, tileYmin, tileYmax,timestate);
 
 
     //
@@ -656,15 +656,15 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 {
     //resolution=avtCallback::idx_get_resolution_hack();
     //VisusInfo()<<"resolution is at "<<resolution<<endl;
-    VisusInfo() << "avtIDXFileFormat::GetVar: timestate("<<timestate<<") domain("<<domain<<") varname("<<varname<<") resolution("<<resolution<<")";
+    VisusInfo() << "avtIDXFileFormat::GetVar(timestate("<<timestate<<") domain("<<domain<<") varname("<<varname<<") resolution("<<resolution<<"))";
 
     //
     // Determine the mesh starting location and size of each cell.
     //
-    double tileXmin, tileXmax, tileYmin, tileYmax;
-    int nx, ny;
+    // double tileXmin, tileXmax, tileYmin, tileYmax;
+    // int nx, ny;
 
-    CalculateMesh(tileXmin, tileXmax, tileYmin, tileYmax, timestate);
+    CalculateMesh(timestate);//tileXmin, tileXmax, tileYmin, tileYmax, timestate);
 
 
 
@@ -831,6 +831,7 @@ void
 avtIDXFileFormat::RegisterDataSelections(
     const std::vector<avtDataSelection_p>& sels, std::vector<bool>* applied)
 {
+    VisusInfo()<<"avtIDXFileFormat::RegisterDataSelections";
     this->selectionsList    = sels;
     this->selectionsApplied = applied;
 }
@@ -859,15 +860,21 @@ avtIDXFileFormat::RegisterDataSelections(
 // ****************************************************************************
 
 void
-avtIDXFileFormat::CalculateMesh(double &tileXmin, double &tileXmax,
-                                double &tileYmin, double &tileYmax, 
+avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
+                                  double &tileYmin, double &tileYmax, */
                                 int timestate)
 {
+    VisusInfo()<<"avtIDXFileFormat::CalculateMesh(timestep="<<timestate<<")";
     //
     // Get the multi resolution data selection.
     //
-    double frustum[6] = {0,0,0,0, 0., 0.};
-    double cellSize = 1.0;
+    double transformMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    double viewArea = (fullextents[1]-fullextents[0]) * (fullextents[3]-fullextents[2]);
+    double desired_extents[6] = {this->fullextents[0],this->fullextents[1],this->fullextents[2],this->fullextents[3],this->fullextents[4],this->fullextents[5]};
+    double cellArea = .002;
+
+    double viewport[6] = {this->fullextents[0],this->fullextents[1],this->fullextents[2],this->fullextents[3],this->fullextents[4],this->fullextents[5]};
+    int windowSize[2] = {0,0};
 
     avtMultiresSelection *selection = NULL;
     for (int i = 0; i < selectionsList.size(); i++)
@@ -876,15 +883,29 @@ avtIDXFileFormat::CalculateMesh(double &tileXmin, double &tileXmax,
         if (string(selectionsList[i]->GetType()) == "Multi Resolution Data Selection")
         {
             selection = (avtMultiresSelection *) *(selectionsList[i]);
-            selection->GetDesiredFrustum(frustum);
-            cellSize = selection->GetDesiredCellSize();
+
+            selection->GetCompositeProjectionTransformMatrix(transformMatrix);
+            cellArea = selection->GetDesiredCellArea();
+
+            viewArea = selection->GetViewArea();
+            selection->GetDesiredExtents(desired_extents);
+            selection->GetViewport(viewport);
+            selection->GetSize(windowSize);
+
+            VisusInfo()<<"\tcellArea: "<<cellArea
+                       <<"\tviewArea: "<<viewArea
+                       <<"\twindowSize: "<<windowSize[0]<<","<<windowSize[1]
+                       <<"\tviewport: "<<viewport[0]<<","<<viewport[0]<<","<<viewport[1]<<","<<viewport[2]<<","<<viewport[3]<<","<<viewport[4]<<","<<viewport[5]
+                       <<"\tdesired_extents: "<<desired_extents[0]<<","<<desired_extents[0]<<","<<desired_extents[1]<<","<<desired_extents[2]<<","<<desired_extents[3]<<","<<desired_extents[4]<<","<<desired_extents[5]
+                       <<"\tMVP matrix: "<<transformMatrix[0]<<","<<transformMatrix[1]<<","<<transformMatrix[2]<<","<<transformMatrix[3]<<"\n\t"<<transformMatrix[4]<<","<<transformMatrix[5]<<","<<transformMatrix[6]<<","<<transformMatrix[7]<<"\n\t"<<transformMatrix[8]<<","<<transformMatrix[9]<<","<<transformMatrix[10]<<transformMatrix[11]<<"\n\t"<<transformMatrix[12]<<","<<transformMatrix[13]<<","<<transformMatrix[14]<<","<<transformMatrix[15]
+                       <<"\n";
 
             (*selectionsApplied)[i] = true;
         }
         else if (string(selectionsList[i]->GetType()) == "avtResolutionSelection")
         {
             const avtResolutionSelection* sel = static_cast<const avtResolutionSelection*>(*selectionsList[i]);
-            VisusInfo()<<"\tnew resolution: "<<sel->resolution()<<", (old resolution: "<<resolution<<")";
+            VisusInfo()<<"\tnew resolution: "<<sel->resolution()<<", (old resolution: "<<resolution<<")\n";
             if (resolution!=sel->resolution())
             {
                 ;//ClearCache();
@@ -905,7 +926,13 @@ avtIDXFileFormat::CalculateMesh(double &tileXmin, double &tileXmax,
 
 
     //set frustum for view dependent read
-    SharedPtr<Frustum> visus_frustum(calcFrustum(frustum[0],frustum[1],frustum[2],frustum[3],this->dim));  //get frustum in local (not world) coordinates
+    VisusInfo()<<"setting frustum for view-dependent read";
+    SharedPtr<Frustum> visus_frustum(calcFrustum(desired_extents[0],desired_extents[1],desired_extents[2],desired_extents[3],this->dim));  //get frustum in local (not world) coordinates
+    Visus::Matrix mvp(transformMatrix);
+    Visus::Viewport visus_viewport(viewport[0],viewport[2],viewport[1]-viewport[0],viewport[3]-viewport[2]);
+    //SharedPtr<Frustum> visus_frustum(new Frustum);
+    //visus_frustum->loadModelview(mvp);
+    //visus_frustum->setViewport(visus_viewport);
     
     query->getInputPort("viewdep")->writeValue(visus_frustum);
     query->getInputPort("time")->writeValue(SharedPtr<IntObject>(new IntObject(timestate)));
@@ -941,17 +968,9 @@ avtIDXFileFormat::CalculateMesh(double &tileXmin, double &tileXmax,
     //
     if (selection != NULL)
     {
-        frustum[0] = extents[0];
-        frustum[1] = extents[1];
-        frustum[2] = extents[2];
-        frustum[3] = extents[3];
-        frustum[4] = 0.;
-        frustum[5] = 0.;
-
-        //cellSize = sqrt(dims.x * dims.x + dims.y * dims.y);
-        cellSize = std::min(dims.x,dims.y); //try to return the smallest cell
-        selection->SetActualFrustum(frustum);
-        selection->SetActualCellSize(cellSize);
+        cellArea = sqrt(dims.x * dims.x + dims.y * dims.y);
+        selection->SetActualExtents(extents);
+        selection->SetActualCellArea(cellArea);
     }
 }
 

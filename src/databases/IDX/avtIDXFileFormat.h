@@ -139,8 +139,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
     std::vector<avtDataSelection_p>  selectionsList;
     std::vector<bool>               *selectionsApplied;
     
-    void                   CalculateMesh(double &, double &,
-                               double &, double &, int);
+    void                   CalculateMesh(/*double &, double &,
+                                           double &, double &, */int timestate);
 
     //
     //<ctc> old ViSUS plugin stuff, may not all be necessary
