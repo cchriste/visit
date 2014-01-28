@@ -26,7 +26,7 @@ avtIDXFileFormat.C
 
 INCLUDE_DIRECTORIES(
 ${CMAKE_CURRENT_SOURCE_DIR}
-/Users/cam/code/nvisus/build/visit-plugin/include
+/scratch/cam/nvisus/build/visit-plugin/include
 ${VISIT_COMMON_INCLUDES}
 ${VISIT_INCLUDE_DIR}/avt/DBAtts/MetaData
 ${VISIT_INCLUDE_DIR}/avt/DBAtts/SIL
@@ -51,7 +51,7 @@ ${VTK_INCLUDE_DIRS}
 )
 
 
-LINK_DIRECTORIES(${VISIT_LIBRARY_DIR} /Users/cam/code/nvisus/build/visit-plugin/lib )
+LINK_DIRECTORIES(${VISIT_LIBRARY_DIR} ${VTK_LIBRARY_DIRS} /scratch/cam/nvisus/build/visit-plugin/lib )
 
 ADD_LIBRARY(IIDXDatabase ${LIBI_SOURCES})
 TARGET_LINK_LIBRARIES(IIDXDatabase visitcommon)
@@ -59,19 +59,37 @@ SET(INSTALLTARGETS IIDXDatabase)
 
 IF(NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
     ADD_LIBRARY(MIDXDatabase ${LIBM_SOURCES}    )
-    TARGET_LINK_LIBRARIES(MIDXDatabase visitcommon avtdbatts avtdatabase_ser visuskernel visusidx visusdb visusdataflow visusscenegraph visusgui Juce tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto /System/Library/Frameworks/CoreMidi.framework /System/Library/Frameworks/CoreAudio.framework /System/Library/Frameworks/CoreFoundation.framework /System/Library/Frameworks/QuartzCore.framework /System/Library/Frameworks/Cocoa.framework /System/Library/Frameworks/IoKit.framework )
+    TARGET_LINK_LIBRARIES(MIDXDatabase visitcommon avtdbatts avtdatabase_ser 
+-Wl,--whole-archive -lvisuskernel -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusidx -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusdb -Wl,--no-whole-archive  
+-Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
+-Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
+ tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
     ADD_TARGET_DEFINITIONS(MIDXDatabase MDSERVER)
     SET(INSTALLTARGETS ${INSTALLTARGETS} MIDXDatabase)
 ENDIF(NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
 
 ADD_LIBRARY(EIDXDatabase_ser ${LIBE_SOURCES})
-TARGET_LINK_LIBRARIES(EIDXDatabase_ser visitcommon avtdatabase_ser avtpipeline_ser visuskernel visusidx visusdb visusdataflow visusscenegraph visusgui Juce tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto /System/Library/Frameworks/CoreMidi.framework /System/Library/Frameworks/CoreAudio.framework /System/Library/Frameworks/CoreFoundation.framework /System/Library/Frameworks/QuartzCore.framework /System/Library/Frameworks/Cocoa.framework /System/Library/Frameworks/IoKit.framework )
+TARGET_LINK_LIBRARIES(EIDXDatabase_ser visitcommon avtdatabase_ser avtpipeline_ser 
+-Wl,--whole-archive -lvisuskernel -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusidx -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusdb -Wl,--no-whole-archive  
+-Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
+-Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
+  tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
 ADD_TARGET_DEFINITIONS(EIDXDatabase_ser ENGINE)
 SET(INSTALLTARGETS ${INSTALLTARGETS} EIDXDatabase_ser)
 
 IF(VISIT_PARALLEL)
     ADD_PARALLEL_LIBRARY(EIDXDatabase_par ${LIBE_SOURCES})
-    TARGET_LINK_LIBRARIES(EIDXDatabase_par visitcommon avtdatabase_par avtpipeline_par visuskernel visusidx visusdb visusdataflow visusscenegraph visusgui Juce tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto /System/Library/Frameworks/CoreMidi.framework /System/Library/Frameworks/CoreAudio.framework /System/Library/Frameworks/CoreFoundation.framework /System/Library/Frameworks/QuartzCore.framework /System/Library/Frameworks/Cocoa.framework /System/Library/Frameworks/IoKit.framework )
+    TARGET_LINK_LIBRARIES(EIDXDatabase_par visitcommon avtdatabase_par avtpipeline_par 
+-Wl,--whole-archive -lvisuskernel -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusidx -Wl,--no-whole-archive 
+-Wl,--whole-archive -lvisusdb -Wl,--no-whole-archive  
+-Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
+-Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
+  tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
     ADD_TARGET_DEFINITIONS(EIDXDatabase_par ENGINE)
     SET(INSTALLTARGETS ${INSTALLTARGETS} EIDXDatabase_par)
 ENDIF(VISIT_PARALLEL)

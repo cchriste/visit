@@ -78,7 +78,8 @@ avtDatabase *
 IDXCommonPluginInfo::SetupDatabase(const char *const *list,
                                    int nList, int nBlock)
 {
-    assert(nBlock==1);
+    if (nBlock!=1) 
+      return NULL;
 
     // ignore any nBlocks past 1
     int nTimestepGroups = nList / nBlock;
