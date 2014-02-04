@@ -28,6 +28,7 @@ INCLUDE_DIRECTORIES(
 ${CMAKE_CURRENT_SOURCE_DIR}
 /scratch/cam/nvisus/build/visit-plugin/include
 ${VISIT_COMMON_INCLUDES}
+${VISIT_INCLUDE_DIR}/avt/View
 ${VISIT_INCLUDE_DIR}/avt/DBAtts/MetaData
 ${VISIT_INCLUDE_DIR}/avt/DBAtts/SIL
 ${VISIT_INCLUDE_DIR}/avt/Database/Database

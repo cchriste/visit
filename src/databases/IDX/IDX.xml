@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
   <Plugin name="IDX" type="database" label="ViSUS-style IDX files" version="1.0" enabled="true" mdspecificcode="false" engspecificcode="false" onlyengine="false" noengine="false" dbtype="MTMD" haswriter="false" hasoptions="false" filePatternsStrict="true" opensWholeDirectory="false">
     <CXXFLAGS>
-      -I/scratch/cam/nvisus/build/visit-plugin/include
+      /scratch/cam/nvisus/build/visit-plugin/include ${VISIT_INCLUDE_DIR}/avt/View
     </CXXFLAGS>
     <LDFLAGS>
       -L/scratch/cam/nvisus/build/visit-plugin/lib
