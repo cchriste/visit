@@ -176,7 +176,7 @@ int avtIDXFileFormat::num_instances=0;
 avtIDXFileFormat::avtIDXFileFormat(const char *filename)
 : avtMTMDFileFormat(filename)
 {
-    resolution = 3;
+    resolution = -1;
     haveData=false;
 
     selectionsList = std::vector<avtDataSelection_p>();
@@ -258,12 +258,11 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename)
     //only load one level (VisIt doesn't support streaming)
     query->getInputPort("progression")->writeValue(SharedPtr<IntObject>(new IntObject(0)));
 
-    //enable view-dependent data loading
-    //<ctc> need a manual override for this for testing manual resolution selection
-    query->getInputPort("enable_viewdep")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
-
     //fieldname
     query->getInputPort("fieldname")->writeValue(SharedPtr<StringObject>(new StringObject(dataset->default_field.name)));
+
+    //position_only (default)
+    query->getInputPort("position_only")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
 
     VisusInfo()<<"querying the bounds...";
     bounds[0] = dataset->logic_box.to.x-dataset->logic_box.from.x+1;
@@ -287,6 +286,9 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename)
     DummyNode *dummy=new DummyNode;
     this->dataflow->addNode(dummy);
     this->dataflow->connectNodes(query,"data","data",dummy);
+
+    //must dispatch once to propagate dataflow_dataset->query connection
+    this->dataflow->dispatchPublishedMessages();
 
     VisusInfo()<<"end of constructor!";
 }
@@ -478,7 +480,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->meshType = AVT_RECTILINEAR_MESH;
     mesh->numBlocks = 1;
     mesh->blockOrigin = 0;
-    mesh->LODs = 16;  //related to "quality" query port, [-8,8]
+    mesh->LODs = dataset->max_resolution;
     mesh->spatialDimension = dim;     
     mesh->topologicalDimension = dim;
 
@@ -514,15 +516,6 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
         else
             md->Add(new avtVectorMetaData(fieldnames[i],mesh->name,AVT_ZONECENT,ndtype));
     }
-
-    //
-    // We want to set the LOD property of the Mesh Meta Data. Since we only
-    // have one mesh we can assume that md->GetMeshes(0) points to the
-    // avtMeshMetaData Object created with the `AddMeshToMetaData' helper.
-    //
-    //md->GetMeshes(0).LODs = 16;//(dataset->maxh - 15) / 3;
-    //resolution <ctc> tie LOD (resolution) to "quality" port.
-    //query->getInputPort("quality")->writeValue(resolution-8);
 
     return;
 }
@@ -666,8 +659,6 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 
     CalculateMesh(timestate);//tileXmin, tileXmax, tileYmin, tileYmax, timestate);
 
-
-
     string name(varname);
     NdBox slice_box = dataset->logic_box;
 
@@ -676,7 +667,6 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
     query->getInputPort("time")->writeValue(SharedPtr<IntObject>(new IntObject(timestate)));
 
     this->dataflow->oninput.emitSignal(query);
-    //this->dataflow->dispatchPublishedMessages();
 
     VisusInfo()<<"query started, waiting for data...";
     Clock t0(Clock::now());
@@ -926,13 +916,7 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
         }
     }
 
-    // if (transformMatrix[0] != DBL_MAX && transformMatrix[1] != DBL_MAX &&
-    //     transformMatrix[2] != DBL_MAX && transformMatrix[3] != DBL_MAX)
-    // {
-    //     avtView2D::CalculateExtentsAndArea(extents, viewArea, transformMatrix);
-    // }
-
-    //if there isn't a valid transformation matrix, just set the extents and dims to the full dataset.
+    //if no valid transformation matrix set extents and dims to full dataset
     if (transformMatrix[0] == DBL_MAX && transformMatrix[1] == DBL_MAX &&
         transformMatrix[2] == DBL_MAX && transformMatrix[3] == DBL_MAX)
     {
@@ -952,35 +936,35 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
 
     //set frustum for view dependent read
     VisusInfo()<<"setting frustum for view-dependent read";
-    //SharedPtr<Frustum> visus_frustum(calcFrustum(desired_extents[0],desired_extents[1],desired_extents[2],desired_extents[3],this->dim));  //get frustum in local (not world) coordinates
     Visus::Matrix mvp(transformMatrix);
-    //Visus::Viewport visus_viewport(viewport[0]*(float)windowSize[0],viewport[2]*(float)windowSize[1],(viewport[1]-viewport[0])*(float)windowSize[0],(viewport[3]-viewport[2])*(float)windowSize[1]);
     Visus::Viewport visus_viewport(0,0,windowSize[0],windowSize[1]);
     SharedPtr<Frustum> visus_frustum(new Frustum);
-    //visus_frustum->loadModelview(mvp);
     visus_frustum->loadProjection(mvp);
     visus_frustum->setViewport(visus_viewport);
-    
-    query->getInputPort("viewdep")->writeValue(visus_frustum);
+
+    //set time
     query->getInputPort("time")->writeValue(SharedPtr<IntObject>(new IntObject(timestate)));
 
-    Int64 max_size=128*128*128; // 2mb but visit always casts to double --> 16mb!
-    bool fits=false;
-    int count=0; //just in case query->processInput returns 0 (it shouldn't, but it still happens and I'm not sure why. bad viewport?)
-    int quality=0;
+    //
+    //view-dependent resolution selection (if resolution is not set using MultiresControl)
+    //
+    query->getInputPort("enable_viewdep")->writeValue(SharedPtr<BoolObject>(new BoolObject(this->resolution<0)));
+    query->getInputPort("viewdep")->writeValue(visus_frustum);
+    Int64 max_size = 128*128*128; // 2gb but visit always casts to double --> 16gb!
+    bool fits      = false;
+    int count      = 0; //just in case query->processInput returns 0 (it shouldn't, but it still happens and I'm not sure why. bad viewport?)
+    int quality    = 0;
     while (!fits && count<10)
     {
-      count++;
-      query->getInputPort("quality")->writeValue(SharedPtr<IntObject>(new IntObject(--quality)));
+        count++;
+        query->getInputPort("quality")->writeValue(SharedPtr<IntObject>(new IntObject(--quality)));
+            
+        //get the size of the target but don't fetch data (we don't know the varname yet)
+        query->getInputPort("position_only")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
+        this->dataflow->oninput.emitSignal(query);
 
-      //need to get the size of the target volume here, but don't fetch data (we don't know the varname yet!)
-      query->getInputPort("position_only")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
-
-      this->dataflow->dispatchPublishedMessages(); //<ctc> have to dispatch this time to propagate dataflow_dataset->query connection. It's basically a no-op after the first call
-      this->dataflow->oninput.emitSignal(query);   //<ctc> still need to do this since after the first propagation it will no longer call onInput for the downstream nodes.
-
-      NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
-      fits=dims.innerProduct()<=max_size;
+        NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
+        fits = this->resolution>0 ? true : dims.innerProduct()<=max_size;
     }
 
     //
