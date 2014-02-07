@@ -486,15 +486,18 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
 
     {
         NdPoint dims(bounds[0],bounds[1],bounds[2],1,1);
-        NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
+        //NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
+        NdBox   exts(NdPoint(fullextents[0],fullextents[2],fullextents[4]),NdPoint(fullextents[1],fullextents[3],fullextents[5]));
         VisusInfo()<<"PopulateDatabaseMetaData: bounds:  "<<dims.toString();
         VisusInfo()<<"PopulateDatabaseMetaData: extents: "<<exts.toString();
     }
 
-    mesh->SetBounds(bounds);
-    mesh->hasLogicalBounds = true;
+    //<ctc> maybe these are tripping things up for panning...
+    // mesh->SetBounds(bounds);
+    // mesh->hasLogicalBounds = true;
 
-    mesh->SetExtents(extents);
+    mesh->SetExtents(fullextents);  //mrtest always sets full extents, so let's try it...
+    //mesh->SetExtents(extents);
     mesh->hasSpatialExtents = true;
 
     md->Add(mesh);
@@ -597,7 +600,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     arrayX = (float *) coordsX->GetVoidPointer(0);
     for (int i = 0; i < dims[0]; i++)
         //arrayX[i] = i * resReduction;
-        arrayX[i] = (extents[0]+i)*spacing.x;
+        arrayX[i] = extents[0]+i*spacing.x;
     //arrayX[dims[0]-1] = slice_box.to[0] + 1.; //<ctc> maybe still need something like this
     rgrid->SetXCoordinates(coordsX);
 
@@ -606,7 +609,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     arrayY = (float *) coordsY->GetVoidPointer(0);
     for (int i = 0; i < dims[1]; i++)
         //arrayY[i] = i * resReduction;
-        arrayY[i] = (extents[2]+i)*spacing.y;
+        arrayY[i] = extents[2]+i*spacing.y;
     //arrayY[dims[1]-1] = slice_box.to[1] + 1.; //<ctc> maybe still need something like this
     rgrid->SetYCoordinates(coordsY);
 
@@ -615,7 +618,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     arrayZ = (float *) coordsZ->GetVoidPointer(0);
     for (int i = 0; i < dims[2]; i++)
         //arrayZ[i] = slice_box.from[2] + i * resReduction;
-        arrayZ[i] = (extents[4]+i)*spacing.z;
+        arrayZ[i] = extents[4]+i*spacing.z;
     //arrayZ[dims[2]-1] = slice_box.to[2] + 1.; //<ctc> maybe still need something like this
     rgrid->SetZCoordinates(coordsZ);
 
@@ -958,7 +961,7 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
     while (!fits && count<10)
     {
         count++;
-        query->getInputPort("quality")->writeValue(SharedPtr<IntObject>(new IntObject(--quality)));
+        query->getInputPort("quality")->writeValue(SharedPtr<IntObject>(new IntObject(quality--)));
             
         //get the size of the target but don't fetch data (we don't know the varname yet)
         query->getInputPort("position_only")->writeValue(SharedPtr<BoolObject>(new BoolObject(true)));
@@ -997,7 +1000,7 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
         cellArea = sqrt(xDelta * xDelta + yDelta * yDelta + zDelta * zDelta);
         VisusInfo()<<"CalculateMesh: bounds:  "<<dims.toString();
         VisusInfo()<<"CalculateMesh: cellArea: "<<cellArea;
-        //selection->SetActualExtents(extents);
+        selection->SetActualExtents(extents);
         selection->SetActualCellArea(cellArea);
         //selection->SetViewArea(dims.innerProduct());
         double viewArea=(extents[1]-extents[0]+1)*(extents[3]-extents[2]+1)*(extents[5]-extents[4]+1);
@@ -1011,7 +1014,7 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
             NdBox   exts(NdPoint(extents2[0],extents2[2],extents2[4]),NdPoint(extents2[1],extents2[3],extents2[5]));
             VisusInfo()<<"\navtView2D::CalculateExtentsAndArea: area:  "<<area;
             VisusInfo()<<"avtView2D::CalculateExtentsAndArea: extents: "<<exts.toString();
-            selection->SetActualExtents(extents2);
+            //selection->SetActualExtents(extents2);
         }
     }
 }
