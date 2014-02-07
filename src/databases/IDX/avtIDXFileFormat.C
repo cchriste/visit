@@ -949,6 +949,7 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
     //view-dependent resolution selection (if resolution is not set using MultiresControl)
     //
     query->getInputPort("enable_viewdep")->writeValue(SharedPtr<BoolObject>(new BoolObject(this->resolution<0)));
+    query->getInputPort("resolution")->writeValue(SharedPtr<IntObject>(new IntObject(this->resolution)));
     query->getInputPort("viewdep")->writeValue(visus_frustum);
     Int64 max_size = 128*128*128; // 2gb but visit always casts to double --> 16gb!
     bool fits      = false;
@@ -972,6 +973,17 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
     //
     if (selection != NULL)
     {
+        //
+        // Handle the cases where we end up with a mesh with zero or negative
+        // extents in one or both directions.
+        //
+        extents[0] = std::max(extents[0],fullextents[0]);
+        extents[1] = std::min(extents[1],fullextents[1]);
+        extents[2] = std::max(extents[2],fullextents[2]);
+        extents[3] = std::min(extents[3],fullextents[3]);
+        extents[4] = std::max(extents[4],fullextents[4]);
+        extents[5] = std::min(extents[5],fullextents[5]);
+
         {
             //VisusInfo()<<"now we should have the bounds and extents of the data!";
             NdBox   exts(NdPoint(extents[0],extents[2],extents[4]),NdPoint(extents[1],extents[3],extents[5]));
@@ -989,7 +1001,7 @@ avtIDXFileFormat::CalculateMesh(/*double &tileXmin, double &tileXmax,
         selection->SetActualCellArea(cellArea);
         //selection->SetViewArea(dims.innerProduct());
         double viewArea=(extents[1]-extents[0]+1)*(extents[3]-extents[2]+1)*(extents[5]-extents[4]+1);
-        selection->SetViewArea(viewArea);
+        //selection->SetViewArea(viewArea);
         VisusInfo()<<"CalculateMesh: viewArea: "<<viewArea;
 
         {
