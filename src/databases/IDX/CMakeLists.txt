@@ -67,7 +67,7 @@ IF(NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
 -Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
 -Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
 -Wl,--whole-archive -lvisusgui -Wl,--no-whole-archive 
-Juce tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
+Juce tinyxml curl FreeImage libz ssl glew crypto )
     ADD_TARGET_DEFINITIONS(MIDXDatabase MDSERVER)
     SET(INSTALLTARGETS ${INSTALLTARGETS} MIDXDatabase)
 ENDIF(NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
@@ -80,7 +80,7 @@ TARGET_LINK_LIBRARIES(EIDXDatabase_ser visitcommon avtdatabase_ser avtpipeline_s
 -Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
 -Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
 -Wl,--whole-archive -lvisusgui -Wl,--no-whole-archive 
-Juce tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
+Juce tinyxml curl FreeImage libz ssl glew crypto )
 ADD_TARGET_DEFINITIONS(EIDXDatabase_ser ENGINE)
 SET(INSTALLTARGETS ${INSTALLTARGETS} EIDXDatabase_ser)
 
@@ -93,7 +93,7 @@ IF(VISIT_PARALLEL)
 -Wl,--whole-archive -lvisusdataflow -Wl,--no-whole-archive
 -Wl,--whole-archive -lvisusscenegraph -Wl,--no-whole-archive 
 -Wl,--whole-archive -lvisusgui -Wl,--no-whole-archive 
-Juce tinyxml curl FreeImage libz ssl mfhdf hdf glew crypto xdr )
+Juce tinyxml curl FreeImage libz ssl glew crypto )
     ADD_TARGET_DEFINITIONS(EIDXDatabase_par ENGINE)
     SET(INSTALLTARGETS ${INSTALLTARGETS} EIDXDatabase_par)
 ENDIF(VISIT_PARALLEL)
