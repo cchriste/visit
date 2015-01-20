@@ -1,0 +1,25 @@
+Function: ChangesRequireRecalculation
+Declaration: bool ChangesRequireRecalculation(const MoleculeAttributes &);
+Definition:
+bool
+MoleculeAttributes::ChangesRequireRecalculation(const MoleculeAttributes &obj)
+{
+    // Really, we should make sure that this will cause us to add the element
+    // or other array as a secondary variable.  This specific test is
+    // a little too ready to cause recalculation.
+    if (scaleRadiusBy != obj.scaleRadiusBy)
+        return true;
+
+    // Same situation here.
+    if (radiusVariable != obj.radiusVariable)
+        return true;
+
+    return false;
+}
+
+Target: xml2cmake
+Condition: VISIT_MANTA
+VSources: avtMantaMoleculeRenderer.C
+ESources: avtMantaMoleculeRenderer.C
+Includes: ${VISIT_INCLUDE_DIR}/avt/Plotter/Manta
+
