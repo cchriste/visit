@@ -1,0 +1,190 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta http-equiv="Content-Language" content="en-us">
+  <meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+  <meta name="ProgId" content="FrontPage.Editor.Document">
+  <title>VisIt 2.10 Release Notes</title>
+</head>
+<body>
+
+<center><b><font size="6">VisIt 2.10 Release Notes</font></b></center>
+
+<p>Welcome to VisIt's release notes page. This page describes the important
+enhancements and bug-fixes that were added to this release.</p>
+
+<p><b>Sections</b></p>
+<ul>
+  <li><a href="#General_Features">Features for all users</a></li>
+  <li><a href="#Advanced_Features">Features for advanced users</a></li>
+  <li><a href="#GUI_Changes">Changes in GUI behavior</a></li>
+  <li><a href="#File_format">Changes to file format readers</a></li>
+  <li><a href="#Plot_changes">Changes to plots</a></li>
+  <li><a href="#Expression_changes">Changes to expressions</a></li>
+  <li><a href="#Query_changes">Changes to picks and queries</a></li>
+  <li><a href="#Bugs_fixed">Other bug fixes</a></li>
+  <li><a href="#Build_Features">Changes to build_visit</a></li>
+  <li><a href="#Dev_changes">Changes for VisIt developers</a></li>
+</ul>
+
+<a name="General_Features"></a>
+<p><b><font size="4">General features added in version 2.10</font></b></p>
+<ul>
+  <li>VisIt's Simulation window was enhanced so it can display up to 500 simulation commands.</li>
+  <li>VisIt was enhanced to launch parallel jobs using sbatch/ibrun.</li>
+  <li>Added a new SPH Resample operator</li>
+  <li></li>
+  <li></li>
+</ul>
+
+<a name="Advanced_Features"></a>
+<p><b><font size="4">Advanced features added in version 2.10</font></b></p>
+<ul>
+  <li>Libsim's VisIt_VariableData object was extended so you can optionally supply it with multiple data arrays, each representing a separate component of data. This enhancement permits VisIt to accept non-contiguous simulation data without first converting that data to a contiguous representation. This is a particularly useful feature for array-of-structure data structures and will reduce Libsim's memory overhead.
+Data arrays using the new <i>setArrayData</i> functions can have one or more components, which have their own base address and associated offset and stride. All of the previous <i>setData</i> functions continue to work and remain the preferred method for passing contiguous data to Libsim. The flexibility offered by the new <i>setArrayData</i> functions allows simulation data to be used directly (zero-copy) in situations that would previously have required a copy of the data.<br>
+<p><b>Structure of Arrays Example:</b><br>
+<font color="#6666dd"><code><pre>
+#define MAX_PART 100
+
+typedef struct
+{
+    double x,y,z;
+    double mass;
+} Particle;
+
+Particle P[MAX_PART];
+
+/* Expose Array of Structure x,y,z values as a single VariableData object. */
+visit_handle coordinates = VISIT_INVALID_HANDLE;
+VisIt_VariableData_alloc(&coordinates);
+VisIt_VariableData_setArrayDataD(coordinates, 0, VISIT_OWNER_SIM, MAX_PART, 0, sizeof(Particle), (void *)&P[0].x);
+VisIt_VariableData_setArrayDataD(coordinates, 1, VISIT_OWNER_SIM, MAX_PART, 0, sizeof(Particle), (void *)&P[0].y);
+VisIt_VariableData_setArrayDataD(coordinates, 2, VISIT_OWNER_SIM, MAX_PART, 0, sizeof(Particle), (void *)&P[0].z);
+
+/* Expose Array of Structures mass array as a single VariableData object. */
+visit_handle mass = VISIT_INVALID_HANDLE;
+VisIt_VariableData_alloc(&mass);
+VisIt_VariableData_setArrayDataD(mass, 0, VISIT_OWNER_SIM, MAX_PART, 0, sizeof(Particle), (void *)&P[0].mass);
+</pre></code></font>
+
+In addition, this new functionality can be used to create the desired interleaved view of coordinates that are stored in separate arrays.
+<br><br>
+<b>Interleaved Coordinates Example:</b><br>
+<font color="#6666dd"><code><pre>
+#define NX 100
+#define NY 100
+#define NZ 100
+int dims[] = {NX, NY, NZ};
+double x[NZ][NY][NX], y[NZ][NY][NX], z[NZ][NY][NX];
+
+/* Expose x,y,z values as a single VariableData object. */
+visit_handle coordinates = VISIT_INVALID_HANDLE;
+VisIt_VariableData_alloc(&coordinates);
+VisIt_VariableData_setArrayDataD(coordinates, 0, VISIT_OWNER_SIM, NX*NY*NZ, 0, sizeof(double), (void *)x);
+VisIt_VariableData_setArrayDataD(coordinates, 1, VISIT_OWNER_SIM, NX*NY*NZ, 0, sizeof(double), (void *)y);
+VisIt_VariableData_setArrayDataD(coordinates, 2, VISIT_OWNER_SIM, NX*NY*NZ, 0, sizeof(double), (void *)z);
+
+visit_handle mesh = VISIT_INVALID_HANDLE;
+VisIt_CurvilinearMesh_alloc(&mesh);
+VisIt_CurvilinearMesh_setCoords3(mesh, dims, coordinates);
+</pre></code></font>
+<br>
+Data passed via the new <i>setDataArray</i> functions are supported for mesh coordinates and variables. Certain other use such as specifying unstructured mesh connectivity are not currently permitted.
+   </p>
+  </li>
+  <li>Libsim's Fortran bindings were enhanced so the <i>visitsetmpicommunicator</i> function passes an MPI communicator by its integer handle. Thank you to William T. Jones for this improvement.</li>
+  <li></li>
+  <li></li>
+  <li></li>
+</ul>
+
+<a name="GUI_Changes"></a>
+<p><b><font size="4">Changes in GUI behavior for version 2.10</font></b></p>
+<ul>
+  <li>The 2D Line annotation interface was enhanced to allow the line color to be the same as the foreground color, and to provide a style setting.</li>
+  <li>A 3D Line annotation object has been added.</li>
+  <li></li>
+  <li></li>
+</ul>
+
+<a name="File_format"></a>
+<p><b><font size="4">File format reader changes in version 2.10</font></b></p>
+<ul>
+  <li>The PLOT3D reader has been enhanced to <i>auto-detect</i> the format options normally specified by the <i>.vp3d meta file</i> or via <i>Read options.</i>Auto-detection works for most binary files, but not for ascii. It is always on, and if successful, will override the values specified in the <i>.vp3d meta file</i> or <i>Read options.</i>  If not successful, the reader will fallback to use the other settings.</li>
+  <li>The PLOT3D reader now supports time-series solution files, specified in the form 'somefile*.q', (where '*' matches a number specifing the timestate) or 'somefile??3?.q'.  Use the '?' form to sub-select from the time series. The q filename in this form can be used in the <i>.vp3d meta file</i>, or via <i>Read Options.</i>  The '.q' extension is the default.</li>
+  <li></li>
+  <li>The Nek5000 reader had an issue with #std 8 data files (double size data). The data dimensions would be read wrong. This has been fixed.</li>
+  <li>VisIt can now read <i>.vtm</i> VTK multiblock files.</li>
+</ul>
+
+<a name="Plot_changes"></a>
+<p><b><font size="4">Changes to VisIt's plots in version 2.10</font></b></p>
+<ul>
+  <li></li>
+  <li></li>
+  <li></li>
+  <li></li>
+</ul>
+
+<a name="Expression_changes"></a>
+<p><b><font size="4">Changes to VisIt's expression language in version 2.10</font></b></p>
+<ul>
+  <li></li>
+  <li></li>
+  <li></li>
+  <li></li>
+</ul>
+
+<a name="Query_changes"></a>
+<p><b><font size="4">Changes to VisIt's picks and queries in version 2.10</font></b></p>
+<ul>
+  <li></li>
+  <li></li>
+  <li></li>
+  <li></li>
+</ul>
+
+<a name="PICS_changes"></a>
+<p><b><font size="4">Changes to VisIt's PICS version in 2.10.0</font></b></p>
+<ul>
+  <li></li>
+  <li></li>
+  <li></li>
+  <li></li>
+</ul>
+
+
+<a name="Bugs_fixed"></a>
+<p><b><font size="4">Other bugs fixed in version 2.10</font></b></p>
+<ul>
+  <li>2D Line annotation has been fixed so that adding arrowheads does not make the line disappear.</li>
+  <li>A bug that caused a warning message to pop up when adding Image Annotation objects has been fixed.</li>
+  <li>2D axis titles have been fixed so that a color other than foreground color can be used.</li>
+  <li>Libsim's internal buffer for retrieving the user's environment was fixed at 10Kb, which is not large enough to accommodate some users' environments. The environment retrieval code has been rewritten to handle arbitrary sizes.</li>
+  <li>The splatting render mode in the Volume plot was corrected so it would no longer change graphics settings in a way that could corrupt the rendering of other plots such as Pseudocolor.</li>
+  <li>The VTK reader was serving up invalid time values for files that did not have time.</li>
+</ul>
+
+<a name="Build_Features"></a>
+<p><b><font size="4">Build features added in version 2.10</font></b></p>
+<ul>
+  <li></li>
+  <li></li>
+  <li></li>
+  <li></li>
+</ul>
+
+<a name="Dev_changes"></a>
+<p><b><font size="4">Changes for VisIt developers in version 2.10</font></b></p>
+<ul>
+  <li></li>
+  <li></li>
+  <li></li>
+  <li></li>
+</ul>
+
+<p>Click the following link to view the release notes for the previous version
+of VisIt: <a href="relnotes2.9.2.html">VisIt 2.9.2 Release Notes</a>.</p>
+</body>
+</html>
