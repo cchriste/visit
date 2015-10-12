@@ -217,9 +217,20 @@ void avtIDXFileFormat::calculateBoundsAndExtents(){
 
 int avtIDXFileFormat::num_instances=0;
 
-avtIDXFileFormat::avtIDXFileFormat(const char *filename)
+avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* attrs)
 : avtMTMDFileFormat(filename)
 {
+    for (int i=0; attrs!=0 && i<attrs->GetNumberOfOptions(); ++i) {
+        if (attrs->GetName(i) == "Big Endian") {
+            reverse_endian = attrs->GetBool("Big Endian");
+        }
+    }
+    
+    if(reverse_endian)
+        VisusInfo() << "Using Big Endian";
+    else
+        VisusInfo() << "Using Little Endian";
+    
 #ifdef PARALLEL
     rank = PAR_Rank();
     nprocs = PAR_Size();
@@ -234,9 +245,6 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename)
     {
         app.reset(new Application);
     }
-
-    //dataflow
-    this->dataflow.reset(new Dataflow);
 
     string name("file://"); name += Path(filename).toString();
 
@@ -633,7 +641,6 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
 vtkDataArray *
 avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 {
-    
   //VisusInfo()<< rank << ": start getvar " << varname << " domain "<< domain;
 
     if (!dataset->getTimesteps()->containsTimestep(timestate))
@@ -688,15 +695,17 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 
     int* my_bounds = boxes_bounds.at(domain);
     int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
-    long ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
+    Uint64 ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
     
-    int ncomponents=1;
+    int ncomponents = 1;
+    Uint64 ntotal = ncomponents * ntuples;
     
     // if( data->c_ptr() != NULL)
     //     VisusInfo()<< rank << ": size data bytes " << data->c_size();
     
     // VisusInfo() << rank << ": size array " << ncomponents*ntuples;
     
+    // TODO make a switch(field.dtype)
     if (field.dtype==DTypes::UINT8)
     {
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
@@ -704,6 +713,7 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
        
         // TODO check this unmanaged in the new ViSUS
         // data->unmanaged=true; //giving the data to VisIt which will delete it when it's no longer needed
+        
         rv->SetArray((unsigned char*)data->c_ptr(),ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
         return rv;
     }
@@ -713,6 +723,17 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
         rv->SetNumberOfComponents(ncomponents);
        
         rv->SetArray((unsigned short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     if (field.dtype==DTypes::UINT32)
@@ -721,21 +742,24 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
         rv->SetNumberOfComponents(ncomponents);
        
         rv->SetArray((unsigned int*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype==DTypes::UINT32)
-    {
-        vtkUnsignedLongArray *rv = vtkUnsignedLongArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-      
-        rv->SetArray((unsigned long*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned long>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     if (field.dtype==DTypes::INT8)
     {
         vtkCharArray*rv = vtkCharArray::New();
         rv->SetNumberOfComponents(ncomponents);
-      //  data->unmanaged=true;
+      
         rv->SetArray((char*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
         return rv;
     }
@@ -743,8 +767,19 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
     {
         vtkShortArray *rv = vtkShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
-      //  data->unmanaged=true;
+      
         rv->SetArray((short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            short *buff = (short *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     if (field.dtype==DTypes::INT32)
@@ -753,6 +788,17 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
         rv->SetNumberOfComponents(ncomponents);
     
         rv->SetArray((int*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            int *buff = (int *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     if (field.dtype==DTypes::INT64)
@@ -760,7 +806,20 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
         vtkLongArray *rv = vtkLongArray::New();
         rv->SetNumberOfComponents(ncomponents);
      
+        // ?? is it correct to use long here ??
+        
         rv->SetArray((long*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            long *buff = (long *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                long tmp;
+                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     if (field.dtype==DTypes::FLOAT32)
@@ -770,6 +829,16 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
         
         rv->SetArray((float*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
         
+        if(reverse_endian){
+            float *buff = (float *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                float tmp;
+                float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     if (field.dtype==DTypes::FLOAT64)
@@ -778,6 +847,17 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
         rv->SetNumberOfComponents(ncomponents);
         
         rv->SetArray((double*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            double *buff = (double *) rv->GetVoidPointer(0);
+            for (unsigned long long i = 0 ; i < ntotal ; i++)
+            {
+                double tmp;
+                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+ 
         return rv;
     }
 

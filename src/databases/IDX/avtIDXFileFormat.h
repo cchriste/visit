@@ -46,13 +46,11 @@
 #include <avtMTMDFileFormat.h>
 
 #include <vector>
+#include <DBOptionsAttributes.h>
 
 #include <visus.h>
 #include <visuscpp/db/dataset/visus_db_dataset.h>
-#include <visuscpp/kernel/mvc/visus_builtin_object.h>
-#include <visuscpp/dataflow/visus_dataflow.h>
-#include <visuscpp/db/nodes/visus_db_querynode.h>
-#include <visuscpp/dataflow/visus_dataflownode.h>
+
 
 // ****************************************************************************
 //  Class: avtIDXFileFormat
@@ -67,10 +65,10 @@
 
 class DummyNode;
 struct avtView3D;
-class avtIDXFileFormat : public avtMTMDFileFormat, public Object
+class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
 {
   public:
-                       avtIDXFileFormat(const char *);
+                       avtIDXFileFormat(const char *, DBOptionsAttributes* attrs);
     virtual           ~avtIDXFileFormat();
 
     //
@@ -114,15 +112,76 @@ class avtIDXFileFormat : public avtMTMDFileFormat, public Object
     static int              num_instances;
 
     Visus::UniquePtr<Visus::Application> app;
-    Visus::UniquePtr<Visus::Dataflow>    dataflow;
     Visus::UniquePtr<Visus::Access>      access;
     Visus::SharedPtr<Visus::Dataset>     dataset;
     std::vector<Visus::Box>              boxes;
     std::vector<int*>                    boxes_bounds;
     bool multibox;
+  
+  private:
+    
+    bool reverse_endian;
     
     void calculateBoundsAndExtents();
     void loadBalance();
+    
+    inline int
+    int16_Reverse_Endian(short val, unsigned char *output)
+    {
+        unsigned char *input  = ((unsigned char *)&val);
+        
+        output[0] = input[1];
+        output[1] = input[0];
+        
+        return 2;
+    }
+    
+    inline int
+    int32_Reverse_Endian(int val, unsigned char *outbuf)
+    {
+        unsigned char *data = ((unsigned char *)&val) + 3;
+        unsigned char *out = outbuf;
+        
+        *out++ = *data--;
+        *out++ = *data--;
+        *out++ = *data--;
+        *out = *data;
+        
+        return 4;
+    }
+    
+    inline int
+    float32_Reverse_Endian(float val, unsigned char *outbuf)
+    {
+        unsigned char *data = ((unsigned char *)&val) + 3;
+        unsigned char *out = outbuf;
+        
+        *out++ = *data--;
+        *out++ = *data--;
+        *out++ = *data--;
+        *out = *data;
+        
+        return 4;
+    }
+    
+    inline int
+    double64_Reverse_Endian(double val, unsigned char *outbuf)
+    {
+        unsigned char *data = ((unsigned char *)&val) + 7;
+        unsigned char *out = outbuf;
+        
+        *out++ = *data--;
+        *out++ = *data--;
+        *out++ = *data--;
+        *out++ = *data--;
+        *out++ = *data--;
+        *out++ = *data--;
+        *out++ = *data--;
+        *out = *data;
+        
+        return 8;
+    }
+
 
     VISUS_DECLARE_BINDABLE(avtIDXFileFormat);
 };
