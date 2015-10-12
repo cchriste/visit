@@ -122,6 +122,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
     
     bool reverse_endian;
     
+    vtkDataArray* queryToVtk(int timestate, int domain, const char *varname);
+    
     void calculateBoundsAndExtents();
     void loadBalance();
     

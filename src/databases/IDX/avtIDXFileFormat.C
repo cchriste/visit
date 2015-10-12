@@ -616,6 +616,312 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
     times.swap(tsteps);
 }
 
+vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
+    
+    if (!dataset->getTimesteps()->containsTimestep(timestate))
+        return NULL;
+    
+    NdBox my_box;
+    int zp2 = (dim == 2) ? 1 : boxes.at(domain).p2.z;
+    
+    NdPoint p1(boxes.at(domain).p1.x,boxes.at(domain).p1.y,boxes.at(domain).p1.z);
+    NdPoint p2(boxes.at(domain).p2.x,boxes.at(domain).p2.y,zp2,1,1);
+    my_box.setP1(p1);
+    my_box.setP2(p2);
+    
+    //VisusInfo() << rank << ": Box query " << my_box.p1().toString() << " p2 " << my_box.p2().toString() << " variable " << varname << " time " << timestate;
+    
+    int hr = dataset->getMaxResolution();
+    
+    // TODO Check memory deallocation (it doesn't work for multiple boxes if I use SharedPtr or UniquePtr)
+    Query* box_query = new Query(dataset.get(),'r');
+    //    UniquePtr<Query> box_query(new Query(dataset.get(),'r'));
+    box_query->setLogicPosition(my_box);
+    box_query->setField(dataset->getFieldByName(varname));
+    
+    box_query->setTime(timestate);
+    
+    box_query->setStartResolution(0);
+    box_query->addEndResolution(hr);
+    box_query->setMaxResolution(hr);
+    
+    // -------- This can be used for lower resolution queries
+    //    box_query->addEndResolution(sres);
+    //    box_query->addEndResolution(hr);
+    //    box_query->setMergeMode(Query::InterpolateSamples);
+    // --------
+    
+    box_query->setAccess(access.get());
+    box_query->begin();
+    
+    VisusReleaseAssert(!box_query->end());
+    VisusReleaseAssert(box_query->execute());
+    
+    // -------- This can be used for lower resolution queries
+    //    box_query->next();
+    //    VisusReleaseAssert(!box_query->end());
+    // --------
+    
+    //    printf("idx query result (dim %dx%dx%d) = %lld:\n", box_query->getBuffer()->getWidth(), box_query->getBuffer()->getHeight(), box_query->getBuffer()->getDepth(), box_query->getBuffer()->c_size());
+    
+    SharedPtr<Array> original_data = box_query->getBuffer();
+    
+    Field field = dataset->getFieldByName(varname);
+    
+    int* my_bounds = boxes_bounds.at(domain);
+    int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
+    Uint64 ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
+    
+    int ncomponents = 1;
+    
+    Uint64 ntotal = ncomponents * ntuples;
+    
+    Array* data = original_data.get();
+    
+    bool isVector = original_data->dtype.isVector();
+    
+    if(isVector)
+        ncomponents = 3;
+    
+    if(isVector && dim == 2)
+        data = new Array();
+    
+    DType type = field.dtype;
+    
+    // if( data->c_ptr() != NULL)
+    //     VisusInfo()<< rank << ": size data bytes " << data->c_size();
+    
+    // VisusInfo() << rank << ": size array " << ncomponents*ntuples;
+    
+    if(type == DTypes::UINT8 || type.isVectorOf(DTypes::UINT8)){
+        vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
+        rv->SetNumberOfComponents(ncomponents); //<ctc> eventually handle vector data, since visit can actually render it!
+        
+        // TODO check this unmanaged in the new ViSUS
+        // data->unmanaged=true; //giving the data to VisIt which will delete it when it's no longer needed
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::UINT8_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((unsigned char*)data->c_ptr(),ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
+        return rv;
+    }
+    else if(type == DTypes::UINT16 || type.isVectorOf(DTypes::UINT16)){
+    
+        vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::UINT16_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((unsigned short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+    
+        return rv;
+    }
+    else if(type == DTypes::UINT32 || type.isVectorOf(DTypes::UINT32)){
+        vtkUnsignedIntArray *rv = vtkUnsignedIntArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::UINT32_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((unsigned int*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
+        return rv;
+    }
+    else if(type == DTypes::INT8 || type.isVectorOf(DTypes::INT8)){
+        vtkCharArray*rv = vtkCharArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::INT8_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((char*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
+        return rv;
+    }
+    else if(type == DTypes::INT16 || type.isVectorOf(DTypes::INT16)){
+        vtkShortArray *rv = vtkShortArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::INT16_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            short *buff = (short *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
+        return rv;
+    }
+    else if(type == DTypes::INT32 || type.isVectorOf(DTypes::INT32)){
+        vtkIntArray *rv = vtkIntArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::INT32_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((int*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            int *buff = (int *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
+        return rv;
+    }
+    else if(type == DTypes::INT64 || type.isVectorOf(DTypes::INT64)){
+        vtkLongArray *rv = vtkLongArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::INT64_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        // ?? is it correct to use long here ??
+        
+        rv->SetArray((long*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            long *buff = (long *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                long tmp;
+                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
+        return rv;
+    }
+    else if(type == DTypes::FLOAT32 || type.isVectorOf(DTypes::FLOAT32)){
+
+        vtkFloatArray *rv = vtkFloatArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::FLOAT32_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((float*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            float *buff = (float *) rv->GetVoidPointer(0);
+            for (Uint64 i = 0 ; i < ntotal ; i++)
+            {
+                float tmp;
+                float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+    
+        return rv;
+    }
+    else if(type == DTypes::FLOAT64 || type.isVectorOf(DTypes::FLOAT64)){
+
+        vtkDoubleArray *rv = vtkDoubleArray::New();
+        rv->SetNumberOfComponents(ncomponents);
+        
+        if(isVector && dim == 2){
+            if(!Array::convertTo(*data, *original_data, DTypes::FLOAT64_RGB)){
+                VisusInfo() << "Cast to 3d vector failed";
+                return NULL;
+            }
+            
+            original_data.reset();
+        }
+        
+        rv->SetArray((double*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
+        
+        if(reverse_endian){
+            double *buff = (double *) rv->GetVoidPointer(0);
+            for (unsigned long long i = 0 ; i < ntotal ; i++)
+            {
+                double tmp;
+                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+    
+        return rv;
+    }
+}
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetVar
@@ -641,229 +947,11 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
 vtkDataArray *
 avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 {
-  //VisusInfo()<< rank << ": start getvar " << varname << " domain "<< domain;
-
-    if (!dataset->getTimesteps()->containsTimestep(timestate))
-        return NULL;
+    //VisusInfo()<< rank << ": start getvar " << varname << " domain "<< domain;
     
-    NdBox my_box;
-    int zp2 = (dim == 2) ? 1 : boxes.at(domain).p2.z;
+    return queryToVtk(timestate, domain, varname);
     
-    NdPoint p1(boxes.at(domain).p1.x,boxes.at(domain).p1.y,boxes.at(domain).p1.z);
-    NdPoint p2(boxes.at(domain).p2.x,boxes.at(domain).p2.y,zp2,1,1);
-    my_box.setP1(p1);
-    my_box.setP2(p2);
-
-    //VisusInfo() << rank << ": Box query " << my_box.p1().toString() << " p2 " << my_box.p2().toString() << " variable " << varname << " time " << timestate;
-
-    int hr = dataset->getMaxResolution();
-    
-    // TODO Check memory deallocation (it doesn't work for multiple boxes if I use SharedPtr or UniquePtr)
-    Query* box_query = new Query(dataset.get(),'r');
-//    UniquePtr<Query> box_query(new Query(dataset.get(),'r'));
-    box_query->setLogicPosition(my_box);
-    box_query->setField(dataset->getFieldByName(varname));
-
-    box_query->setTime(timestate);
-    
-    box_query->setStartResolution(0);
-    box_query->addEndResolution(hr);
-    box_query->setMaxResolution(hr);
-
-// -------- This can be used for lower resolution queries
-//    box_query->addEndResolution(sres);
-//    box_query->addEndResolution(hr);
-//    box_query->setMergeMode(Query::InterpolateSamples);
-// --------
-    
-    box_query->setAccess(access.get());
-    box_query->begin();
-
-    VisusReleaseAssert(!box_query->end());
-    VisusReleaseAssert(box_query->execute());
-    
-// -------- This can be used for lower resolution queries
-//    box_query->next();
-//    VisusReleaseAssert(!box_query->end());
-// --------
-    
-//    printf("idx query result (dim %dx%dx%d) = %lld:\n", box_query->getBuffer()->getWidth(), box_query->getBuffer()->getHeight(), box_query->getBuffer()->getDepth(), box_query->getBuffer()->c_size());
-
-    SharedPtr<Array> data = box_query->getBuffer();
-
-    Field field = dataset->getFieldByName(varname);
-
-    int* my_bounds = boxes_bounds.at(domain);
-    int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
-    Uint64 ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
-    
-    int ncomponents = 1;
-    Uint64 ntotal = ncomponents * ntuples;
-    
-    // if( data->c_ptr() != NULL)
-    //     VisusInfo()<< rank << ": size data bytes " << data->c_size();
-    
-    // VisusInfo() << rank << ": size array " << ncomponents*ntuples;
-    
-    // TODO make a switch(field.dtype)
-    if (field.dtype==DTypes::UINT8)
-    {
-        vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
-        rv->SetNumberOfComponents(ncomponents); //<ctc> eventually handle vector data, since visit can actually render it!
-       
-        // TODO check this unmanaged in the new ViSUS
-        // data->unmanaged=true; //giving the data to VisIt which will delete it when it's no longer needed
-        
-        rv->SetArray((unsigned char*)data->c_ptr(),ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype==DTypes::UINT16)
-    {
-        vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-       
-        rv->SetArray((unsigned short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
-        
-        if(reverse_endian){
-            unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
-            for (Uint64 i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
-        }
-        
-        return rv;
-    }
-    if (field.dtype==DTypes::UINT32)
-    {
-        vtkUnsignedIntArray *rv = vtkUnsignedIntArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-       
-        rv->SetArray((unsigned int*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
-        
-        if(reverse_endian){
-            unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
-            for (Uint64 i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
-        }
-        
-        return rv;
-    }
-    if (field.dtype==DTypes::INT8)
-    {
-        vtkCharArray*rv = vtkCharArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-      
-        rv->SetArray((char*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype==DTypes::INT16)
-    {
-        vtkShortArray *rv = vtkShortArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-      
-        rv->SetArray((short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
-        
-        if(reverse_endian){
-            short *buff = (short *) rv->GetVoidPointer(0);
-            for (Uint64 i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
-        }
-        
-        return rv;
-    }
-    if (field.dtype==DTypes::INT32)
-    {
-        vtkIntArray *rv = vtkIntArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-    
-        rv->SetArray((int*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
-        
-        if(reverse_endian){
-            int *buff = (int *) rv->GetVoidPointer(0);
-            for (Uint64 i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
-        }
-        
-        return rv;
-    }
-    if (field.dtype==DTypes::INT64)
-    {
-        vtkLongArray *rv = vtkLongArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-     
-        // ?? is it correct to use long here ??
-        
-        rv->SetArray((long*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
-        
-        if(reverse_endian){
-            long *buff = (long *) rv->GetVoidPointer(0);
-            for (Uint64 i = 0 ; i < ntotal ; i++)
-            {
-                long tmp;
-                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
-        }
-        
-        return rv;
-    }
-    if (field.dtype==DTypes::FLOAT32)
-    {
-        vtkFloatArray *rv = vtkFloatArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        
-        rv->SetArray((float*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
-        
-        if(reverse_endian){
-            float *buff = (float *) rv->GetVoidPointer(0);
-            for (Uint64 i = 0 ; i < ntotal ; i++)
-            {
-                float tmp;
-                float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
-        }
-        
-        return rv;
-    }
-    if (field.dtype==DTypes::FLOAT64)
-    {
-        vtkDoubleArray *rv = vtkDoubleArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        
-        rv->SetArray((double*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
-        
-        if(reverse_endian){
-            double *buff = (double *) rv->GetVoidPointer(0);
-            for (unsigned long long i = 0 ; i < ntotal ; i++)
-            {
-                double tmp;
-                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
-        }
- 
-        return rv;
-    }
-
-    return NULL;
 }
-
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetVectorVar
@@ -892,236 +980,6 @@ avtIDXFileFormat::GetVectorVar(int timestate, int domain, const char *varname)
 
   //VisusInfo()<< rank << ": start getVectorVar " << varname << " domain "<< domain;
     
-    if (!dataset->getTimesteps()->containsTimestep(timestate))
-        return NULL;
+    return queryToVtk(timestate, domain, varname);
     
-    NdBox my_box;
-    int zp2 = (dim == 2) ? 1 : boxes.at(domain).p2.z;
-    
-    NdPoint p1(boxes.at(domain).p1.x,boxes.at(domain).p1.y,boxes.at(domain).p1.z);
-    NdPoint p2(boxes.at(domain).p2.x,boxes.at(domain).p2.y,zp2,1,1);
-    
-    my_box.setP1(p1);
-    my_box.setP2(p2);
-    
-    //VisusInfo()<<"Box query " << my_box.p1().toString() << " p2 " << my_box.p2().toString();
-    
-    int hr = dataset->getMaxResolution();
-    
-    // TODO Check memory deallocation (it doesn't work for multiple boxes if I use SharedPtr or UniquePtr)
-    Query* box_query = new Query(dataset.get(),'r');
-    //    UniquePtr<Query> box_query(new Query(dataset.get(),'r'));
-    box_query->setLogicPosition(my_box);
-    box_query->setField(dataset->getFieldByName(varname));
-    box_query->setTime(timestate);
-    
-    box_query->setStartResolution(0);
-    box_query->addEndResolution(hr);
-    box_query->setMaxResolution(hr);
-    
-    // -------- This can be used for lower resolution queries
-    //    box_query->addEndResolution(sres);
-    //    box_query->addEndResolution(hr);
-    //    box_query->setMergeMode(Query::InterpolateSamples);
-    // --------
-    
-    box_query->setAccess(access.get());
-    box_query->begin();
-    VisusReleaseAssert(!box_query->end());
-    VisusReleaseAssert(box_query->execute());
-    
-    // -------- This can be used for lower resolution queries
-    //    box_query->next();
-    //    VisusReleaseAssert(!box_query->end());
-    // --------
-    
- //   printf("idx query result (dim %dx%dx%d) = %lld:\n", box_query->getBuffer()->getWidth(), box_query->getBuffer()->getHeight(), box_query->getBuffer()->getDepth(), box_query->getBuffer()->c_size());
-    
-    SharedPtr<Array> original_data = box_query->getBuffer();
-    
-    Field field = dataset->getFieldByName(varname);
-    
-    int* my_bounds = boxes_bounds.at(domain);
-    int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
-    long ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
-    
-    int ncomponents = 3; // Visit works fine only with 3 components
-    
-    Array* data = original_data.get();
-    
-    if(dim == 2)
-        data = new Array();
-    
-    // if( data->c_ptr() != NULL)
-    //     VisusInfo()<< "size data bytes " << data->c_size();
-    
-    // VisusInfo() << "size array " << ncomponents*ntuples;
-    
-    if (field.dtype.isVectorOf(DTypes::UINT8))
-    {
-        vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        // TODO check this unmanaged with the new ViSUS
-        //data->unmanaged=true;
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::UINT8_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((unsigned char*)data->c_ptr(),ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::UINT16))
-    {
-        vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::UINT16_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((unsigned short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::UINT32))
-    {
-        vtkUnsignedLongArray *rv = vtkUnsignedLongArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::UINT32_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((unsigned long*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned long>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::INT8))
-    {
-        vtkCharArray*rv = vtkCharArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::INT8_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((char*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::INT16))
-    {
-        vtkShortArray *rv = vtkShortArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::INT16_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((short*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::INT32))
-    {
-        vtkIntArray *rv = vtkIntArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::INT32_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((int*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::INT64))
-    {
-        vtkLongArray *rv = vtkLongArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::INT64_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((long*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::FLOAT32))
-    {
-        vtkFloatArray *rv = vtkFloatArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::FLOAT32_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((float*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<float>::VTK_DATA_ARRAY_FREE);
-        
-        return rv;
-    }
-    if (field.dtype.isVectorOf(DTypes::FLOAT64))
-    {
-        vtkDoubleArray *rv = vtkDoubleArray::New();
-        rv->SetNumberOfComponents(ncomponents);
-        rv->SetNumberOfTuples(ntuples);
-        
-        if(dim == 2){
-            if(!Array::convertTo(*data, *original_data, DTypes::FLOAT64_RGB)){
-                VisusInfo() << "Cast to 3d vector failed";
-                return NULL;
-            }
-            
-            original_data.reset();
-        }
-        
-        rv->SetArray((double*)data->c_ptr(),ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-
-    return NULL;
 }
