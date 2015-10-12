@@ -40,6 +40,7 @@
 #include <avtIDXFileFormat.h>
 #include <avtMTMDFileFormatInterface.h>
 #include <avtGenericDatabase.h>
+#include <avtIDXOptions.h>
 
 // ****************************************************************************
 //  Method:  IDXCommonPluginInfo::GetDatabaseType
@@ -86,10 +87,23 @@ IDXCommonPluginInfo::SetupDatabase(const char *const *list,
     avtMTMDFileFormat **ffl = new avtMTMDFileFormat*[nTimestepGroups];
     for (int i = 0 ; i < nTimestepGroups ; i++)
     {
-        ffl[i] = new avtIDXFileFormat(list[i*nBlock]);
+        ffl[i] = new avtIDXFileFormat(list[i*nBlock], readOptions);
     }
     avtMTMDFileFormatInterface *inter 
            = new avtMTMDFileFormatInterface(ffl, nTimestepGroups);
 
     return new avtGenericDatabase(inter);
 }
+
+DBOptionsAttributes *
+IDXCommonPluginInfo::GetReadOptions() const
+{
+    return GetIDXReadOptions();
+}
+
+DBOptionsAttributes *
+IDXCommonPluginInfo::GetWriteOptions() const
+{
+    return GetIDXWriteOptions();
+}
+

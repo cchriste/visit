@@ -16,12 +16,14 @@ SET(LIBM_SOURCES
 IDXMDServerPluginInfo.C
 ${COMMON_SOURCES}
 avtIDXFileFormat.C
+avtIDXOptions.C
 )
 
 SET(LIBE_SOURCES
 IDXEnginePluginInfo.C
 ${COMMON_SOURCES}
 avtIDXFileFormat.C
+avtIDXOptions.C
 )
 
 INCLUDE_DIRECTORIES(
