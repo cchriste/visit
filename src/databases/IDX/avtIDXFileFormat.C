@@ -150,8 +150,8 @@ void avtIDXFileFormat::loadBalance(){
         int part_p1 = box.p1[maxdir];
         int part_p2 = box.p1[maxdir] + loc_avg_ext;
         
-        SimplePoint3D p1(box.p1);
-        SimplePoint3D p2(box.p2);
+        SimplePoint3d p1(box.p1);
+        SimplePoint3d p2(box.p2);
         
         //std::cout << "Old box p1: " << p1 << " p2: "<< p2;
         
@@ -289,8 +289,8 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
             
             //std::cout<< "lower " << lower << " upper " << upper;
             
-            SimplePoint3D p1;
-            SimplePoint3D p2;
+            SimplePoint3d p1;
+            SimplePoint3d p2;
             int eCells[3];
             int resdata[3];
         
