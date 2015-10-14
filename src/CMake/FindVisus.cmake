@@ -94,10 +94,13 @@ IF (VISUS_INCLUDE_DIR)
    FIND_LIBRARY(VISUS_XML_LIB       tinyxml                ${VISUS_DIR}/lib NO_DEFAULT_PATH)
    FIND_LIBRARY(VISUS_LIBZ_LIB      zlib                   ${VISUS_DIR}/lib NO_DEFAULT_PATH)
    FIND_LIBRARY(VISUS_SSL_LIB       ssl                    ${VISUS_DIR}/lib NO_DEFAULT_PATH)
-   FIND_LIBRARY(VISUS_CRYPTO_LIB    libcrypto                 ${VISUS_DIR}/lib NO_DEFAULT_PATH)
+   FIND_LIBRARY(VISUS_CRYPTO_LIB    libcrypto              ${VISUS_DIR}/lib NO_DEFAULT_PATH)
+
+   FIND_LIBRARY(VISUS_SIMPLEIO_LIB    visussimpleio        ${VISUS_DIR}/lib NO_DEFAULT_PATH)
 
    SET(VISUS_CORE_LIBRARIES
         ${VISUS_LIB}
+        ${VISUS_SIMPLEIO_LIB}
    )
 
    SET(VISUS_ADDL_LIBRARIES

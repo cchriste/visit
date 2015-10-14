@@ -47,10 +47,10 @@
 
 #include <vector>
 #include <DBOptionsAttributes.h>
+#include <visus_simpleio.h>
+#include <string>
 
-#include <visus.h>
-#include <visuscpp/db/dataset/visus_db_dataset.h>
-
+typedef std::string String;
 
 // ****************************************************************************
 //  Class: avtIDXFileFormat
@@ -63,9 +63,7 @@
 //
 // ****************************************************************************
 
-class DummyNode;
-struct avtView3D;
-class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
+class avtIDXFileFormat : public avtMTMDFileFormat
 {
   public:
                        avtIDXFileFormat(const char *, DBOptionsAttributes* attrs);
@@ -111,15 +109,13 @@ class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
     int                     dim;         //2d or 3d
     static int              num_instances;
 
-    Visus::UniquePtr<Visus::Application> app;
-    Visus::UniquePtr<Visus::Access>      access;
-    Visus::SharedPtr<Visus::Dataset>     dataset;
-    std::vector<Visus::Box>              boxes;
-    std::vector<int*>                    boxes_bounds;
+    std::vector<SimpleBox>  boxes;
+    std::vector<int*>       boxes_bounds;
     bool multibox;
   
   private:
     
+    SimpleIO reader;
     bool reverse_endian;
     
     vtkDataArray* queryToVtk(int timestate, int domain, const char *varname);
@@ -184,8 +180,6 @@ class avtIDXFileFormat : public avtMTMDFileFormat, public Visus::Object
         return 8;
     }
 
-
-    VISUS_DECLARE_BINDABLE(avtIDXFileFormat);
 };
 
 
