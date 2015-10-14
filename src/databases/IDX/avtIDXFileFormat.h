@@ -134,6 +134,9 @@ class avtIDXFileFormat : public avtMTMDFileFormat
         return 2;
     }
     
+    template <typename Type>
+    Type* convertComponents(const unsigned char* src, int init_ncomponents, int final_ncomponents, long long totsamples);
+    
     inline int
     int32_Reverse_Endian(int val, unsigned char *outbuf)
     {

@@ -189,6 +189,36 @@ void avtIDXFileFormat::loadBalance(){
     
 }
 
+template <typename Type>
+Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncomponents, int dst_ncomponents, long long totsamples){
+    int n=src_ncomponents;
+    int m=dst_ncomponents;
+    int ncomponents=std::min(m,n);
+    
+    std::cout << "n " << n << " m " << m << " ncomp " << ncomponents;
+    
+    Type* dst = (Type*)calloc(totsamples*m, sizeof(Type));
+    std::cout << "new vector size " << totsamples << std::endl;
+    
+    //for each component...
+    for (int C=0;C<ncomponents;C++)
+    {
+        Type* src_p=((Type*)src)+C;
+        Type* dst_p=((Type*)dst)+C;
+        for (long long I=0; I<totsamples; I++,src_p+=n,dst_p+=m)
+        {
+            *dst_p=*src_p;
+            
+            //std::cout << "c " << C << " I " <<I << std::endl;
+        }
+        
+    }
+    
+    std::cout << "data converted " << std::endl;
+    
+    return dst;
+}
+
 // TODO consider the physical box
 void avtIDXFileFormat::calculateBoundsAndExtents(){
     
@@ -252,7 +282,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     
     // TODO (if necessary) read only with rank 0 and then broadcast to the other processors
     vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
-    String upsfilename = filename;//Path(filename).toString();
+    String upsfilename = filename;
     upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
     
     parser->SetFileName(upsfilename.c_str());
@@ -603,6 +633,8 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         return NULL;
     }
     
+    std::cout << "Got data from visus" << std::endl;
+    
     SimpleField field = reader.getCurrField();
     SimpleDTypes type = field.type;
     
@@ -615,27 +647,44 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     bool isVector = field.isVector;
     
     if(isVector)
-        ncomponents = 3;
+        ncomponents = 3; // Visit wants 3 components vectors
     
     long long ntotal = ntuples * ncomponents;
+    
 //    if( data != NULL)
 //         std::cout<< rank << ": size data bytes " << data->c_size() << std::endl;
     
 //    std::cout << rank << ": size array " << ncomponents*ntuples << std::endl;
     
-    if(type == VisusSimpleIO::UINT8 || type == VisusSimpleIO::UINT8_RGB){
+    if(type == VisusSimpleIO::UINT8){
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
         rv->SetNumberOfComponents(ncomponents); //<ctc> eventually handle vector data, since visit can actually render it!
         
-        rv->SetArray((unsigned char*)data,ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            unsigned char* newdata = convertComponents<unsigned char>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((unsigned char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((unsigned char*)data,ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
         return rv;
     }
-    else if(type == VisusSimpleIO::UINT16 || type == VisusSimpleIO::UINT16_RGB){
+    else if(type == VisusSimpleIO::UINT16){
     
         vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
-        rv->SetArray((unsigned short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            unsigned short* newdata = convertComponents<unsigned short>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((unsigned short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((unsigned short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
             unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
@@ -649,11 +698,19 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
         return rv;
     }
-    else if(type == VisusSimpleIO::UINT32 || type == VisusSimpleIO::UINT32_RGB){
+    else if(type == VisusSimpleIO::UINT32){
         vtkUnsignedIntArray *rv = vtkUnsignedIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
-        rv->SetArray((unsigned int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            unsigned int* newdata = convertComponents<unsigned int>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((unsigned int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((unsigned int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
             unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
@@ -667,18 +724,35 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::INT8 || type == VisusSimpleIO::INT8_RGB){
+    else if(type == VisusSimpleIO::INT8){
         vtkCharArray*rv = vtkCharArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
-        rv->SetArray((char*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            char* newdata = convertComponents<char>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((char*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
+        
         return rv;
     }
-    else if(type == VisusSimpleIO::INT16 || type == VisusSimpleIO::INT16_RGB){
+    else if(type == VisusSimpleIO::INT16){
         vtkShortArray *rv = vtkShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
-        rv->SetArray((short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            short* newdata = convertComponents<short>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
             short *buff = (short *) rv->GetVoidPointer(0);
@@ -692,11 +766,19 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::INT32 || type == VisusSimpleIO::INT32_RGB){
+    else if(type == VisusSimpleIO::INT32){
         vtkIntArray *rv = vtkIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
-        rv->SetArray((int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            int* newdata = convertComponents<int>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
             int *buff = (int *) rv->GetVoidPointer(0);
@@ -710,13 +792,20 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::INT64 || type == VisusSimpleIO::INT64_RGB){
+    else if(type == VisusSimpleIO::INT64){
         vtkLongArray *rv = vtkLongArray::New();
         rv->SetNumberOfComponents(ncomponents);
     
         // ?? is it correct to use long here ??
-        
-        rv->SetArray((long*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            long* newdata = convertComponents<long>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((long*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((long*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
             long *buff = (long *) rv->GetVoidPointer(0);
@@ -730,15 +819,19 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::FLOAT32 || type == VisusSimpleIO::FLOAT32_RGB){
+    else if(type == VisusSimpleIO::FLOAT32){
 
         vtkFloatArray *rv = vtkFloatArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
-        rv->SetArray((float*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
-        
-        
-        std::cout << "set array float 32" << std::endl;
+        if(isVector && dim < 3){
+            float* newdata = convertComponents<float>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((float*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((float*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
             float *buff = (float *) rv->GetVoidPointer(0);
@@ -752,12 +845,20 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
         return rv;
     }
-    else if(type == VisusSimpleIO::FLOAT64 || type == VisusSimpleIO::FLOAT64_RGB){
+    else if(type == VisusSimpleIO::FLOAT64){
 
         vtkDoubleArray *rv = vtkDoubleArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
-        rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
+        if(isVector && dim < 3){
+            
+            double* newdata = convertComponents<double>(data, field.ncomponents, 3, ntuples);
+            rv->SetArray((double*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
+            
+            delete data;
+        }
+        else
+            rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
             double *buff = (double *) rv->GetVoidPointer(0);
