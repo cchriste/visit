@@ -345,7 +345,8 @@ avtIDXFileFormat::~avtIDXFileFormat()
     std::cout<<"(avtIDXFileFormat destructor)" << std::endl;
 
     for(int i=0; i < boxes_bounds.size(); i++)
-        delete [] boxes_bounds.at(i);
+        if(boxes_bounds.at(i) != NULL)
+            delete [] boxes_bounds.at(i);
 }
 
 // ****************************************************************************
