@@ -303,10 +303,11 @@ void avtIDXFileFormat::createBoxes(){
             
             //std::cout<< "lower " << lower << " upper " << upper;
             
-            SimplePoint3d p1;
-            SimplePoint3d p2;
+            SimplePoint3d p1phy, p1log;
+            SimplePoint3d p2phy, p2log;
             int eCells[3];
             int resdata[3];
+            double phy2log[3];
             
             std::stringstream ress(resolution);
             std::stringstream ss1(lower);
@@ -322,25 +323,33 @@ void avtIDXFileFormat::createBoxes(){
                 eCells[k] = cint(espace);
                 resdata[k] = cint(res);
                 
-                p1[k] = cfloat(p1s);
-                p2[k] = cfloat(p2s);
+                p1phy[k] = cfloat(p1s);
+                p2phy[k] = cfloat(p2s);
                 
-                p1[k] = p1[k] * resdata[k] * (p2[k]-p1[k]);
-                p2[k] = p1[k] + resdata[k] +1;
+                phy2log[k] = (p2phy[k]-p1phy[k])/resdata[k];
+                p2phy[k] += phy2log[k];
+                
+                p1log[k] = p1phy[k] / phy2log[k];
+                p2log[k] = p1log[k] + resdata[k] +1;
                 
                 if (use_extracells)
-                    p2[k] += eCells[k];
+                    p2log[k] += eCells[k];
             }
+        
+            std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
+            std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
             
-            std::cout <<"Read box: p1 " << p1 << " p2 "<< p2 << std::endl;
-            
-            boxes.push_back(SimpleBox(p1,p2));
+            phyboxes.push_back(SimpleBox(p1phy, p2phy));
+            physicalBox = physicalBox.getUnion((const SimpleBox)phyboxes.at(i));
+            boxes.push_back(SimpleBox(p1log,p2log));
             
         }
         
     }
     else{
         boxes.push_back(reader.getLogicBox());
+        physicalBox = reader.getLogicBox();
+        phyboxes.push_back(physicalBox);
     }
 
 }
@@ -546,14 +555,15 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     // Set bounds and extents for SLIVR rendering
     // TODO use the physical box (logic_to_physic)
     mesh->hasSpatialExtents = true;
+
+    mesh->minSpatialExtents[0] = physicalBox.p1.x;
+    mesh->maxSpatialExtents[0] = physicalBox.p2.x;
+    mesh->minSpatialExtents[1] = physicalBox.p1.y;
+    mesh->maxSpatialExtents[1] = physicalBox.p2.y;
+    mesh->minSpatialExtents[2] = physicalBox.p1.z;
+    mesh->maxSpatialExtents[2] = physicalBox.p2.z;
+
     SimpleBox logicBox = reader.getLogicBox();
-    mesh->minSpatialExtents[0] = logicBox.p1.x;
-    mesh->maxSpatialExtents[0] = logicBox.p2.x;
-    mesh->minSpatialExtents[1] = logicBox.p1.y;
-    mesh->maxSpatialExtents[1] = logicBox.p2.y;
-    mesh->minSpatialExtents[2] = logicBox.p1.z;
-    mesh->maxSpatialExtents[2] = logicBox.p2.z;
-    
     mesh->hasLogicalBounds = true;
     mesh->logicalBounds[0] = logicBox.p2.x - logicBox.p1.x;
     mesh->logicalBounds[1] = logicBox.p2.y - logicBox.p1.y;
@@ -580,17 +590,17 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
         
     avtRectilinearDomainBoundaries *rdb =
     new avtRectilinearDomainBoundaries(true);
-    rdb->SetNumDomains(boxes.size());
+    rdb->SetNumDomains(phyboxes.size());
     
-    for (long long i = 0 ; i < boxes.size() ; i++)
+    for (long long i = 0 ; i < phyboxes.size() ; i++)
     {
         int extents[6];
-        extents[0] = boxes.at(i).p1.x;
-        extents[1] = boxes.at(i).p2.x;
-        extents[2] = boxes.at(i).p1.y;
-        extents[3] = boxes.at(i).p2.y;
-        extents[4] = boxes.at(i).p1.z;
-        extents[5] = boxes.at(i).p2.z;
+        extents[0] = phyboxes.at(i).p1.x;
+        extents[1] = phyboxes.at(i).p2.x;
+        extents[2] = phyboxes.at(i).p1.y;
+        extents[3] = phyboxes.at(i).p2.y;
+        extents[4] = phyboxes.at(i).p1.z;
+        extents[5] = phyboxes.at(i).p2.z;
         
         rdb->SetIndicesForRectGrid(i, extents);
     }
@@ -638,7 +648,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     int* my_bounds = NULL;
     int* my_extents = NULL;
 
-    slice_box = boxes.at(domain);
+    slice_box = phyboxes.at(domain);
     my_bounds = boxes_bounds.at(domain);
     
     vtkRectilinearGrid *rgrid = vtkRectilinearGrid::New();
@@ -657,7 +667,6 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     my_dims[2] = my_bounds[2]+1;
     
 //    std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
-//    std::cout << rank << ": extent " << slice_box.p1.toString() << " " << slice_box.p2.toString();
     
     rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
     
@@ -665,22 +674,28 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     coordsX->SetNumberOfTuples(my_dims[0]);
     arrayX = (float *) coordsX->GetVoidPointer(0);
     
+    float steps[3];
+    
+    for (int i = 0; i < dim; i++){
+        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/my_dims[i];
+    }
+    
     for (int i = 0; i < my_dims[0]; i++)
-        arrayX[i] = slice_box.p1.x +i;
+        arrayX[i] = slice_box.p1.x + i*steps[0];//+i;
     rgrid->SetXCoordinates(coordsX);
     
     coordsY = vtkFloatArray::New();
     coordsY->SetNumberOfTuples(my_dims[1]);
     arrayY = (float *) coordsY->GetVoidPointer(0);
     for (int i = 0; i < my_dims[1]; i++)
-        arrayY[i] = slice_box.p1.y +i;
+        arrayY[i] = slice_box.p1.y + i*steps[1];//+i;
     rgrid->SetYCoordinates(coordsY);
     
     coordsZ = vtkFloatArray::New();
     coordsZ->SetNumberOfTuples(my_dims[2]);
     arrayZ = (float *) coordsZ->GetVoidPointer(0);
     for (int i = 0; i < my_dims[2]; i++)
-        arrayZ[i] = slice_box.p1.z +i;
+        arrayZ[i] = slice_box.p1.z + i*steps[2];//+i;
     rgrid->SetZCoordinates(coordsZ);
     
     //std::cout << "end mesh";
@@ -724,8 +739,6 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         std::cout << " NO DATA " << std::endl;
         return NULL;
     }
-    
-    std::cout << "Got data from visus" << std::endl;
     
     SimpleField field = reader.getCurrField();
     SimpleDTypes type = field.type;

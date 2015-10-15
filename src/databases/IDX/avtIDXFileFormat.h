@@ -110,6 +110,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     static int              num_instances;
 
     std::vector<SimpleBox>  boxes;
+    std::vector<SimpleBox>  phyboxes;
+    SimpleBox               physicalBox;
     std::vector<int*>       boxes_bounds;
     bool multibox;
     bool use_extracells;
