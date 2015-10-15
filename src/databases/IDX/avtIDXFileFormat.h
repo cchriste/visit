@@ -96,7 +96,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual vtkDataArray  *GetVar(int, int, const char *);
     virtual vtkDataArray  *GetVectorVar(int, int, const char *);
 
-//    virtual void GetCycles(std::vector<int> &);
+    virtual void GetCycles(std::vector<int> &);
     virtual void GetTimes(std::vector<double> &);
     
     virtual void           FreeUpResources(void); 
@@ -128,7 +128,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     void calculateBoundsAndExtents();
     void loadBalance();
     
-    std::map<int,double> timeIndex;
+    std::vector<double> timeIndex;
     
     inline int
     int16_Reverse_Endian(short val, unsigned char *output)

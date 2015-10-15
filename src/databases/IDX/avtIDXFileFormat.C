@@ -368,14 +368,14 @@ void avtIDXFileFormat::createTimeIndex(){
         std::vector<double> times = reader.getTimes();
         
         for(int i=0; i< times.size(); i++)
-            timeIndex[i] = times.at(i);
+            timeIndex.push_back(times.at(i));
         
         return;
     }
     else{
         
         std::cout << "Found index.xml file" << std::endl;
-        
+
         vtkXMLDataElement *root = parser->GetRootElement();
         vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
         int ntimesteps = level->GetNumberOfNestedElements();
@@ -386,10 +386,11 @@ void avtIDXFileFormat::createTimeIndex(){
             
             vtkXMLDataElement *xmltime = level->GetNestedElement(i);
             String timestr(xmltime->GetAttribute("time"));
+            std::cout << "time " << timestr << std::endl;
             
             double time = cdouble(timestr);
             
-            timeIndex[i] = time;
+            timeIndex.push_back(time);
         }
     }
     
@@ -704,26 +705,22 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     
 }
 
-//void
-//avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
-//{
-//    int ncycles, *vals = 0;
-//    ncycles = OPEN FILE AND READ THE NUMBER OF CYCLES;
-//    READ ncycles INTEGER VALUES INTO THE vals ARRAY;
-//    // Store the cycles in the vector.
-//    for(int i = 0; i < ncycles; ++i)
-//        cycles.push_back(vals[i]);
-//    delete [] vals;
-//}
+void
+avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
+{
+    for(int i = 0; i < reader.getNTimesteps(); ++i)
+        cycles.push_back(i);
+}
 
 void
 avtIDXFileFormat::GetTimes(std::vector<double> &times)
 {
-    std::map<int, double> m;
-    std::vector<double> v;
-    for(std::map<int,double>::iterator it = m.begin(); it != m.end(); ++it) {
-        times.push_back(it->second);
-    }
+    times.swap(timeIndex);
+//    std::map<int, double> m;
+//    std::vector<double> v;
+//    for(std::map<int,double>::iterator it = m.begin(); it != m.end(); ++it) {
+//        times.push_back(it->second);
+//    }
     
 //    std::vector<double> tsteps = reader.getTimes();
 //    times.swap(tsteps);
