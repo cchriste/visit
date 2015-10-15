@@ -103,7 +103,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
 
   protected:
 
-    std::string             filename;
+    std::string             dataset_filename;
     int                     nprocs;
     int                     rank;
     int                     dim;         //2d or 3d
@@ -112,6 +112,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     std::vector<SimpleBox>  boxes;
     std::vector<int*>       boxes_bounds;
     bool multibox;
+    bool use_extracells;
   
   private:
     
@@ -120,8 +121,12 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     
     vtkDataArray* queryToVtk(int timestate, int domain, const char *varname);
     
+    void createBoxes();
+    void createTimeIndex();
     void calculateBoundsAndExtents();
     void loadBalance();
+    
+    std::map<int,double> timeIndex;
     
     inline int
     int16_Reverse_Endian(short val, unsigned char *output)

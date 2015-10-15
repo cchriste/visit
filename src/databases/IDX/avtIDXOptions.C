@@ -52,6 +52,7 @@ GetIDXReadOptions(void)
 {
     DBOptionsAttributes *rv = new DBOptionsAttributes;
     rv->SetBool("Big Endian", false);
+    rv->SetBool("Use extra cells", true);
     return rv;
 }
 

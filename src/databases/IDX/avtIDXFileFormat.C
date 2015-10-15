@@ -83,6 +83,7 @@
 #include <Expression.h>
 
 #include <InvalidVariableException.h>
+#include <dirent.h>
 
 #ifdef PARALLEL
 #include <avtParallel.h>
@@ -94,6 +95,7 @@ using namespace VisusSimpleIO;
 
 int        cint   (String s) {int    value;std::istringstream iss(s);iss>>value;return value;}
 float      cfloat (String s) {float  value;std::istringstream iss(s);iss>>value;return value;}
+double     cdouble(String s) {double value;std::istringstream iss(s);iss>>value;return value;}
 
 void avtIDXFileFormat::loadBalance(){
     
@@ -237,6 +239,153 @@ void avtIDXFileFormat::calculateBoundsAndExtents(){
     
 }
 
+void avtIDXFileFormat::createBoxes(){
+    
+    size_t found = dataset_filename.find_last_of("/\\");
+    String folder = dataset_filename.substr(0,found);
+    
+    String upsfilename = "noupsfile.ups";
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir (folder.c_str())) != NULL) {
+        /* print all the files and directories within directory */
+        while ((ent = readdir (dir)) != NULL) {
+            String name(ent->d_name);
+            if(name.substr(name.find_last_of(".") + 1) == "ups"){
+                upsfilename = name;
+                std::cout<< ".ups file found " << upsfilename << std::endl;
+                upsfilename = folder + "/" +upsfilename;
+                break;
+            }
+        }
+        closedir (dir);
+    } else {
+        std::cout<< "No .ups file found" << std::endl;
+    }
+    
+    vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
+    
+    upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
+    
+    parser->SetFileName(upsfilename.c_str());
+    if (!parser->Parse())
+    {
+        std::cout<< "No .ups file found" << std::endl;
+        multibox = false;
+        
+        std::cout << "Single-box mode" << std::endl;
+    }else{
+        multibox = true;
+        std::cout << "Multi-box mode" << std::endl;
+    }
+    
+    if(multibox){
+        vtkXMLDataElement *root = parser->GetRootElement();
+        vtkXMLDataElement *level = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("Level");
+        int nboxes = level->GetNumberOfNestedElements();
+        
+        std::cout << "Found " << nboxes << " boxes" << std::endl;
+        
+        for(int i=0; i < nboxes; i++){
+            
+            vtkXMLDataElement *xmlbox = level->GetNestedElement(i);
+            String lower(xmlbox->FindNestedElementWithName("lower")->GetCharacterData());
+            String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
+            String extra_cells(xmlbox->FindNestedElementWithName("extraCells")->GetCharacterData());
+            String resolution(xmlbox->FindNestedElementWithName("resolution")->GetCharacterData());
+            
+            lower = lower.substr(1,lower.length()-2);
+            upper = upper.substr(1,upper.length()-2);
+            
+            // TODO Extra cells managements (add flag on the plugin)
+            extra_cells = extra_cells.substr(1,extra_cells.length()-2);
+            resolution = resolution.substr(1,resolution.length()-2);
+            
+            //std::cout<< "lower " << lower << " upper " << upper;
+            
+            SimplePoint3d p1;
+            SimplePoint3d p2;
+            int eCells[3];
+            int resdata[3];
+            
+            std::stringstream ress(resolution);
+            std::stringstream ss1(lower);
+            std::stringstream ss2(upper);
+            std::stringstream ssSpace(extra_cells);
+            std::string p1s, p2s, espace, res;
+            for (int k=0; k < 3; k++){
+                std::getline(ss1, p1s, ',');
+                std::getline(ss2, p2s, ',');
+                std::getline(ssSpace, espace, ',');
+                std::getline(ress, res, ',');
+                
+                eCells[k] = cint(espace);
+                resdata[k] = cint(res);
+                
+                p1[k] = cfloat(p1s);
+                p2[k] = cfloat(p2s);
+                
+                p1[k] = p1[k] * resdata[k] * (p2[k]-p1[k]);
+                p2[k] = p1[k] + resdata[k] +1;
+                
+                if (use_extracells)
+                    p2[k] += eCells[k];
+            }
+            
+            std::cout <<"Read box: p1 " << p1 << " p2 "<< p2 << std::endl;
+            
+            boxes.push_back(SimpleBox(p1,p2));
+            
+        }
+        
+    }
+    else{
+        boxes.push_back(reader.getLogicBox());
+    }
+
+}
+
+void avtIDXFileFormat::createTimeIndex(){
+    vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
+    size_t found = dataset_filename.find_last_of("/\\");
+    String folder = dataset_filename.substr(0,found);
+    
+    String udafilename = folder + "/index.xml";
+    
+    parser->SetFileName(udafilename.c_str());
+    if (!parser->Parse()){
+        std::cout<< "No index.xml file found" << udafilename << std::endl;
+        
+        std::vector<double> times = reader.getTimes();
+        
+        for(int i=0; i< times.size(); i++)
+            timeIndex[i] = times.at(i);
+        
+        return;
+    }
+    else{
+        
+        std::cout << "Found index.xml file" << std::endl;
+        
+        vtkXMLDataElement *root = parser->GetRootElement();
+        vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
+        int ntimesteps = level->GetNumberOfNestedElements();
+        
+        std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
+        
+        for(int i=0; i < ntimesteps; i++){
+            
+            vtkXMLDataElement *xmltime = level->GetNestedElement(i);
+            String timestr(xmltime->GetAttribute("time"));
+            
+            double time = cdouble(timestr);
+            
+            timeIndex[i] = time;
+        }
+    }
+    
+}
+
 // ****************************************************************************
 //  Method: avtIDXFileFormat constructor
 //
@@ -254,8 +403,16 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         if (attrs->GetName(i) == "Big Endian") {
             reverse_endian = attrs->GetBool("Big Endian");
         }
+        else if (attrs->GetName(i) == "Use extra cells") {
+            use_extracells = attrs->GetBool("Use extra cells");
+        }
     }
     
+    if(use_extracells)
+        std::cout << "Using extra cells" << std::endl;
+    else
+        std::cout << "Not using extra cells" << std::endl;
+        
     if(reverse_endian)
         std::cout << "Using Big Endian";
     else
@@ -277,85 +434,14 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         return;
     }
     
+    dataset_filename = filename;
+    
 //    std::cout <<"dataset loaded";
     dim = reader.getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
     
     // TODO (if necessary) read only with rank 0 and then broadcast to the other processors
-    vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
-    String upsfilename = filename;
-    upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
-    
-    parser->SetFileName(upsfilename.c_str());
-    if (!parser->Parse())
-    {
-        std::cout<< "No .ups file " << upsfilename << std::endl;
-        multibox = false;
-        
-        std::cout << "Single-box mode" << std::endl;
-    }else{
-        multibox = true;
-        std::cout << "Multi-box mode" << std::endl;
-    }
-
-    if(multibox){
-        vtkXMLDataElement *root = parser->GetRootElement();
-        vtkXMLDataElement *level = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("Level");
-        int nboxes = level->GetNumberOfNestedElements();
-        
-        std::cout << "Found " << nboxes << " boxes" << std::endl;
-        
-        for(int i=0; i < nboxes; i++){
-
-            vtkXMLDataElement *xmlbox = level->GetNestedElement(i);
-            String lower(xmlbox->FindNestedElementWithName("lower")->GetCharacterData());
-            String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
-            String extra_cells(xmlbox->FindNestedElementWithName("extraCells")->GetCharacterData());
-            String resolution(xmlbox->FindNestedElementWithName("resolution")->GetCharacterData());
-            
-            lower = lower.substr(1,lower.length()-2);
-            upper = upper.substr(1,upper.length()-2);
-            extra_cells = extra_cells.substr(1,extra_cells.length()-2);
-            resolution = resolution.substr(1,resolution.length()-2);
-            
-            //std::cout<< "lower " << lower << " upper " << upper;
-            
-            SimplePoint3d p1;
-            SimplePoint3d p2;
-            int eCells[3];
-            int resdata[3];
-        
-            std::stringstream ress(resolution);
-            std::stringstream ss1(lower);
-            std::stringstream ss2(upper);
-            std::stringstream ssSpace(extra_cells);
-            std::string p1s, p2s, espace, res;
-            for (int k=0; k < 3; k++){
-                std::getline(ss1, p1s, ',');
-                std::getline(ss2, p2s, ',');
-                std::getline(ssSpace, espace, ',');
-                std::getline(ress, res, ',');
-                
-                eCells[k] = cint(espace);
-                resdata[k] = cint(res);
-
-                p1[k] = cfloat(p1s);
-                p2[k] = cfloat(p2s);
-                
-                p1[k] = p1[k] * resdata[k] * (p2[k]-p1[k]);
-                p2[k] = p1[k] + resdata[k] + eCells[k] +1;
-            }
-            
-            std::cout <<"Read box: p1 " << p1 << " p2 "<< p2 << std::endl;
-            
-            boxes.push_back(SimpleBox(p1,p2));
-            
-        }
-        
-    }
-    else{
-        boxes.push_back(reader.getLogicBox());
-    }
-    
+    createBoxes();
+    createTimeIndex();
     loadBalance();
     calculateBoundsAndExtents();
     
@@ -618,8 +704,14 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 void
 avtIDXFileFormat::GetTimes(std::vector<double> &times)
 {
-    std::vector<double> tsteps = reader.getTimes();
-    times.swap(tsteps);
+    std::map<int, double> m;
+    std::vector<double> v;
+    for(std::map<int,double>::iterator it = m.begin(); it != m.end(); ++it) {
+        times.push_back(it->second);
+    }
+    
+//    std::vector<double> tsteps = reader.getTimes();
+//    times.swap(tsteps);
 }
 
 vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
