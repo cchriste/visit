@@ -47,7 +47,7 @@
 
 #include <vector>
 #include <DBOptionsAttributes.h>
-#include <visus_simpleio.h>
+#include <visuscpp/simpleio/visus_simpleio.h>
 #include <string>
 
 typedef std::string String;
@@ -107,7 +107,6 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     int                     nprocs;
     int                     rank;
     int                     dim;         //2d or 3d
-    static int              num_instances;
 
     std::vector<SimpleBox>  boxes;
     std::vector<SimpleBox>  phyboxes;
@@ -118,7 +117,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
   
   private:
     
-    SimpleIO reader;
+    SimpleIO* reader;
     bool reverse_endian;
     
     vtkDataArray* queryToVtk(int timestate, int domain, const char *varname);

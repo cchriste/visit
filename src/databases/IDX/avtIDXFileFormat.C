@@ -347,8 +347,8 @@ void avtIDXFileFormat::createBoxes(){
         
     }
     else{
-        boxes.push_back(reader.getLogicBox());
-        physicalBox = reader.getLogicBox();
+        boxes.push_back(reader->getLogicBox());
+        physicalBox = reader->getLogicBox();
         phyboxes.push_back(physicalBox);
     }
 
@@ -365,7 +365,7 @@ void avtIDXFileFormat::createTimeIndex(){
     if (!parser->Parse()){
         std::cout<< "No index.xml file found" << udafilename << std::endl;
         
-        std::vector<double> times = reader.getTimes();
+        std::vector<double> times = reader->getTimes();
         
         for(int i=0; i< times.size(); i++)
             timeIndex.push_back(times.at(i));
@@ -404,8 +404,6 @@ void avtIDXFileFormat::createTimeIndex(){
 //
 // ****************************************************************************
 
-int avtIDXFileFormat::num_instances=0;
-
 avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* attrs)
 : avtMTMDFileFormat(filename)
 {
@@ -437,8 +435,10 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 #endif
     
     std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
-    
-    if (!reader.openDataset(filename))
+  
+    reader = new SimpleIO();
+  
+    if (!reader->openDataset(filename))
     {
         std::cout <<"could not load "<<filename << std::endl;
         return;
@@ -447,7 +447,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     dataset_filename = filename;
     
 //    std::cout <<"dataset loaded";
-    dim = reader.getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
+    dim = reader->getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
     
     // TODO (if necessary) read only with rank 0 and then broadcast to the other processors
     createBoxes();
@@ -473,6 +473,10 @@ avtIDXFileFormat::~avtIDXFileFormat()
     for(int i=0; i < boxes_bounds.size(); i++)
         if(boxes_bounds.at(i) != NULL)
             delete [] boxes_bounds.at(i);
+  
+    if(reader != NULL)
+      delete reader;
+  
 }
 
 // ****************************************************************************
@@ -489,7 +493,7 @@ avtIDXFileFormat::~avtIDXFileFormat()
 int
 avtIDXFileFormat::GetNTimesteps(void)
 {
-    return reader.getNTimesteps();
+    return reader->getNTimesteps();
 }
 
 
@@ -546,7 +550,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     
     mesh->numBlocks = boxes.size();
     mesh->blockOrigin = 0;
-    mesh->LODs = reader.getMaxResolution();
+    mesh->LODs = reader->getMaxResolution();
     mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
     
@@ -564,7 +568,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->minSpatialExtents[2] = physicalBox.p1.z;
     mesh->maxSpatialExtents[2] = physicalBox.p2.z;
 
-    SimpleBox logicBox = reader.getLogicBox();
+    SimpleBox logicBox = reader->getLogicBox();
     mesh->hasLogicalBounds = true;
     mesh->logicalBounds[0] = logicBox.p2.x - logicBox.p1.x;
     mesh->logicalBounds[1] = logicBox.p2.y - logicBox.p1.y;
@@ -574,7 +578,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     
     //std::cout << rank << ": Added mesh";
 
-    const std::vector<SimpleField>& fields = reader.getFields();
+    const std::vector<SimpleField>& fields = reader->getFields();
     
     int ndtype;
     for (int i = 0; i < (int) fields.size(); i++)
@@ -708,7 +712,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 void
 avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 {
-    for(int i = 0; i < reader.getNTimesteps(); ++i)
+    for(int i = 0; i < reader->getNTimesteps(); ++i)
         cycles.push_back(i);
 }
 
@@ -722,7 +726,7 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
 //        times.push_back(it->second);
 //    }
     
-//    std::vector<double> tsteps = reader.getTimes();
+//    std::vector<double> tsteps = reader->getTimes();
 //    times.swap(tsteps);
 }
 
@@ -730,14 +734,14 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
     const SimpleBox& my_box = boxes.at(domain);
     
-    unsigned char* data = reader.getData(my_box, timestate, varname);
+    unsigned char* data = reader->getData(my_box, timestate, varname);
     
     if(data == NULL){
         std::cout << " NO DATA " << std::endl;
         return NULL;
     }
     
-    SimpleField field = reader.getCurrField();
+    SimpleField field = reader->getCurrField();
     SimpleDTypes type = field.type;
     
     int* my_bounds = boxes_bounds.at(domain);
