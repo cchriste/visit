@@ -47,7 +47,8 @@
 
 #include <vector>
 #include <DBOptionsAttributes.h>
-#include <visuscpp/simpleio/visus_simpleio.h>
+//#include <visuscpp/simpleio/visus_simpleio.h>
+#include <visus_simpleio.h>
 #include <string>
 
 typedef std::string String;

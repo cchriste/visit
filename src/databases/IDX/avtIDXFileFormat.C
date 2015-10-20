@@ -454,7 +454,6 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     createTimeIndex();
     loadBalance();
     calculateBoundsAndExtents();
-    
 }
 
 
