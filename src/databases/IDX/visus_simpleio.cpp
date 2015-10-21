@@ -17,6 +17,7 @@
 #include <visuscpp/db/dataset/visus_db_dataset.h>
 #include <visuscpp/kernel/geometry/visus_position.h>
 #include <visuscpp/kernel/core/visus_path.h>
+#include <visuscpp/idx/visus_idx_dataset.h>
 
 #include "visus_simpleio.h"
 
@@ -98,7 +99,18 @@ bool SimpleIO::openDataset(const String filename){
     
     tsteps = dataset->getTimesteps()->asVector();
     max_resolution = dataset->getMaxResolution();
+  
+    NdBox orig_box = dynamic_cast<IdxDataset*>(dataset)->getOriginalBox();
     
+    if (orig_box == NdBox()){
+      compressed_dataset = false;
+      VisusInfo() << "NOT COMPRESSED";
+    }
+    else{
+      compressed_dataset = true;
+      VisusInfo() << "COMPRESSED";
+    }
+  
     const std::vector<Field>& dfields = dataset->getFields();
     
     for (int i = 0; i < (int) dfields.size(); i++)
@@ -109,14 +121,18 @@ bool SimpleIO::openDataset(const String filename){
         SimpleField my_field;
         
         my_field.type = convertType(field.dtype);
-        my_field.isVector = field.dtype.isVector();
-        my_field.ncomponents = field.dtype.ncomponents();
+        my_field.isVector = (compressed_dataset) ? false : field.dtype.isVector();
+        my_field.ncomponents = (compressed_dataset) ? 1 :field.dtype.ncomponents();
         my_field.name = fieldname;
         
         fields.push_back(my_field);
     }
-    
-    NdBox lb = dataset->getLogicBox();
+  
+  
+  
+    NdBox lb = (compressed_dataset) ? orig_box : dataset->getLogicBox();
+  
+    //NdBox lb = dataset->getLogicBox();
     memcpy(logic_to_physic, dataset->getLogicToPhysic().mat, 16*sizeof(double));
 
     for(int i=0; i < 3; i++){
@@ -159,11 +175,16 @@ unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const
     my_box.setP1(p1);
     my_box.setP2(p2);
     
-//    std::cout << " Box query " << my_box.p1().toString() << " p2 " << my_box.p2().toString() << " variable " << varname << " time " << timestate;
+    VisusInfo() << " Box query " << p1.toString() << " p2 " << p2.toString() << " variable " << varname << " time " << timestate;
     
     Query* box_query = new Query(dataset,'r');
-    
-    box_query->setLogicPosition(my_box);
+  
+    if(!compressed_dataset){
+      box_query->setLogicPosition(my_box);
+    }
+    else{
+      box_query->setOriginalLogicPosition(my_box);
+    }
     box_query->setField(dataset->getFieldByName(varname));
     
     box_query->setTime(timestate);
@@ -182,21 +203,27 @@ unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const
     box_query->begin();
     
     VisusReleaseAssert(!box_query->end());
-    VisusReleaseAssert(box_query->execute());
-    
+  
+  if(!compressed_dataset){
+      VisusReleaseAssert(box_query->execute());
+  }
+  else{
+      VisusReleaseAssert(box_query->executeAndDecompress());
+  }
+  
     // -------- This can be used for lower resolution queries
     //    box_query->next();
     //    VisusReleaseAssert(!box_query->end());
     // --------
     
-//    printf("idx query result (dim %dx%dx%d) = %lld:\n", box_query->getBuffer()->getWidth(), box_query->getBuffer()->getHeight(), box_query->getBuffer()->getDepth(), box_query->getBuffer()->c_size());
-    
+    printf("idx query result (dim %dx%dx%d) = %lld:\n", box_query->getBuffer()->getWidth(), box_query->getBuffer()->getHeight(), box_query->getBuffer()->getDepth(), box_query->getBuffer()->c_size());
+  
     delete access;
     
     SharedPtr<Array> data = box_query->getBuffer();
 
-//    if( data->c_ptr() != NULL)
-//         std::cout << "size data bytes " << data->c_size();
+    if( data->c_ptr() != NULL)
+         std::cout << "size data bytes " << data->c_size();
 
     return (unsigned char*)data->c_ptr();
    

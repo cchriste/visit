@@ -83,6 +83,7 @@ private:
     SimpleField curr_field;
     double logic_to_physic[16];
     DatasetImpl* datasetImpl;
+    bool compressed_dataset;
 };
 
 

@@ -135,6 +135,7 @@ void avtIDXFileFormat::loadBalance(){
     //std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext;
     
     std::vector<SimpleBox> newboxes;
+    std::vector<SimpleBox> newphyboxes;
     
     for(int i=0; i < boxes.size(); i++){
         SimpleBox& box = boxes.at(i);
@@ -154,9 +155,19 @@ void avtIDXFileFormat::loadBalance(){
         
         SimplePoint3d p1(box.p1);
         SimplePoint3d p2(box.p2);
-        
-        //std::cout << "Old box p1: " << p1 << " p2: "<< p2;
-        
+
+      /// to do
+        SimplePoint3d log2phy;
+        SimpleBox& phybox = phyboxes.at(i);
+      
+//      std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
+      
+        for (int k = 0; k < dim; k++){
+          log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k]);
+        }
+      
+//      std::cout << "log2phy " <<log2phy << std::endl;
+      
         while(part_p2 <= box.p2[maxdir]){
             
             p1[maxdir] = part_p1;
@@ -164,9 +175,18 @@ void avtIDXFileFormat::loadBalance(){
             
             SimpleBox newbox(p1,p2);
             newboxes.push_back(newbox);
+          
+            SimpleBox newphybox;
+          
+            for (int k = 0; k < dim; k++){
+              newphybox.p1[k] = newbox.p1[k] * log2phy[k];
+              newphybox.p2[k] = newbox.p2[k] * log2phy[k];
+            }
+          
+            newphyboxes.push_back(newphybox);
             
-            //std::cout << "New box p1: " << p1 << " p2: "<< p2;
-            
+//            std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
+          
             part_p1 += loc_avg_ext;
             part_p2 += loc_avg_ext;
            
@@ -175,17 +195,23 @@ void avtIDXFileFormat::loadBalance(){
         if(loc_res > 0){
             SimpleBox& boxres = newboxes.at(newboxes.size()-1);
             boxres.p2[maxdir] += loc_res;
+          
+            SimpleBox& phyboxres = newphyboxes.at(newphyboxes.size()-1);
+            phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
+          
 //            std::cout << "Residual " << loc_res <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
         }
 
     }
     
     boxes.swap(newboxes);
-
+    phyboxes.swap(newphyboxes);
+  
     std::cout << "Total number of boxes/domains: " << boxes.size() << std::endl;
     std::cout << "----------Boxes----------" << std::endl;
     for(int i=0; i< boxes.size(); i++){
-        std::cout << i << " = "<< boxes.at(i).p1 << " , " << boxes.at(i).p2 << std::endl;
+        std::cout << i << " = "<< boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
+          << phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl;
     }
     std::cout << "-------------------------" << std::endl;
     
@@ -575,7 +601,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     
     md->Add(mesh);
     
-    //std::cout << rank << ": Added mesh";
+    std::cout << rank << ": Added mesh";
 
     const std::vector<SimpleField>& fields = reader->getFields();
     
@@ -590,7 +616,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
             md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
     }
     
-    //std::cout << rank << ": Added fields";
+    std::cout << rank << ": Added fields";
         
     avtRectilinearDomainBoundaries *rdb =
     new avtRectilinearDomainBoundaries(true);
@@ -610,7 +636,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     }
     rdb->CalculateBoundaries();
     
-    //std::cout << rank << ": Calculated boundaries";
+    std::cout << rank << ": Calculated boundaries";
     
     void_ref_ptr vr = void_ref_ptr(rdb,
                                    avtStructuredDomainBoundaries::Destruct);
@@ -702,7 +728,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
         arrayZ[i] = slice_box.p1.z + i*steps[2];//+i;
     rgrid->SetZCoordinates(coordsZ);
     
-    //std::cout << "end mesh";
+    std::cout << "end mesh";
     
     return rgrid;
     
@@ -758,9 +784,9 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
 //    if( data != NULL)
 //         std::cout<< rank << ": size data bytes " << data->c_size() << std::endl;
-    
+//    
 //    std::cout << rank << ": size array " << ncomponents*ntuples << std::endl;
-    
+  
     if(type == VisusSimpleIO::UINT8){
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
         rv->SetNumberOfComponents(ncomponents); //<ctc> eventually handle vector data, since visit can actually render it!
