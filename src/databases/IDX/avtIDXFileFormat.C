@@ -171,7 +171,7 @@ void avtIDXFileFormat::loadBalance(){
         while(part_p2 <= box.p2[maxdir]){
             
             p1[maxdir] = part_p1;
-            p2[maxdir] = part_p2;
+            p2[maxdir] = part_p2 + 1;
             
             SimpleBox newbox(p1,p2);
             newboxes.push_back(newbox);
