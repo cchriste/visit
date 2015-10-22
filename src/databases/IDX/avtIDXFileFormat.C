@@ -128,11 +128,11 @@ void avtIDXFileFormat::loadBalance(){
         
         total_extent += box.p2[maxdir];
     }
-    
+    //total_extent++; // DIM
     avg_ext = total_extent / nprocs;
-    int res_ext = total_extent % nprocs;
+    int res_ext = (total_extent % nprocs);
     
-    //std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext;
+    //  std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext;
     
     std::vector<SimpleBox> newboxes;
     std::vector<SimpleBox> newphyboxes;
@@ -148,7 +148,7 @@ void avtIDXFileFormat::loadBalance(){
             loc_avg_ext = avg_ext;
         }
         
-//        std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
+        //        std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
         
         int part_p1 = box.p1[maxdir];
         int part_p2 = box.p1[maxdir] + loc_avg_ext;
@@ -156,23 +156,22 @@ void avtIDXFileFormat::loadBalance(){
         SimplePoint3d p1(box.p1);
         SimplePoint3d p2(box.p2);
 
-      /// to do
         SimplePoint3d log2phy;
         SimpleBox& phybox = phyboxes.at(i);
       
 //      std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
       
         for (int k = 0; k < dim; k++){
-          log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k]);
-        }
+          log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
+       }
       
 //      std::cout << "log2phy " <<log2phy << std::endl;
       
         while(part_p2 <= box.p2[maxdir]){
             
             p1[maxdir] = part_p1;
-            p2[maxdir] = part_p2 + 1;
-            
+            p2[maxdir] = (part_p2 < box.p2[maxdir]) ? part_p2+1 : part_p2;
+           
             SimpleBox newbox(p1,p2);
             newboxes.push_back(newbox);
           
@@ -194,12 +193,12 @@ void avtIDXFileFormat::loadBalance(){
         
         if(loc_res > 0){
             SimpleBox& boxres = newboxes.at(newboxes.size()-1);
-            boxres.p2[maxdir] += loc_res;
+            boxres.p2[maxdir] += loc_res-1;
           
             SimpleBox& phyboxres = newphyboxes.at(newphyboxes.size()-1);
             phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
           
-//            std::cout << "Residual " << loc_res <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
+            //  std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
         }
 
     }
