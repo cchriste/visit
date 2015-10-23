@@ -154,7 +154,7 @@ bool SimpleIO::openDataset(const String filename){
     
 }
 
-unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const char* varname, bool reverseEndianess){
+unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const char* varname){
 
     Dataset* dataset = datasetImpl->get();
     
@@ -216,10 +216,10 @@ unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const
     VisusReleaseAssert(!box_query->end());
   
   if(!compressed_dataset){
-      VisusReleaseAssert(box_query->execute(reverseEndianess));
+      VisusReleaseAssert(box_query->execute());
   }
   else{
-      VisusReleaseAssert(box_query->executeAndDecompress(reverseEndianess));
+      VisusReleaseAssert(box_query->executeAndDecompress());
   }
   
     // -------- This can be used for lower resolution queries

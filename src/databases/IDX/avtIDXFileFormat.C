@@ -758,7 +758,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
     const SimpleBox& my_box = boxes.at(domain);
     
-    unsigned char* data = reader->getData(my_box, timestate, varname, reverse_endian);
+    unsigned char* data = reader->getData(my_box, timestate, varname);
     
     if(data == NULL){
         std::cout << " NO DATA " << std::endl;
@@ -780,7 +780,10 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         ncomponents = 3; // Visit wants 3 components vectors
     
     long long ntotal = ntuples * ncomponents;
-    
+  
+    // do not reverse endianess if data is compressed
+    reverse_endian = reverse_endian * !reader->isCompressed();
+  
 //    if( data != NULL)
 //         std::cout<< rank << ": size data bytes " << data->c_size() << std::endl;
 //    
@@ -816,15 +819,15 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         else
             rv->SetArray((unsigned short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
         
-//        if(reverse_endian){
-//            unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
-//            for (long long i = 0 ; i < ntotal ; i++)
-//            {
-//                int tmp;
-//                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-//                buff[i] = tmp;
-//            }
-//        }
+        if(reverse_endian){
+            unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
+            for (long long i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
     
         return rv;
     }
@@ -842,16 +845,16 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         else
             rv->SetArray((unsigned int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
         
-//        if(reverse_endian){
-//            unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
-//            for (long long i = 0 ; i < ntotal ; i++)
-//            {
-//                int tmp;
-//                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-//                buff[i] = tmp;
-//            }
-//        }
-      
+        if(reverse_endian){
+            unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
+            for (long long i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     else if(type == VisusSimpleIO::INT8){
@@ -884,16 +887,16 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         else
             rv->SetArray((short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
         
-//        if(reverse_endian){
-//            short *buff = (short *) rv->GetVoidPointer(0);
-//            for (long long i = 0 ; i < ntotal ; i++)
-//            {
-//                int tmp;
-//                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-//                buff[i] = tmp;
-//            }
-//        }
-      
+        if(reverse_endian){
+            short *buff = (short *) rv->GetVoidPointer(0);
+            for (long long i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     else if(type == VisusSimpleIO::INT32){
@@ -910,16 +913,16 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         else
             rv->SetArray((int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
         
-//        if(reverse_endian){
-//            int *buff = (int *) rv->GetVoidPointer(0);
-//            for (long long i = 0 ; i < ntotal ; i++)
-//            {
-//                int tmp;
-//                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-//                buff[i] = tmp;
-//            }
-//        }
-      
+        if(reverse_endian){
+            int *buff = (int *) rv->GetVoidPointer(0);
+            for (long long i = 0 ; i < ntotal ; i++)
+            {
+                int tmp;
+                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     else if(type == VisusSimpleIO::INT64){
@@ -937,16 +940,16 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         else
             rv->SetArray((long*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
         
-//        if(reverse_endian){
-//            long *buff = (long *) rv->GetVoidPointer(0);
-//            for (long long i = 0 ; i < ntotal ; i++)
-//            {
-//                long tmp;
-//                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-//                buff[i] = tmp;
-//            }
-//        }
-      
+        if(reverse_endian){
+            long *buff = (long *) rv->GetVoidPointer(0);
+            for (long long i = 0 ; i < ntotal ; i++)
+            {
+                long tmp;
+                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
+        
         return rv;
     }
     else if(type == VisusSimpleIO::FLOAT32){
@@ -963,15 +966,15 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         else
             rv->SetArray((float*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
         
-//        if(reverse_endian){
-//            float *buff = (float *) rv->GetVoidPointer(0);
-//            for (long long i = 0 ; i < ntotal ; i++)
-//            {
-//                float tmp;
-//                float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-//                buff[i] = tmp;
-//            }
-//        }
+        if(reverse_endian){
+            float *buff = (float *) rv->GetVoidPointer(0);
+            for (long long i = 0 ; i < ntotal ; i++)
+            {
+                float tmp;
+                float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
     
         return rv;
     }
@@ -993,15 +996,15 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
         }
       
-//        if(reverse_endian){
-//            double *buff = (double *) rv->GetVoidPointer(0);
-//            for (unsigned long long i = 0 ; i < ntotal ; i++)
-//            {
-//                double tmp;
-//                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-//                buff[i] = tmp;
-//            }
-//        }
+        if(reverse_endian){
+            double *buff = (double *) rv->GetVoidPointer(0);
+            for (unsigned long long i = 0 ; i < ntotal ; i++)
+            {
+                double tmp;
+                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+                buff[i] = tmp;
+            }
+        }
     
         return rv;
     }

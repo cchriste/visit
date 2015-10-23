@@ -48,7 +48,7 @@ public:
         return max_resolution;
     }
     
-    unsigned char* getData(const SimpleBox box, const int timestate, const char* varname, bool reverseEndianess = false);
+    unsigned char* getData(const SimpleBox box, const int timestate, const char* varname, bool reverseEndianess);
     
     inline std::vector<double> getTimes(){
         return tsteps;
@@ -68,6 +68,10 @@ public:
     
     inline SimpleField getCurrField(){
         return curr_field;
+    }
+  
+    inline bool isCompressed(){
+      return compressed_dataset;
     }
     
     ~SimpleIO();
