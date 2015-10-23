@@ -65,8 +65,9 @@ VisusSimpleIO::SimpleDTypes convertType(DType intype){
         return VisusSimpleIO::UINT64;
     else if(intype == DTypes::FLOAT32 || intype.isVectorOf(DTypes::FLOAT32))
         return VisusSimpleIO::FLOAT32;
-    else if(intype == DTypes::FLOAT64 || intype.isVectorOf(DTypes::FLOAT64))
+    else if(intype == DTypes::FLOAT64 || intype.isVectorOf(DTypes::FLOAT64)){
         return VisusSimpleIO::FLOAT64;
+    }
 
     VisusWarning() << "No type found for conversion";
     VisusAssert(false);
@@ -101,7 +102,10 @@ bool SimpleIO::openDataset(const String filename){
     max_resolution = dataset->getMaxResolution();
   
     NdBox orig_box = dynamic_cast<IdxDataset*>(dataset)->getOriginalBox();
-    
+  
+    VisusInfo() << "original box "<< orig_box.toString();
+ // VisusInfo() <<orig_box.p1().toString() << "  " << orig_box.p2().toString();
+  
     if (orig_box == NdBox()){
       compressed_dataset = false;
       VisusInfo() << "NOT COMPRESSED";
@@ -122,13 +126,11 @@ bool SimpleIO::openDataset(const String filename){
         
         my_field.type = convertType(field.dtype);
         my_field.isVector = (compressed_dataset) ? false : field.dtype.isVector();
-        my_field.ncomponents = (compressed_dataset) ? 1 :field.dtype.ncomponents();
+        my_field.ncomponents = (compressed_dataset) ? 1 : field.dtype.ncomponents();
         my_field.name = fieldname;
         
         fields.push_back(my_field);
     }
-  
-  
   
     NdBox lb = (compressed_dataset) ? orig_box : dataset->getLogicBox();
   
@@ -139,7 +141,15 @@ bool SimpleIO::openDataset(const String filename){
         logic_box.p1[i] = lb.p1()[i];
         logic_box.p2[i] = lb.p2()[i];
     }
-    
+  
+  if(compressed_dataset){
+    for(int i=0; i < 3; i++){
+      logic_box.p2[i]--;
+    }
+  }
+  
+//    std::cout << "logic box " <<logic_box.p1 << " p2 " << logic_box.p2 << std::endl;
+  
     return true;
     
 }
@@ -163,8 +173,9 @@ unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const
     Field field = dataset->getFieldByName(varname);
     
     curr_field.type = convertType(field.dtype);
-    curr_field.isVector = field.dtype.isVector();
-    curr_field.ncomponents = field.dtype.ncomponents();
+  // TODO better
+    curr_field.isVector = (compressed_dataset) ? false : field.dtype.isVector();
+    curr_field.ncomponents = (compressed_dataset) ? 1 : field.dtype.ncomponents();
     curr_field.name = varname;
     
     NdBox my_box;

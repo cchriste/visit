@@ -159,7 +159,7 @@ void avtIDXFileFormat::loadBalance(){
         SimplePoint3d log2phy;
         SimpleBox& phybox = phyboxes.at(i);
       
-//      std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
+      std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
       
         for (int k = 0; k < dim; k++){
           log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
@@ -184,7 +184,7 @@ void avtIDXFileFormat::loadBalance(){
           
             newphyboxes.push_back(newphybox);
             
-//            std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
+            std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
           
             part_p1 += loc_avg_ext;
             part_p2 += loc_avg_ext;
@@ -198,7 +198,7 @@ void avtIDXFileFormat::loadBalance(){
             SimpleBox& phyboxres = newphyboxes.at(newphyboxes.size()-1);
             phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
           
-            //  std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
+              std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
         }
 
     }
@@ -987,9 +987,12 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             
             delete data;
         }
-        else
+        else{
+          
+          std::cout << "components " <<ncomponents << " tuples " <<ntuples;
             rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
-        
+        }
+      
         if(reverse_endian){
             double *buff = (double *) rv->GetVoidPointer(0);
             for (unsigned long long i = 0 ; i < ntotal ; i++)
