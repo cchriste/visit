@@ -48,7 +48,7 @@ public:
         return max_resolution;
     }
     
-    unsigned char* getData(const SimpleBox box, const int timestate, const char* varname, bool reverseEndianess);
+    unsigned char* getData(const SimpleBox box, const int timestate, const char* varname);
     
     inline std::vector<double> getTimes(){
         return tsteps;
