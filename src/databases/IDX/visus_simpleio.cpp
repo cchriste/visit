@@ -96,7 +96,7 @@ bool SimpleIO::openDataset(const String filename){
     
     dims=dataset->getDimension();
     
-    ntimesteps = std::max(1, (int)(dataset->getTimesteps()->getMax() - dataset->getTimesteps()->getMin()));
+    ntimesteps = std::max(1, (int)(dataset->getTimesteps()->getMax() - dataset->getTimesteps()->getMin())+1);
     
     tsteps = dataset->getTimesteps()->asVector();
     max_resolution = dataset->getMaxResolution();
