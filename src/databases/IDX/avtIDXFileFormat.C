@@ -159,12 +159,13 @@ void avtIDXFileFormat::loadBalance(){
         SimplePoint3d log2phy;
         SimpleBox& phybox = phyboxes.at(i);
       
-      std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
+        std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
       
         for (int k = 0; k < dim; k++){
           log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
        }
       
+        SimplePoint3d phyOffset = phyboxes.at(0).p1;
 //      std::cout << "log2phy " <<log2phy << std::endl;
       
         while(part_p2 <= box.p2[maxdir]){
@@ -178,8 +179,8 @@ void avtIDXFileFormat::loadBalance(){
             SimpleBox newphybox;
           
             for (int k = 0; k < dim; k++){
-              newphybox.p1[k] = newbox.p1[k] * log2phy[k];
-              newphybox.p2[k] = newbox.p2[k] * log2phy[k];
+              newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
+              newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k];;
             }
           
             newphyboxes.push_back(newphybox);
@@ -328,8 +329,9 @@ void avtIDXFileFormat::createBoxes(){
             
             //std::cout<< "lower " << lower << " upper " << upper;
             
-            SimplePoint3d p1phy, p1log;
-            SimplePoint3d p2phy, p2log;
+            SimplePoint3d p1phy(0,0,0), p1log(0,0,0);
+            SimplePoint3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
+          
             int eCells[3];
             int resdata[3];
             double phy2log[3];
@@ -339,7 +341,7 @@ void avtIDXFileFormat::createBoxes(){
             std::stringstream ss2(upper);
             std::stringstream ssSpace(extra_cells);
             std::string p1s, p2s, espace, res;
-            for (int k=0; k < 3; k++){
+            for (int k=0; k < dim; k++){
                 std::getline(ss1, p1s, ',');
                 std::getline(ss2, p2s, ',');
                 std::getline(ssSpace, espace, ',');
@@ -350,13 +352,17 @@ void avtIDXFileFormat::createBoxes(){
                 
                 p1phy[k] = cfloat(p1s);
                 p2phy[k] = cfloat(p2s);
-                
+              
                 phy2log[k] = (p2phy[k]-p1phy[k])/resdata[k];
                 p2phy[k] += phy2log[k];
-                
-                p1log[k] = p1phy[k] / phy2log[k];
+              
+                if(boxes.size() == 0){
+                  logOffset[k] = std::abs(p1phy[k]) / phy2log[k];
+                }
+              
+                p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
                 p2log[k] = p1log[k] + resdata[k] +1;
-                
+              
                 if (use_extracells)
                     p2log[k] += eCells[k];
             }
@@ -414,7 +420,8 @@ void avtIDXFileFormat::createTimeIndex(){
             std::cout << "time " << timestr << std::endl;
             
             double time = cdouble(timestr);
-            
+          std::cout << "time double " << time << std::endl;
+          
             timeIndex.push_back(time);
         }
     }
@@ -673,7 +680,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     //std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
     
     SimpleBox slice_box;
-    
+  
     int* my_bounds = NULL;
     int* my_extents = NULL;
 
@@ -710,21 +717,21 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     }
     
     for (int i = 0; i < my_dims[0]; i++)
-        arrayX[i] = slice_box.p1.x + i*steps[0];//+i;
+      arrayX[i] = slice_box.p1.x + i*steps[0];
     rgrid->SetXCoordinates(coordsX);
     
     coordsY = vtkFloatArray::New();
     coordsY->SetNumberOfTuples(my_dims[1]);
     arrayY = (float *) coordsY->GetVoidPointer(0);
     for (int i = 0; i < my_dims[1]; i++)
-        arrayY[i] = slice_box.p1.y + i*steps[1];//+i;
+      arrayY[i] = slice_box.p1.y + i*steps[1];
     rgrid->SetYCoordinates(coordsY);
     
     coordsZ = vtkFloatArray::New();
     coordsZ->SetNumberOfTuples(my_dims[2]);
     arrayZ = (float *) coordsZ->GetVoidPointer(0);
     for (int i = 0; i < my_dims[2]; i++)
-        arrayZ[i] = slice_box.p1.z + i*steps[2];//+i;
+      arrayZ[i] = slice_box.p1.z + i*steps[2];
     rgrid->SetZCoordinates(coordsZ);
     
     std::cout << "end mesh";
@@ -743,7 +750,8 @@ avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 void
 avtIDXFileFormat::GetTimes(std::vector<double> &times)
 {
-    times.swap(timeIndex);
+  times.swap(timeIndex);
+
 //    std::map<int, double> m;
 //    std::vector<double> v;
 //    for(std::map<int,double>::iterator it = m.begin(); it != m.end(); ++it) {

@@ -79,14 +79,6 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     //                                     DestructorFunction &);
     //
 
-    //
-    // If you know the times and cycle numbers, overload this function.
-    // Otherwise, VisIt will make up some reasonable ones for you.
-    //
-    // virtual void        GetCycles(std::vector<int> &);
-    // virtual void        GetTimes(std::vector<double> &);
-    //
-
     virtual int            GetNTimesteps(void);
 
     virtual const char    *GetType(void)   { return "IDX"; };
