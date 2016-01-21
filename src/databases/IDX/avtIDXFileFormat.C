@@ -96,6 +96,22 @@ using namespace VisusSimpleIO;
 int        cint   (String s) {int    value;std::istringstream iss(s);iss>>value;return value;}
 float      cfloat (String s) {float  value;std::istringstream iss(s);iss>>value;return value;}
 double     cdouble(String s) {double value;std::istringstream iss(s);iss>>value;return value;}
+// trim from start
+static inline std::string &ltrim(std::string &s) {
+  s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+  return s;
+}
+
+// trim from end
+static inline std::string &rtrim(std::string &s) {
+  s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+  return s;
+}
+
+// trim from both ends
+static inline std::string &trim(std::string &s) {
+  return ltrim(rtrim(s));
+}
 
 void avtIDXFileFormat::loadBalance(){
     
@@ -319,16 +335,20 @@ void avtIDXFileFormat::createBoxes(){
             String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
             String extra_cells(xmlbox->FindNestedElementWithName("extraCells")->GetCharacterData());
             String resolution(xmlbox->FindNestedElementWithName("resolution")->GetCharacterData());
-            
+            lower = trim(lower);
+            upper = trim(upper);
+            extra_cells = trim(extra_cells);
+            resolution = trim(resolution);
+          
             lower = lower.substr(1,lower.length()-2);
             upper = upper.substr(1,upper.length()-2);
             
-            // TODO Extra cells managements (add flag on the plugin)
+            // TODO Do we still need extra cells managements as a flag?
             extra_cells = extra_cells.substr(1,extra_cells.length()-2);
             resolution = resolution.substr(1,resolution.length()-2);
             
-            //std::cout<< "lower " << lower << " upper " << upper;
-            
+            std::cout<< "lower " << lower << " upper " << upper << " resolution " << resolution << std::endl;
+          
             SimplePoint3d p1phy(0,0,0), p1log(0,0,0);
             SimplePoint3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
           
@@ -417,13 +437,17 @@ void avtIDXFileFormat::createTimeIndex(){
             
             vtkXMLDataElement *xmltime = level->GetNestedElement(i);
             String timestr(xmltime->GetAttribute("time"));
-            std::cout << "time " << timestr << std::endl;
+        //    std::cout << "time " << timestr << std::endl;
             
             double time = cdouble(timestr);
-          std::cout << "time double " << time << std::endl;
           
             timeIndex.push_back(time);
         }
+      
+        std::cout << "loaded " << timeIndex.size() << " timesteps from index.xml"<< std::endl;
+        std::cout << reader->getNTimesteps() << " timesteps in the IDX file" << std::endl;
+        if(timeIndex.size() != reader->getNTimesteps())
+          std::cout << "ERROR: the timesteps in the IDX file and in the index.xml are not consistent!\n You will not be able to use the physical time"<< std::endl;
     }
     
 }
