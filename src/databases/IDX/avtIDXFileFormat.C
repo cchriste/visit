@@ -85,13 +85,16 @@
 #include <InvalidVariableException.h>
 #include <dirent.h>
 
+// USING VISUS
+#include <visus_idx_io.h>
+
 #ifdef PARALLEL
 #include <avtParallel.h>
 #endif
 
 typedef std::string String;
 
-using namespace VisusSimpleIO;
+using namespace VisitIDXIO;
 
 int        cint   (String s) {int    value;std::istringstream iss(s);iss>>value;return value;}
 float      cfloat (String s) {float  value;std::istringstream iss(s);iss>>value;return value;}
@@ -122,7 +125,7 @@ void avtIDXFileFormat::loadBalance(){
     int maxbox = 0;
     
     for(int i=0; i < boxes.size(); i++){
-        SimpleBox& box = boxes.at(i);
+        Box& box = boxes.at(i);
         
         for(int j=0; j < 3; j++){
             int extent = box.p2[j]-box.p1[j];
@@ -140,7 +143,7 @@ void avtIDXFileFormat::loadBalance(){
     int avg_ext = 0;
     
     for(int i=0; i < boxes.size(); i++){
-        SimpleBox& box = boxes.at(i);
+        Box& box = boxes.at(i);
         
         total_extent += box.p2[maxdir];
     }
@@ -150,11 +153,11 @@ void avtIDXFileFormat::loadBalance(){
     
     //  std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext;
     
-    std::vector<SimpleBox> newboxes;
-    std::vector<SimpleBox> newphyboxes;
+    std::vector<Box> newboxes;
+    std::vector<Box> newphyboxes;
     
     for(int i=0; i < boxes.size(); i++){
-        SimpleBox& box = boxes.at(i);
+        Box& box = boxes.at(i);
         
         int loc_avg_ext = box.p2[maxdir] - box.p1[maxdir];
         int loc_res = 0;
@@ -169,11 +172,11 @@ void avtIDXFileFormat::loadBalance(){
         int part_p1 = box.p1[maxdir];
         int part_p2 = box.p1[maxdir] + loc_avg_ext;
         
-        SimplePoint3d p1(box.p1);
-        SimplePoint3d p2(box.p2);
+        Point3d p1(box.p1);
+        Point3d p2(box.p2);
 
-        SimplePoint3d log2phy;
-        SimpleBox& phybox = phyboxes.at(i);
+        Point3d log2phy;
+        Box& phybox = phyboxes.at(i);
       
         std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
       
@@ -181,7 +184,7 @@ void avtIDXFileFormat::loadBalance(){
           log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
        }
       
-        SimplePoint3d phyOffset = phyboxes.at(0).p1;
+        Point3d phyOffset = phyboxes.at(0).p1;
 //      std::cout << "log2phy " <<log2phy << std::endl;
       
         while(part_p2 <= box.p2[maxdir]){
@@ -189,10 +192,10 @@ void avtIDXFileFormat::loadBalance(){
             p1[maxdir] = part_p1;
             p2[maxdir] = (part_p2 < box.p2[maxdir]) ? part_p2+1 : part_p2;
            
-            SimpleBox newbox(p1,p2);
+            Box newbox(p1,p2);
             newboxes.push_back(newbox);
           
-            SimpleBox newphybox;
+            Box newphybox;
           
             for (int k = 0; k < dim; k++){
               newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
@@ -209,10 +212,10 @@ void avtIDXFileFormat::loadBalance(){
         }
         
         if(loc_res > 0){
-            SimpleBox& boxres = newboxes.at(newboxes.size()-1);
+            Box& boxres = newboxes.at(newboxes.size()-1);
             boxres.p2[maxdir] += loc_res-1;
           
-            SimpleBox& phyboxres = newphyboxes.at(newphyboxes.size()-1);
+            Box& phyboxres = newphyboxes.at(newphyboxes.size()-1);
             phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
           
               std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
@@ -268,7 +271,7 @@ void avtIDXFileFormat::calculateBoundsAndExtents(){
     
     // TODO deallocate this stuff
     for(int i=0; i< boxes.size(); i++){
-        SimpleBox& box = boxes.at(i);
+        Box& box = boxes.at(i);
         int* my_bounds = new int[3];
             
         my_bounds[0] = box.p2.x-box.p1.x;
@@ -349,8 +352,8 @@ void avtIDXFileFormat::createBoxes(){
             
             std::cout<< "lower " << lower << " upper " << upper << " resolution " << resolution << std::endl;
           
-            SimplePoint3d p1phy(0,0,0), p1log(0,0,0);
-            SimplePoint3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
+            Point3d p1phy(0,0,0), p1log(0,0,0);
+            Point3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
           
             int eCells[3];
             int resdata[3];
@@ -390,9 +393,9 @@ void avtIDXFileFormat::createBoxes(){
             std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
             std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
             
-            phyboxes.push_back(SimpleBox(p1phy, p2phy));
-            physicalBox = physicalBox.getUnion((const SimpleBox)phyboxes.at(i));
-            boxes.push_back(SimpleBox(p1log,p2log));
+            phyboxes.push_back(Box(p1phy, p2phy));
+            physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
+            boxes.push_back(Box(p1log,p2log));
             
         }
         
@@ -492,7 +495,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     
     std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
   
-    reader = new SimpleIO();
+    reader = new VisusIDXIO(); // USING VISUS
   
     if (!reader->openDataset(filename))
     {
@@ -623,7 +626,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->minSpatialExtents[2] = physicalBox.p1.z;
     mesh->maxSpatialExtents[2] = physicalBox.p2.z;
 
-    SimpleBox logicBox = reader->getLogicBox();
+    Box logicBox = reader->getLogicBox();
     mesh->hasLogicalBounds = true;
     mesh->logicalBounds[0] = logicBox.p2.x - logicBox.p1.x;
     mesh->logicalBounds[1] = logicBox.p2.y - logicBox.p1.y;
@@ -633,12 +636,12 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     
     std::cout << rank << ": Added mesh";
 
-    const std::vector<SimpleField>& fields = reader->getFields();
+    const std::vector<Field>& fields = reader->getFields();
     
     int ndtype;
     for (int i = 0; i < (int) fields.size(); i++)
     {
-        const SimpleField& field = fields[i];
+        const Field& field = fields[i];
         
         if (!field.isVector)
             md->Add(new avtScalarMetaData(field.name,mesh->name,AVT_ZONECENT));
@@ -703,7 +706,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 {
     //std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
     
-    SimpleBox slice_box;
+    Box slice_box;
   
     int* my_bounds = NULL;
     int* my_extents = NULL;
@@ -788,7 +791,7 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
 
 vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
     
-    const SimpleBox& my_box = boxes.at(domain);
+    const Box& my_box = boxes.at(domain);
     
     unsigned char* data = reader->getData(my_box, timestate, varname);
     
@@ -797,8 +800,8 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         return NULL;
     }
     
-    SimpleField field = reader->getCurrField();
-    SimpleDTypes type = field.type;
+    Field field = reader->getCurrField();
+    DTypes type = field.type;
     
     int* my_bounds = boxes_bounds.at(domain);
     int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
@@ -821,7 +824,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 //    
 //    std::cout << rank << ": size array " << ncomponents*ntuples << std::endl;
   
-    if(type == VisusSimpleIO::UINT8){
+    if(type == VisitIDXIO::UINT8){
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
         rv->SetNumberOfComponents(ncomponents); //<ctc> eventually handle vector data, since visit can actually render it!
         
@@ -836,7 +839,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             rv->SetArray((unsigned char*)data,ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
         return rv;
     }
-    else if(type == VisusSimpleIO::UINT16){
+    else if(type == VisitIDXIO::UINT16){
     
         vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
@@ -863,7 +866,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
         return rv;
     }
-    else if(type == VisusSimpleIO::UINT32){
+    else if(type == VisitIDXIO::UINT32){
         vtkUnsignedIntArray *rv = vtkUnsignedIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -889,7 +892,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::INT8){
+    else if(type == VisitIDXIO::INT8){
         vtkCharArray*rv = vtkCharArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -905,7 +908,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::INT16){
+    else if(type == VisitIDXIO::INT16){
         vtkShortArray *rv = vtkShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -931,7 +934,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::INT32){
+    else if(type == VisitIDXIO::INT32){
         vtkIntArray *rv = vtkIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -957,7 +960,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::INT64){
+    else if(type == VisitIDXIO::INT64){
         vtkLongArray *rv = vtkLongArray::New();
         rv->SetNumberOfComponents(ncomponents);
     
@@ -984,7 +987,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisusSimpleIO::FLOAT32){
+    else if(type == VisitIDXIO::FLOAT32){
 
         vtkFloatArray *rv = vtkFloatArray::New();
         rv->SetNumberOfComponents(ncomponents);
@@ -1010,7 +1013,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
         return rv;
     }
-    else if(type == VisusSimpleIO::FLOAT64){
+    else if(type == VisitIDXIO::FLOAT64){
 
         vtkDoubleArray *rv = vtkDoubleArray::New();
         rv->SetNumberOfComponents(ncomponents);

@@ -6,7 +6,7 @@ INCLUDE(${VISIT_SOURCE_DIR}/CMake/PluginMacros.cmake)
 SET(COMMON_SOURCES
 IDXPluginInfo.C
 IDXCommonPluginInfo.C
-visus_simpleio.cpp
+visus_idx_io.cpp
 )
 
 SET(LIBI_SOURCES 

@@ -12,13 +12,13 @@
  **                                                **
  ****************************************************/
 
-#ifndef ViSUS_visus_simpleio_types_h
-#define ViSUS_visus_simpleio_types_h
+#ifndef _visit_idx_io_types_h
+#define _visit_idx_io_types_h
 
 #include <cmath>
 
-namespace VisusSimpleIO{
-enum SimpleDTypes{
+namespace VisitIDXIO{
+enum DTypes{
     INT8, UINT8,
     INT16, UINT16,
     INT32, UINT32,
@@ -27,27 +27,27 @@ enum SimpleDTypes{
     UNKNOWN
 };
     
-struct SimpleField{
+struct Field{
     std::string name;
-    SimpleDTypes type;
+    DTypes type;
     bool isVector;
     int ncomponents;
 };
 
-class SimplePoint3d{
+class Point3d{
 public:
     double x,y,z;
     
     //default constructor
-    inline SimplePoint3d() :x(0.0),y(0.0),z(0.0)
+    inline Point3d() :x(0.0),y(0.0),z(0.0)
     {}
     
     //constructor
-    inline explicit SimplePoint3d(double x_,double y_,double z_=0) : x(x_), y(y_), z(z_)
+    inline explicit Point3d(double x_,double y_,double z_=0) : x(x_), y(y_), z(z_)
     {}
     
     //constructor from string
-    inline explicit SimplePoint3d(std::string value)
+    inline explicit Point3d(std::string value)
     {std::stringstream parser(value);parser>>x>>y>>z;}
     
     //convert to std::string
@@ -67,79 +67,79 @@ public:
     {return (double)sqrt(module2());}
     
     //normalize a vector
-    inline SimplePoint3d normalize() const
+    inline Point3d normalize() const
     {
         double len=module();
         if (!len) len=1.0;
-        return SimplePoint3d(x/len,y/len,z/len);
+        return Point3d(x/len,y/len,z/len);
     }
     
     //abs
-    inline SimplePoint3d abs() const
-    {return SimplePoint3d(x>=0?+x:-x , y>=0?+y:-y , z>=0?+z:-z);}
+    inline Point3d abs() const
+    {return Point3d(x>=0?+x:-x , y>=0?+y:-y , z>=0?+z:-z);}
     
     //inverse
-    inline SimplePoint3d inv() const
-    {return SimplePoint3d(1.0/x,1.0/y,1.0/z);}
+    inline Point3d inv() const
+    {return Point3d(1.0/x,1.0/y,1.0/z);}
     
     //+a
-    inline const SimplePoint3d& operator+()  const
+    inline const Point3d& operator+()  const
     {return *this;}
     
     //-a
-    inline SimplePoint3d operator-()  const
-    {return SimplePoint3d(-this->x,-this->y,-this->z);}
+    inline Point3d operator-()  const
+    {return Point3d(-this->x,-this->y,-this->z);}
     
     //a+b
-    inline SimplePoint3d operator+(const SimplePoint3d&  b)  const
-    {return SimplePoint3d(this->x+b.x,this->y+b.y,this->z+b.z);}
+    inline Point3d operator+(const Point3d&  b)  const
+    {return Point3d(this->x+b.x,this->y+b.y,this->z+b.z);}
     
     //a+=b
-    inline SimplePoint3d& operator+=(const SimplePoint3d&  b)
+    inline Point3d& operator+=(const Point3d&  b)
     {this->x+=b.x;this->y+=b.y;this->z+=b.z;return *this;}
     
     //a-b
-    inline SimplePoint3d operator-(const SimplePoint3d&  b)  const
-    {return SimplePoint3d(this->x-b.x,this->y-b.y,this->z-b.z);}
+    inline Point3d operator-(const Point3d&  b)  const
+    {return Point3d(this->x-b.x,this->y-b.y,this->z-b.z);}
     
     //a-=b
-    inline SimplePoint3d& operator-=(const SimplePoint3d&  b)
+    inline Point3d& operator-=(const Point3d&  b)
     {this->x-=b.x;this->y-=b.y;this->z-=b.z;return *this;}
     
     //a*f
-    inline SimplePoint3d operator*(double s) const
-    {return SimplePoint3d(this->x*s,this->y*s,this->z*s);}
+    inline Point3d operator*(double s) const
+    {return Point3d(this->x*s,this->y*s,this->z*s);}
     
     //a*=f
-    inline SimplePoint3d& operator*=(double s)
+    inline Point3d& operator*=(double s)
     {this->x=this->x*s;this->y=this->y*s;this->z=this->z*s;return *this;}
     
     //a/f
-    inline SimplePoint3d operator/(double s) const
-    {return SimplePoint3d(this->x/s,this->y/s,this->z/s);}
+    inline Point3d operator/(double s) const
+    {return Point3d(this->x/s,this->y/s,this->z/s);}
     
     //a/f
-    inline SimplePoint3d& operator/=(double s)
+    inline Point3d& operator/=(double s)
     {this->x=this->x/s;this->y=this->y/s;this->z=this->z/s;return *this;}
     
     //a==b
-    inline bool operator==(const SimplePoint3d& b) const
+    inline bool operator==(const Point3d& b) const
     {return  x==b.x && y==b.y && z==b.z;}
     
     //a!=b
-    inline bool operator!=(const SimplePoint3d& b) const
+    inline bool operator!=(const Point3d& b) const
     {return  x!=b.x || y!=b.y || z!=b.z;}
     
     //dot product
-    inline double dot(const SimplePoint3d&  b) const
+    inline double dot(const Point3d&  b) const
     {return this->x*b.x+this->y*b.y+this->z*b.z;}
     
     //dot product
-    inline double operator*(const SimplePoint3d& b) const
+    inline double operator*(const Point3d& b) const
     {return this->dot(b);}
     
     //distance between two points
-    inline double distance(const SimplePoint3d& p) const
+    inline double distance(const Point3d& p) const
     {return (p-*this).module();}
     
     //access an item using an index
@@ -161,13 +161,13 @@ public:
     }
     
     //set
-    inline SimplePoint3d& set(int index,double value)
+    inline Point3d& set(int index,double value)
     {(*this)[index]=value;return *this;}
     
     //cross product
-    inline SimplePoint3d cross(const SimplePoint3d& v) const
+    inline Point3d cross(const Point3d& v) const
     {
-        return SimplePoint3d
+        return Point3d
         (
          y * v.z - v.y * z,
          z * v.x - v.z * x,
@@ -182,19 +182,19 @@ public:
 };
 
 // TODO add other useful operators
-inline std::ostream& operator<<(std::ostream &out,const SimplePoint3d &p)
+inline std::ostream& operator<<(std::ostream &out,const Point3d &p)
 {out <<"<"<<p.x <<","<<p.y<<","<<p.z<<">";return out;}
 
-class SimpleBox{
+class Box{
 public:
     
-    SimplePoint3d p1;
-    SimplePoint3d p2;
+    Point3d p1;
+    Point3d p2;
     
-    inline SimpleBox(){};
+    inline Box(){};
     
     //construct from string
-    inline SimpleBox(std::string value)
+    inline Box(std::string value)
     {
         std::istringstream parser(value);
         parser>>this->p1.x>>this->p1.y>>this->p1.z;
@@ -202,14 +202,14 @@ public:
     }
     
     //constructor
-    inline SimpleBox(SimplePoint3d p1,SimplePoint3d p2)
+    inline Box(Point3d p1,Point3d p2)
     {
-        this->p1=SimplePoint3d(std::min(p1.x,p2.x),std::min(p1.y,p2.y),std::min(p1.z,p2.z));
-        this->p2=SimplePoint3d(std::max(p1.x,p2.x),std::max(p1.y,p2.y),std::max(p1.z,p2.z));
+        this->p1=Point3d(std::min(p1.x,p2.x),std::min(p1.y,p2.y),std::min(p1.z,p2.z));
+        this->p2=Point3d(std::max(p1.x,p2.x),std::max(p1.y,p2.y),std::max(p1.z,p2.z));
     }
     
     //size
-    inline SimplePoint3d size() const
+    inline Point3d size() const
     {return p2-p1;}
     
     //addPoint
@@ -221,29 +221,29 @@ public:
     }
     
     //add a point to the bounding box
-    inline void addPoint(SimplePoint3d p)
+    inline void addPoint(Point3d p)
     {addPoint(p.x,p.y,p.z);}
     
     //get point
-    inline SimplePoint3d getPoint(int idx) const
+    inline Point3d getPoint(int idx) const
     {
         switch (idx)
         {
-            case 0:return SimplePoint3d(p1.x,p1.y,p1.z);
-            case 1:return SimplePoint3d(p2.x,p1.y,p1.z);
-            case 2:return SimplePoint3d(p2.x,p2.y,p1.z);
-            case 3:return SimplePoint3d(p1.x,p2.y,p1.z);
-            case 4:return SimplePoint3d(p1.x,p1.y,p2.z);
-            case 5:return SimplePoint3d(p2.x,p1.y,p2.z);
-            case 6:return SimplePoint3d(p2.x,p2.y,p2.z);
-            case 7:return SimplePoint3d(p1.x,p2.y,p2.z);
+            case 0:return Point3d(p1.x,p1.y,p1.z);
+            case 1:return Point3d(p2.x,p1.y,p1.z);
+            case 2:return Point3d(p2.x,p2.y,p1.z);
+            case 3:return Point3d(p1.x,p2.y,p1.z);
+            case 4:return Point3d(p1.x,p1.y,p2.z);
+            case 5:return Point3d(p2.x,p1.y,p2.z);
+            case 6:return Point3d(p2.x,p2.y,p2.z);
+            case 7:return Point3d(p1.x,p2.y,p2.z);
         }
         
-        return SimplePoint3d();
+        return Point3d();
     }
     
     //test if a point is inside the box
-    inline bool containsPoint(SimplePoint3d p) const
+    inline bool containsPoint(Point3d p) const
     {
         return p.x>=this->p1.x && p.x<=this->p2.x
         && p.y>=this->p1.y && p.y<=this->p2.y
@@ -251,17 +251,17 @@ public:
     }
     
     //test if two box are equal
-    inline bool operator==(const SimpleBox& b) const
+    inline bool operator==(const Box& b) const
     {return p1==b.p1 && p2==b.p2;}
     
     //test equality
-    inline bool operator!=(const SimpleBox& b) const
+    inline bool operator!=(const Box& b) const
     {return !(this->operator==(b));}
     
     //get intersection of two boxes
-    inline SimpleBox getIntersection(const SimpleBox& b) const
+    inline Box getIntersection(const Box& b) const
     {
-        SimpleBox ret;
+        Box ret;
         ret.p1.x=std::max(this->p1.x,b.p1.x); ret.p2.x=std::min(this->p2.x,b.p2.x);
         ret.p1.y=std::max(this->p1.y,b.p1.y); ret.p2.y=std::min(this->p2.y,b.p2.y);
         ret.p1.z=std::max(this->p1.z,b.p1.z); ret.p2.z=std::min(this->p2.z,b.p2.z);
@@ -269,9 +269,9 @@ public:
     }
     
     //get union of two boxes
-    inline SimpleBox getUnion(const SimpleBox& b) const
+    inline Box getUnion(const Box& b) const
     {
-        SimpleBox ret;
+        Box ret;
         ret.p1.x=std::min(this->p1.x,b.p1.x);ret.p2.x=std::max(this->p2.x,b.p2.x);
         ret.p1.y=std::min(this->p1.y,b.p1.y);ret.p2.y=std::max(this->p2.y,b.p2.y);
         ret.p1.z=std::min(this->p1.z,b.p1.z);ret.p2.z=std::max(this->p2.z,b.p2.z);

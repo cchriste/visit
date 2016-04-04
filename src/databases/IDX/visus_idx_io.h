@@ -12,15 +12,16 @@
  **                                                **
  ****************************************************/
 
-#ifndef _visus_simpleio_h
-#define _visus_simpleio_h
+#ifndef _visus_idx_io_h
+#define _visus_idx_io_h
 
 #include <string>
 #include <vector>
 #include <cassert>
-#include "visus_simpleio_types.h"
+#include "visit_idx_io.h"
+#include "visit_idx_io_types.h"
 
-using namespace VisusSimpleIO;
+using namespace VisitIDXIO;
 
 class DatasetImpl;
 class AccessImpl;
@@ -28,11 +29,11 @@ class AccessImpl;
 // TODO generalize end extend
 // Query at full resolution only
 
-class SimpleIO{
+class VisusIDXIO : public IDX_IO{
     
 public:
     
-    SimpleIO(){};
+    VisusIDXIO(){};
     
     bool openDataset(const std::string filename);
     
@@ -48,17 +49,17 @@ public:
         return max_resolution;
     }
     
-    unsigned char* getData(const SimpleBox box, const int timestate, const char* varname);
+    unsigned char* getData(const Box box, const int timestate, const char* varname);
     
     inline std::vector<double> getTimes(){
         return tsteps;
     }
     
-    inline std::vector<SimpleField> getFields(){
+    inline std::vector<Field> getFields(){
         return fields;
     }
     
-    inline SimpleBox getLogicBox(){
+    inline Box getLogicBox(){
         return logic_box;
     }
     
@@ -66,7 +67,7 @@ public:
         return &logic_to_physic[0];
     }
     
-    inline SimpleField getCurrField(){
+    inline Field getCurrField(){
         return curr_field;
     }
   
@@ -74,20 +75,11 @@ public:
       return compressed_dataset;
     }
     
-    ~SimpleIO();
-    
+    virtual ~VisusIDXIO();
+  
 private:
-    int dims;
-    int ntimesteps;
-    int max_resolution;
-    std::vector<double> tsteps;
-    std::string dataset_url;
-    std::vector<SimpleField> fields;
-    SimpleBox logic_box;
-    SimpleField curr_field;
-    double logic_to_physic[16];
-    DatasetImpl* datasetImpl;
-    bool compressed_dataset;
+  DatasetImpl* datasetImpl;
+  
 };
 
 

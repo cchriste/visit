@@ -19,9 +19,9 @@
 #include <visuscpp/kernel/core/visus_path.h>
 #include <visuscpp/idx/visus_idx_dataset.h>
 
-#include "visus_simpleio.h"
+#include "visus_idx_io.h"
 
-using namespace VisusSimpleIO;
+//using namespace VisitIDXIO;
 using namespace Visus;
 
 static Application app;
@@ -45,28 +45,28 @@ public:
     }
 };
 
-VisusSimpleIO::SimpleDTypes convertType(DType intype){
+VisitIDXIO::DTypes convertType(DType intype){
     
-    if(intype == DTypes::INT8 || intype.isVectorOf(DTypes::INT8))
-        return VisusSimpleIO::INT8;
-    else if(intype == DTypes::UINT8 || intype.isVectorOf(DTypes::UINT8))
-        return VisusSimpleIO::UINT8;
-    else if(intype == DTypes::INT16 || intype.isVectorOf(DTypes::INT16))
-        return VisusSimpleIO::INT16;
-    else if(intype == DTypes::UINT16 || intype.isVectorOf(DTypes::UINT16))
-        return VisusSimpleIO::UINT16;
-    else if(intype == DTypes::INT32 || intype.isVectorOf(DTypes::INT32))
-        return VisusSimpleIO::INT32;
-    else if(intype == DTypes::UINT32 || intype.isVectorOf(DTypes::INT32))
-        return VisusSimpleIO::UINT32;
-    else if(intype == DTypes::INT64 || intype.isVectorOf(DTypes::INT64))
-        return VisusSimpleIO::INT64;
-    else if(intype == DTypes::UINT64 || intype.isVectorOf(DTypes::UINT64))
-        return VisusSimpleIO::UINT64;
-    else if(intype == DTypes::FLOAT32 || intype.isVectorOf(DTypes::FLOAT32))
-        return VisusSimpleIO::FLOAT32;
-    else if(intype == DTypes::FLOAT64 || intype.isVectorOf(DTypes::FLOAT64)){
-        return VisusSimpleIO::FLOAT64;
+  if(intype == Visus::DTypes::INT8 || intype.isVectorOf(Visus::DTypes::INT8))
+        return VisitIDXIO::INT8;
+    else if(intype == Visus::DTypes::UINT8 || intype.isVectorOf(Visus::DTypes::UINT8))
+        return VisitIDXIO::UINT8;
+    else if(intype == Visus::DTypes::INT16 || intype.isVectorOf(Visus::DTypes::INT16))
+        return VisitIDXIO::INT16;
+    else if(intype == Visus::DTypes::UINT16 || intype.isVectorOf(Visus::DTypes::UINT16))
+        return VisitIDXIO::UINT16;
+    else if(intype == Visus::DTypes::INT32 || intype.isVectorOf(Visus::DTypes::INT32))
+        return VisitIDXIO::INT32;
+    else if(intype == Visus::DTypes::UINT32 || intype.isVectorOf(Visus::DTypes::INT32))
+        return VisitIDXIO::UINT32;
+    else if(intype == Visus::DTypes::INT64 || intype.isVectorOf(Visus::DTypes::INT64))
+        return VisitIDXIO::INT64;
+    else if(intype == Visus::DTypes::UINT64 || intype.isVectorOf(Visus::DTypes::UINT64))
+        return VisitIDXIO::UINT64;
+    else if(intype == Visus::DTypes::FLOAT32 || intype.isVectorOf(Visus::DTypes::FLOAT32))
+        return VisitIDXIO::FLOAT32;
+    else if(intype == Visus::DTypes::FLOAT64 || intype.isVectorOf(Visus::DTypes::FLOAT64)){
+        return VisitIDXIO::FLOAT64;
     }
 
     VisusWarning() << "No type found for conversion";
@@ -74,12 +74,12 @@ VisusSimpleIO::SimpleDTypes convertType(DType intype){
     
 }
 
-SimpleIO::~SimpleIO(){
+VisusIDXIO::~VisusIDXIO(){
     if (datasetImpl != nullptr)
         delete datasetImpl;
 }
 
-bool SimpleIO::openDataset(const String filename){
+bool VisusIDXIO::openDataset(const String filename){
 
     String name("file://"); name += Path(filename).toString();
     
@@ -115,14 +115,14 @@ bool SimpleIO::openDataset(const String filename){
       VisusInfo() << "COMPRESSED";
     }
   
-    const std::vector<Field>& dfields = dataset->getFields();
+    const std::vector<Visus::Field>& dfields = dataset->getFields();
     
     for (int i = 0; i < (int) dfields.size(); i++)
     {
         std::string fieldname = dfields[i].name;
         
-        Field field = dataset->getFieldByName(fieldname);
-        SimpleField my_field;
+        Visus::Field field = dataset->getFieldByName(fieldname);
+        VisitIDXIO::Field my_field;
         
         my_field.type = convertType(field.dtype);
         my_field.isVector = (compressed_dataset) ? false : field.dtype.isVector();
@@ -154,7 +154,7 @@ bool SimpleIO::openDataset(const String filename){
     
 }
 
-unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const char* varname){
+unsigned char* VisusIDXIO::getData(const VisitIDXIO::Box box, const int timestate, const char* varname){
 
     Dataset* dataset = datasetImpl->get();
     
@@ -170,7 +170,7 @@ unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const
     
     Access* access = dataset->createAccess();
 
-    Field field = dataset->getFieldByName(varname);
+    Visus::Field field = dataset->getFieldByName(varname);
     
     curr_field.type = convertType(field.dtype);
   // TODO better
@@ -178,7 +178,7 @@ unsigned char* SimpleIO::getData(const SimpleBox box, const int timestate, const
     curr_field.ncomponents = (compressed_dataset) ? 1 : field.dtype.ncomponents();
     curr_field.name = varname;
     
-    NdBox my_box;
+    Visus::NdBox my_box;
     int zp2 = (dims == 2) ? 1 : box.p2.z;
     
     NdPoint p1(box.p1.x,box.p1.y,box.p1.z);
