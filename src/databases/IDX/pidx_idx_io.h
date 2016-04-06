@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <PIDX.h>
 #include "visit_idx_io.h"
 #include "visit_idx_io_types.h"
 
@@ -26,23 +27,17 @@ using namespace VisitIDXIO;
 class DatasetImpl;
 class AccessImpl;
 
-// TODO generalize end extend
-// Query at full resolution only
-
-class VisusIDXIO : public IDX_IO{
+class PIDXIO : public IDX_IO{
     
 public:
     
-    VisusIDXIO(){};
+    PIDXIO(){};
     
     bool openDataset(const std::string filename);
     
     unsigned char* getData(const Box box, const int timestate, const char* varname);
     
-    virtual ~VisusIDXIO();
-  
-private:
-  DatasetImpl* datasetImpl;
+    virtual ~PIDXIO();
   
 };
 

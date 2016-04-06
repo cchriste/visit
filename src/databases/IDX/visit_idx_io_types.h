@@ -16,6 +16,7 @@
 #define _visit_idx_io_types_h
 
 #include <cmath>
+#include <sstream>
 
 namespace VisitIDXIO{
 enum DTypes{

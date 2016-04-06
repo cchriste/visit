@@ -31,35 +31,39 @@ public:
   virtual unsigned char* getData(const VisitIDXIO::Box box,
                                  const int timestate, const char* varname) = 0;
   
-  virtual inline std::vector<double> getTimes() = 0;
+  inline std::vector<double> getTimes() const{
+    return tsteps;
+  }
 
-  virtual std::vector<VisitIDXIO::Field> getFields() = 0;
+  inline std::vector<VisitIDXIO::Field> getFields() const{
+    return fields;
+  }
   
-  inline int getDimension(){
+  inline int getDimension() const{
     return dims;
   }
   
-  inline int getNTimesteps(){
+  inline int getNTimesteps() const{
     return ntimesteps;
   }
   
-  inline int getMaxResolution(){
+  inline int getMaxResolution() const{
     return max_resolution;
   }
   
-  inline VisitIDXIO::Box getLogicBox(){
+  inline VisitIDXIO::Box getLogicBox() const{
       return logic_box;
   }
   
-  inline const double* getLogicToPhysic(){
+  inline const double* getLogicToPhysic() const{
       return &logic_to_physic[0];
   }
   
-  inline VisitIDXIO::Field getCurrField(){
+  inline VisitIDXIO::Field getCurrField() const{
       return curr_field;
   }
 
-  inline bool isCompressed(){
+  inline bool isCompressed() const{
     return compressed_dataset;
   }
   
