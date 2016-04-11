@@ -23,8 +23,9 @@
 
 //using namespace VisitIDXIO;
 using namespace Visus;
-
+#ifdef USE_VISUS
 static Application app;
+#endif
 
 class DatasetImpl{
     
@@ -48,25 +49,25 @@ public:
 VisitIDXIO::DTypes convertType(DType intype){
     
   if(intype == Visus::DTypes::INT8 || intype.isVectorOf(Visus::DTypes::INT8))
-        return VisitIDXIO::INT8;
+        return VisitIDXIO::IDX_INT8;
     else if(intype == Visus::DTypes::UINT8 || intype.isVectorOf(Visus::DTypes::UINT8))
-        return VisitIDXIO::UINT8;
+        return VisitIDXIO::IDX_UINT8;
     else if(intype == Visus::DTypes::INT16 || intype.isVectorOf(Visus::DTypes::INT16))
-        return VisitIDXIO::INT16;
+        return VisitIDXIO::IDX_INT16;
     else if(intype == Visus::DTypes::UINT16 || intype.isVectorOf(Visus::DTypes::UINT16))
-        return VisitIDXIO::UINT16;
+        return VisitIDXIO::IDX_UINT16;
     else if(intype == Visus::DTypes::INT32 || intype.isVectorOf(Visus::DTypes::INT32))
-        return VisitIDXIO::INT32;
+        return VisitIDXIO::IDX_INT32;
     else if(intype == Visus::DTypes::UINT32 || intype.isVectorOf(Visus::DTypes::INT32))
-        return VisitIDXIO::UINT32;
+        return VisitIDXIO::IDX_UINT32;
     else if(intype == Visus::DTypes::INT64 || intype.isVectorOf(Visus::DTypes::INT64))
-        return VisitIDXIO::INT64;
+        return VisitIDXIO::IDX_INT64;
     else if(intype == Visus::DTypes::UINT64 || intype.isVectorOf(Visus::DTypes::UINT64))
-        return VisitIDXIO::UINT64;
+        return VisitIDXIO::IDX_UINT64;
     else if(intype == Visus::DTypes::FLOAT32 || intype.isVectorOf(Visus::DTypes::FLOAT32))
-        return VisitIDXIO::FLOAT32;
+        return VisitIDXIO::IDX_FLOAT32;
     else if(intype == Visus::DTypes::FLOAT64 || intype.isVectorOf(Visus::DTypes::FLOAT64)){
-        return VisitIDXIO::FLOAT64;
+        return VisitIDXIO::IDX_FLOAT64;
     }
 
     VisusWarning() << "No type found for conversion";

@@ -85,8 +85,11 @@
 #include <InvalidVariableException.h>
 #include <dirent.h>
 
-// USING VISUS
-#include <visus_idx_io.h>
+#ifdef USE_VISUS
+  #include <visus_idx_io.h>
+#else
+  #include <pidx_idx_io.h>
+#endif
 
 #ifdef PARALLEL
 #include <avtParallel.h>
@@ -495,7 +498,11 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     
     std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
   
-    reader = new VisusIDXIO(); // USING VISUS
+#ifdef USE_VISUS
+    reader = new VisusIDXIO(); // USE VISUS
+#else
+    reader = new PIDXIO();     // USE PIDX
+#endif
   
     if (!reader->openDataset(filename))
     {
@@ -824,7 +831,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 //    
 //    std::cout << rank << ": size array " << ncomponents*ntuples << std::endl;
   
-    if(type == VisitIDXIO::UINT8){
+    if(type == VisitIDXIO::IDX_UINT8){
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
         rv->SetNumberOfComponents(ncomponents); //<ctc> eventually handle vector data, since visit can actually render it!
         
@@ -839,7 +846,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             rv->SetArray((unsigned char*)data,ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
         return rv;
     }
-    else if(type == VisitIDXIO::UINT16){
+    else if(type == VisitIDXIO::IDX_UINT16){
     
         vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
@@ -866,7 +873,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
         return rv;
     }
-    else if(type == VisitIDXIO::UINT32){
+    else if(type == VisitIDXIO::IDX_UINT32){
         vtkUnsignedIntArray *rv = vtkUnsignedIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -892,7 +899,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisitIDXIO::INT8){
+    else if(type == VisitIDXIO::IDX_INT8){
         vtkCharArray*rv = vtkCharArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -908,7 +915,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisitIDXIO::INT16){
+    else if(type == VisitIDXIO::IDX_INT16){
         vtkShortArray *rv = vtkShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -934,7 +941,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisitIDXIO::INT32){
+    else if(type == VisitIDXIO::IDX_INT32){
         vtkIntArray *rv = vtkIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -960,7 +967,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisitIDXIO::INT64){
+    else if(type == VisitIDXIO::IDX_INT64){
         vtkLongArray *rv = vtkLongArray::New();
         rv->SetNumberOfComponents(ncomponents);
     
@@ -987,7 +994,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         return rv;
     }
-    else if(type == VisitIDXIO::FLOAT32){
+    else if(type == VisitIDXIO::IDX_FLOAT32){
 
         vtkFloatArray *rv = vtkFloatArray::New();
         rv->SetNumberOfComponents(ncomponents);
@@ -1013,7 +1020,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
         return rv;
     }
-    else if(type == VisitIDXIO::FLOAT64){
+    else if(type == VisitIDXIO::IDX_FLOAT64){
 
         vtkDoubleArray *rv = vtkDoubleArray::New();
         rv->SetNumberOfComponents(ncomponents);
