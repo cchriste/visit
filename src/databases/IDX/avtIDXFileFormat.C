@@ -135,6 +135,8 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
   sub_div[2] = (global_size[2] / local_size[2]);
   
   boxes.clear();
+  phyboxes.clear();
+  
   for(int r=0; r < process_count; r++){
     
     int local_offset[3];
@@ -148,15 +150,20 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     newbox.p1[0] = local_offset[0];
     newbox.p1[1] = local_offset[1];
     newbox.p1[2] = local_offset[2];
-    newbox.p2[0] = local_offset[0]+local_size[0];
-    newbox.p2[1] = local_offset[1]+local_size[1];
-    newbox.p2[2] = local_offset[2]+local_size[2];
+    newbox.p2[0] = local_offset[0]+local_size[0]+1;
+    newbox.p2[1] = local_offset[1]+local_size[1]+1;
+    newbox.p2[2] = local_offset[2]+local_size[2]+1;
     
     printf("%d: created box %d %d %d size %d %d %d\n", r, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
     
     boxes.push_back(newbox);
+    
+    phyboxes.push_back(newbox);
+   // physicalBox = physicalBox.getUnion((const Box)phyboxes.at(r));
+    
   }
 
+  physicalBox = reader->getLogicBox();
   
 }
 
@@ -318,9 +325,9 @@ void avtIDXFileFormat::calculateBoundsAndExtents(){
         Box& box = boxes.at(i);
         int* my_bounds = new int[3];
             
-        my_bounds[0] = box.p2.x-box.p1.x;
-        my_bounds[1] = box.p2.y-box.p1.y;
-        my_bounds[2] = box.p2.z-box.p1.z;
+        my_bounds[0] = box.p2.x-box.p1.x+1;
+        my_bounds[1] = box.p2.y-box.p1.y+1;
+        my_bounds[2] = box.p2.z-box.p1.z+1;
         
         boxes_bounds.push_back(my_bounds);
         
@@ -558,10 +565,13 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
   
     createBoxes();
     createTimeIndex();
-  
+#ifdef PARALLEL
     pidx_decomposition(nprocs);
+#endif
+#ifdef USE_VISUS
+    loadBalance();
+#endif
   
-  //  loadBalance();
     calculateBoundsAndExtents();
 }
 
@@ -678,13 +688,15 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
 
     Box logicBox = reader->getLogicBox();
     mesh->hasLogicalBounds = true;
-    mesh->logicalBounds[0] = logicBox.p2.x - logicBox.p1.x;
-    mesh->logicalBounds[1] = logicBox.p2.y - logicBox.p1.y;
-    mesh->logicalBounds[2] = logicBox.p2.z - logicBox.p1.z;
+    mesh->logicalBounds[0] = logicBox.p2.x - logicBox.p1.x+1;
+    mesh->logicalBounds[1] = logicBox.p2.y - logicBox.p1.y+1;
+    mesh->logicalBounds[2] = logicBox.p2.z - logicBox.p1.z+1;
     
     md->Add(mesh);
   
- //   md->SetFormatCanDoDomainDecomposition(true);
+#ifdef PARALLEL // only PIDX
+    //md->SetFormatCanDoDomainDecomposition(true);
+#endif
   
     const std::vector<Field>& fields = reader->getFields();
     
@@ -750,7 +762,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
 vtkDataSet *
 avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 {
-    //std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
+    std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
     
     Box slice_box;
   
@@ -774,8 +786,8 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     my_dims[0] = my_bounds[0]+1;
     my_dims[1] = my_bounds[1]+1;
     my_dims[2] = my_bounds[2]+1;
-    
-//    std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
+  
+    std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
     
     rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
     

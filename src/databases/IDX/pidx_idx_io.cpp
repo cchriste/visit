@@ -210,7 +210,10 @@ bool PIDXIO::openDataset(const String filename){
 }
 
 unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, const char* varname){
-  printf("-----PIDXIO getData\n");
+  printf("-----PIDXIO getData %d \n", rank);
+  
+//  double* datatemp = new double[global_size[0]*global_size[0]*global_size[0]];
+//  return (unsigned char*)datatemp;
   
   int ret = 0;
   
@@ -230,10 +233,29 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   
   curr_field = fields[variable_index];
   
+#ifdef PARALLEL
+  local_size[0] = 32;
+  local_size[1] = 32;
+  local_size[2] = 32;
+  local_size[3] = 1;
+  local_size[4] = 1;
+  
+  int sub_div[3];
+  sub_div[0] = (global_size[0] / local_size[0]);
+  sub_div[1] = (global_size[1] / local_size[1]);
+  sub_div[2] = (global_size[2] / local_size[2]);
+  
+  local_offset[2] = (rank / (sub_div[0] * sub_div[1])) * local_size[2];
+  int slice = rank % (sub_div[0] * sub_div[1]);
+  local_offset[1] = (slice / sub_div[0]) * local_size[1];
+  local_offset[0] = (slice % sub_div[0]) * local_size[0];
+  
+#else
   for(int i=0; i< dims; i++){
-      local_size[i] = box.p2[i] - box.p1[i];
+      local_size[i] = box.p2[i] - box.p1[i] + 1;
       local_offset[i] = box.p1[i];
   }
+#endif
   
   printf("local box %lld %lld %lld size %lld %lld %lld\n", local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
   
