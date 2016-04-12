@@ -640,9 +640,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->logicalBounds[2] = logicBox.p2.z - logicBox.p1.z;
     
     md->Add(mesh);
-    
-    std::cout << rank << ": Added mesh";
-
+  
     const std::vector<Field>& fields = reader->getFields();
     
     int ndtype;
@@ -655,8 +653,6 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
         else
             md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
     }
-    
-    std::cout << rank << ": Added fields";
         
     avtRectilinearDomainBoundaries *rdb =
     new avtRectilinearDomainBoundaries(true);
@@ -675,12 +671,10 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
         rdb->SetIndicesForRectGrid(i, extents);
     }
     rdb->CalculateBoundaries();
-    
-    std::cout << rank << ": Calculated boundaries";
-    
+  
     void_ref_ptr vr = void_ref_ptr(rdb,
                                    avtStructuredDomainBoundaries::Destruct);
-    cache->CacheVoidRef("any_mesh",                  AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
+    cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
 
     return;
 }
@@ -767,9 +761,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     for (int i = 0; i < my_dims[2]; i++)
       arrayZ[i] = slice_box.p1.z + i*steps[2];
     rgrid->SetZCoordinates(coordsZ);
-    
-    std::cout << "end mesh";
-    
+        
     return rgrid;
     
 }
@@ -777,8 +769,10 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 void
 avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 {
-    for(int i = 0; i < reader->getNTimesteps(); ++i)
-        cycles.push_back(i);
+//  if(cycles.size() > 0) return;
+  
+  for(int i = 0; i < reader->getNTimesteps(); ++i)
+      cycles.push_back(i);
 }
 
 void
@@ -1021,7 +1015,6 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT64){
-
         vtkDoubleArray *rv = vtkDoubleArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -1034,7 +1027,6 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         }
         else{
           
-          std::cout << "components " <<ncomponents << " tuples " <<ntuples;
             rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
         }
       
@@ -1050,6 +1042,8 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
         return rv;
     }
+  
+  return NULL;
 }
 
 // ****************************************************************************
