@@ -119,6 +119,47 @@ static inline std::string &trim(std::string &s) {
   return ltrim(rtrim(s));
 }
 
+void avtIDXFileFormat::pidx_decomposition(int process_count){
+  
+  if (process_count == 1) return;
+  
+  // Single box
+  Box box = boxes[0];
+
+  int global_size[3] = {box.p2[0]-box.p1[0]+1,box.p2[1]-box.p1[1]+1,box.p2[2]-box.p1[2]+1};
+  int local_size[3] = {32,32,32};
+  printf("global box size %d %d %d\n", global_size[0],global_size[1],global_size[2]);
+  int sub_div[3];
+  sub_div[0] = (global_size[0] / local_size[0]);
+  sub_div[1] = (global_size[1] / local_size[1]);
+  sub_div[2] = (global_size[2] / local_size[2]);
+  
+  boxes.clear();
+  for(int r=0; r < process_count; r++){
+    
+    int local_offset[3];
+   
+    local_offset[2] = (r / (sub_div[0] * sub_div[1])) * local_size[2];
+    int slice = r % (sub_div[0] * sub_div[1]);
+    local_offset[1] = (slice / sub_div[0]) * local_size[1];
+    local_offset[0] = (slice % sub_div[0]) * local_size[0];
+    
+    Box newbox;
+    newbox.p1[0] = local_offset[0];
+    newbox.p1[1] = local_offset[1];
+    newbox.p1[2] = local_offset[2];
+    newbox.p2[0] = local_offset[0]+local_size[0];
+    newbox.p2[1] = local_offset[1]+local_size[1];
+    newbox.p2[2] = local_offset[2]+local_size[2];
+    
+    printf("%d: created box %d %d %d size %d %d %d\n", r, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
+    
+    boxes.push_back(newbox);
+  }
+
+  
+}
+
 void avtIDXFileFormat::loadBalance(){
     
   //std::cout << "Load balancing";
@@ -514,11 +555,13 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     
 //    std::cout <<"dataset loaded";
     dim = reader->getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
-    
-    // TODO (if necessary) read only with rank 0 and then broadcast to the other processors
+  
     createBoxes();
     createTimeIndex();
-    loadBalance();
+  
+    pidx_decomposition(nprocs);
+  
+  //  loadBalance();
     calculateBoundsAndExtents();
 }
 
@@ -641,6 +684,8 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     
     md->Add(mesh);
   
+ //   md->SetFormatCanDoDomainDecomposition(true);
+  
     const std::vector<Field>& fields = reader->getFields();
     
     int ndtype;
@@ -761,7 +806,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     for (int i = 0; i < my_dims[2]; i++)
       arrayZ[i] = slice_box.p1.z + i*steps[2];
     rgrid->SetZCoordinates(coordsZ);
-        
+  
     return rgrid;
     
 }

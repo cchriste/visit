@@ -118,6 +118,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     void createTimeIndex();
     void calculateBoundsAndExtents();
     void loadBalance();
+    void pidx_decomposition(int nprocs);
+  
     
     std::vector<double> timeIndex;
     

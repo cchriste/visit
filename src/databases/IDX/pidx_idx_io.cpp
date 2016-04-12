@@ -18,20 +18,18 @@
 
 typedef std::string String;
 
-static int process_count = 1, rank = 0;
+int process_count = 1, rank = 0;
 //unsigned long long local_box_offset[3];
-static PIDX_point global_size, local_offset, local_size;
-static PIDX_file pidx_file;
-static PIDX_access pidx_access;
-static String input_filename;
-static bool mpi_on = false;
+PIDX_point global_size, local_offset, local_size;
+PIDX_file pidx_file;
+PIDX_access pidx_access;
+String input_filename;
 //unsigned long long global_box_size[3] = {0, 0, 0};
 //unsigned long long local_box_size[3] = {0, 0, 0};
 
 static void terminate(int out)
 {
 #if PIDX_HAVE_MPI
-  mpi_on = false;
   MPI_Abort(MPI_COMM_WORLD, out);
 #else
   exit(out);
@@ -49,10 +47,15 @@ static void terminate_with_error_msg(const char *format, ...)
 
 static void init_mpi()
 {
-  mpi_on = true;
+
 #if PIDX_HAVE_MPI
-  if (MPI_Init(0, NULL) != MPI_SUCCESS)
-    terminate_with_error_msg("ERROR: MPI_Init error\n");
+  int mpi_init;
+  MPI_Initialized(&mpi_init);
+  
+  if (!mpi_init){
+    if (MPI_Init(NULL, NULL) != MPI_SUCCESS)
+      terminate_with_error_msg("ERROR: MPI_Init error\n");
+  }
   if (MPI_Comm_size(MPI_COMM_WORLD, &process_count) != MPI_SUCCESS)
     terminate_with_error_msg("ERROR: MPI_Comm_size error\n");
   if (MPI_Comm_rank(MPI_COMM_WORLD, &rank) != MPI_SUCCESS)
@@ -98,8 +101,7 @@ bool PIDXIO::openDataset(const String filename){
   
   printf("-----PIDXIO openDataset\n");
   
-  if(!mpi_on)
-    init_mpi();
+  init_mpi();
   
   int ret;
   int variable_count;
@@ -121,7 +123,7 @@ bool PIDXIO::openDataset(const String filename){
   
   (global_size[2] > 1) ? dims = 3 : dims = 2;
   
-  for(int i=0; i < 3; i++){
+  for(int i=0; i < dims; i++){
     logic_box.p1[i] = 0;
     logic_box.p2[i] = global_size[i]-1;
   }
@@ -228,14 +230,12 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   
   curr_field = fields[variable_index];
   
-  for(int i=0; i < 3; i++){
-    logic_box.p1[i] = 0;
-    logic_box.p2[i] = global_size[i]-1;
-    
-    // only one box
-    local_size[i] = global_size[i];
-    local_offset[i] = 0;
+  for(int i=0; i< dims; i++){
+      local_size[i] = box.p2[i] - box.p1[i];
+      local_offset[i] = box.p1[i];
   }
+  
+  printf("local box %lld %lld %lld size %lld %lld %lld\n", local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
   
   PIDX_create_access(&pidx_access);
 #if PIDX_HAVE_MPI
