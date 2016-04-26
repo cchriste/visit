@@ -91,7 +91,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual void GetCycles(std::vector<int> &);
     virtual void GetTimes(std::vector<double> &);
     
-    virtual void           FreeUpResources(void); 
+    virtual void           FreeUpResources(void);
+    //virtual void           ActivateTimestep();
 
   protected:
 

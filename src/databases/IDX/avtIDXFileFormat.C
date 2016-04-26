@@ -819,6 +819,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       arrayZ[i] = slice_box.p1.z + i*steps[2];
     rgrid->SetZCoordinates(coordsZ);
   
+  printf("end mesh\n");
     return rgrid;
     
 }
@@ -877,10 +878,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     // do not reverse endianess if data is compressed
     reverse_endian = reverse_endian * !reader->isCompressed();
   
-//    if( data != NULL)
-//         std::cout<< rank << ": size data bytes " << data->c_size() << std::endl;
-//    
-//    std::cout << rank << ": size array " << ncomponents*ntuples << std::endl;
+  printf("before convert to vtk\n");
   
     if(type == VisitIDXIO::IDX_UINT8){
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
@@ -1072,6 +1070,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT64){
+      printf("DOUBLE creating array ncomp %d \n", ncomponents);
         vtkDoubleArray *rv = vtkDoubleArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -1083,7 +1082,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             delete data;
         }
         else{
-          
+          printf("DOUBLE converting %d \n", ncomponents*ntuples);
             rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
         }
       

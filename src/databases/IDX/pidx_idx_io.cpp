@@ -18,12 +18,12 @@
 
 typedef std::string String;
 
-int process_count = 1, rank = 0;
+static int process_count = 1, rank = 0;
 //unsigned long long local_box_offset[3];
-PIDX_point global_size, local_offset, local_size;
-PIDX_file pidx_file;
-PIDX_access pidx_access;
-String input_filename;
+static PIDX_point global_size, local_offset, local_size;
+static PIDX_file pidx_file;
+static PIDX_access pidx_access;
+static String input_filename;
 //unsigned long long global_box_size[3] = {0, 0, 0};
 //unsigned long long local_box_size[3] = {0, 0, 0};
 
@@ -211,10 +211,7 @@ bool PIDXIO::openDataset(const String filename){
 
 unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, const char* varname){
   printf("-----PIDXIO getData %d \n", rank);
-  
-//  double* datatemp = new double[global_size[0]*global_size[0]*global_size[0]];
-//  return (unsigned char*)datatemp;
-  
+
   int ret = 0;
   
   int variable_index = -1;
@@ -232,6 +229,9 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   printf("var index %d\n", variable_index);
   
   curr_field = fields[variable_index];
+  
+//  double* datatemp = new double[global_size[0]*global_size[0]*global_size[0]];
+//  return (unsigned char*)datatemp;
   
 #ifdef PARALLEL
   local_size[0] = 32;
@@ -256,8 +256,11 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
       local_offset[i] = box.p1[i];
   }
 #endif
+
+  local_size[3] = 1;
+  local_size[4] = 1;
   
-  printf("local box %lld %lld %lld size %lld %lld %lld\n", local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
+  printf("local box %lld %lld %lld size %lld %lld %lld time %d\n", local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2], timestate);
   
   PIDX_create_access(&pidx_access);
 #if PIDX_HAVE_MPI
@@ -267,14 +270,23 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   ret = PIDX_file_open(input_filename.c_str(), PIDX_MODE_RDONLY, pidx_access, &pidx_file);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_file_create");
 
-  // set RAW for now
-  PIDX_enable_raw_io(pidx_file);
+  int variable_count,time_step_count;
+  ret = PIDX_get_dims(pidx_file, global_size);
+  if (ret != PIDX_success)  terminate_with_error_msg("PIDX_set_dims");
   
+  ret = PIDX_get_variable_count(pidx_file, &variable_count);
+  if (ret != PIDX_success)  terminate_with_error_msg("PIDX_set_variable_count");
+  
+  if (variable_index >= variable_count) terminate_with_error_msg("Variable index more than variable count\n");
+  
+  // set RAW for now
+ // PIDX_enable_raw_io(pidx_file);
+
   ret = PIDX_set_current_time_step(pidx_file, timestate);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_set_current_time_step");
-  
+//   PIDX_debug_output(pidx_file);
   PIDX_variable variable;
-
+  
   ret = PIDX_set_current_variable_index(pidx_file, variable_index);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_set_current_variable_index");
 
@@ -284,24 +296,21 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   int bits_per_sample = 0;
   ret = PIDX_default_bits_per_datatype(variable->type_name, &bits_per_sample);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_default_bytes_per_datatype");
-
-  int vbits_per_sample = 0, v_per_sample = 0;
-  PIDX_values_per_datatype(variable->type_name, &v_per_sample, &vbits_per_sample);
   
   printf("reading %lldx%lldx%lld bps %d\n", local_size[0], local_size[1], local_size[2], bits_per_sample);
   
   void *data = malloc((bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * variable->values_per_sample);
   memset(data, 0, (bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * variable->values_per_sample);
-  
+
   ret = PIDX_variable_read_data_layout(variable, local_offset, local_size, data, PIDX_row_major);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_variable_read_data_layout");
   
   ret = PIDX_close(pidx_file);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_close");
-  
+
   ret = PIDX_close_access(pidx_access);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_close_access");
-  
+
   return (unsigned char*)data;
 
 }
