@@ -368,21 +368,37 @@ void avtIDXFileFormat::createBoxes(){
     
     upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
     
+    bool uintah_metadata = false;
+
     parser->SetFileName(upsfilename.c_str());
     if (!parser->Parse())
     {
-        std::cout<< "No .ups file found" << std::endl;
-        multibox = false;
+        std::cout<< "No .ups file found (Uintah only)" << std::endl;
+
+        parser->SetFileName(metadata_filename.c_str());
+        //std::cout << "trying metadata " << idxmetadata << std::endl;
+        if (!parser->Parse()){        
+            multibox = false;
+            std::cout << "Single-box mode" << std::endl;
+        }else{
+            multibox = true;
+        }       
         
-        std::cout << "Single-box mode" << std::endl;
     }else{
+        uintah_metadata = true;
         multibox = true;
         std::cout << "Multi-box mode" << std::endl;
     }
     
     if(multibox){
         vtkXMLDataElement *root = parser->GetRootElement();
-        vtkXMLDataElement *level = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("Level");
+        vtkXMLDataElement *level = NULL;
+
+        if(uintah_metadata)
+            level = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("Level");
+        else 
+            level = root->FindNestedElementWithName("level");
+
         int nboxes = level->GetNumberOfNestedElements();
         
         std::cout << "Found " << nboxes << " boxes" << std::endl;
@@ -392,11 +408,16 @@ void avtIDXFileFormat::createBoxes(){
             vtkXMLDataElement *xmlbox = level->GetNestedElement(i);
             String lower(xmlbox->FindNestedElementWithName("lower")->GetCharacterData());
             String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
-            String extra_cells(xmlbox->FindNestedElementWithName("extraCells")->GetCharacterData());
+            
+            String extra_cells = "[0 0 0]";
+
+            if(uintah_metadata)
+                extra_cells = String(xmlbox->FindNestedElementWithName("extraCells")->GetCharacterData());
+            
             String resolution(xmlbox->FindNestedElementWithName("resolution")->GetCharacterData());
             lower = trim(lower);
             upper = trim(upper);
-            extra_cells = trim(extra_cells);
+            
             resolution = trim(resolution);
           
             lower = lower.substr(1,lower.length()-2);
@@ -432,15 +453,15 @@ void avtIDXFileFormat::createBoxes(){
                 p1phy[k] = cfloat(p1s);
                 p2phy[k] = cfloat(p2s);
               
-                phy2log[k] = (p2phy[k]-p1phy[k])/resdata[k];
-                p2phy[k] += phy2log[k];
+                phy2log[k] = (p2phy[k]-p1phy[k])/(resdata[k]);
+                //p2phy[k] += phy2log[k];
               
                 if(boxes.size() == 0){
                   logOffset[k] = std::abs(p1phy[k]) / phy2log[k];
                 }
               
                 p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
-                p2log[k] = p1log[k] + resdata[k] +1;
+                p2log[k] = p1log[k] + resdata[k] - 1;// +1;
               
                 if (use_extracells)
                     p2log[k] += eCells[k];

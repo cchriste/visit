@@ -146,7 +146,7 @@ bool PIDXIO::openDataset(const String filename){
     tsteps.push_back(i);
   
   ntimesteps = tsteps.size();
-  printf("time size %d\n", tsteps.size());
+  printf("time size %u\n", tsteps.size());
  /*
   int res[2];
   ret = PIDX_get_resolution(pidx_file, res);
