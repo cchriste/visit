@@ -12,6 +12,7 @@
  **                                                **
  ****************************************************/
 
+#include <cstdarg>
 #include <string>
 #include "pidx_idx_io.h"
 #include "data_handle/PIDX_data_types.h"
@@ -24,6 +25,7 @@ static PIDX_point global_size, local_offset, local_size;
 static PIDX_file pidx_file;
 static PIDX_access pidx_access;
 static String input_filename;
+static MPI_Comm NEW_COMM_WORLD;
 //unsigned long long global_box_size[3] = {0, 0, 0};
 //unsigned long long local_box_size[3] = {0, 0, 0};
 
@@ -56,9 +58,10 @@ static void init_mpi()
     if (MPI_Init(NULL, NULL) != MPI_SUCCESS)
       terminate_with_error_msg("ERROR: MPI_Init error\n");
   }
-  if (MPI_Comm_size(MPI_COMM_WORLD, &process_count) != MPI_SUCCESS)
+  MPI_Comm_dup(MPI_COMM_WORLD, &NEW_COMM_WORLD);
+  if (MPI_Comm_size(NEW_COMM_WORLD, &process_count) != MPI_SUCCESS)
     terminate_with_error_msg("ERROR: MPI_Comm_size error\n");
-  if (MPI_Comm_rank(MPI_COMM_WORLD, &rank) != MPI_SUCCESS)
+  if (MPI_Comm_rank(NEW_COMM_WORLD, &rank) != MPI_SUCCESS)
     terminate_with_error_msg("ERROR: MPI_Comm_rank error\n");
 #endif
 }
@@ -169,14 +172,19 @@ bool PIDXIO::openDataset(const String filename){
     ret = PIDX_default_bits_per_datatype(variable[var]->type_name, &bits_per_sample);
     if (ret != PIDX_success)  terminate_with_error_msg("PIDX_default_bytes_per_datatype");
     
-    if(rank == 0){
-      printf("\t variable %s idx %d values per sample %d bits per sample %d \n", variable[var]->var_name, var, values_per_sample, bits_per_sample);
-    
+    if(rank == 0){    
       VisitIDXIO::Field my_field;
+
+      my_field.ncomponents = atoi((const char*)(variable[var]->type_name)); // trick to resolve type easilty and get ncomponents
+      char typetocheck[32];
+      strncpy(typetocheck, variable[var]->type_name, 32);
+      typetocheck[0] = '1';
+      my_field.type = convertType(typetocheck);
       
-      my_field.type = convertType(variable[var]->type_name);
-      my_field.isVector = values_per_sample > 1 ? true : false;
-      my_field.ncomponents = values_per_sample;
+      my_field.isVector = my_field.ncomponents > 1 ? true : false;
+      
+      printf("\t variable %s idx %d values per sample %d bits per sample %d ncomp %d\n", variable[var]->var_name, var, values_per_sample, bits_per_sample, my_field.ncomponents);
+
       char *name = new char[256];
       strcpy(name, variable[var]->var_name);
       my_field.name = name;
@@ -230,8 +238,8 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   
   curr_field = fields[variable_index];
   
-//  double* datatemp = new double[global_size[0]*global_size[0]*global_size[0]];
-//  return (unsigned char*)datatemp;
+  // double* datatemp = new double[global_size[0]*global_size[0]*global_size[0]];
+  // return (unsigned char*)datatemp;
   
 #ifdef PARALLEL
   local_size[0] = 32;

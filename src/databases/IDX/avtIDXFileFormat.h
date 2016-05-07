@@ -92,11 +92,12 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual void GetTimes(std::vector<double> &);
     
     virtual void           FreeUpResources(void);
-    //virtual void           ActivateTimestep();
+    virtual void           ActivateTimestep(int ts);
 
   protected:
 
     std::string                   dataset_filename;
+    std::string                   metadata_filename;
     int                           nprocs;
     int                           rank;
     int                           dim;         //2d or 3d

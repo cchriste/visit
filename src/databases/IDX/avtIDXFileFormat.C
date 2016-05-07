@@ -287,6 +287,11 @@ void avtIDXFileFormat::loadBalance(){
     
 }
 
+void avtIDXFileFormat::ActivateTimestep(int ts){
+
+    std::cout << rank <<" activate timesteps " << std::endl;
+}
+
 template <typename Type>
 Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncomponents, int dst_ncomponents, long long totsamples){
     int n=src_ncomponents;
@@ -461,48 +466,53 @@ void avtIDXFileFormat::createBoxes(){
 
 void avtIDXFileFormat::createTimeIndex(){
     vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
-    size_t found = dataset_filename.find_last_of("/\\");
-    String folder = dataset_filename.substr(0,found);
+    size_t folder_point = dataset_filename.find_last_of("/\\");
+    String folder = dataset_filename.substr(0,folder_point);
     
     String udafilename = folder + "/index.xml";
-    
+
+    //std::cout << "trying metadata " << udafilename << std::endl;
     parser->SetFileName(udafilename.c_str());
     if (!parser->Parse()){
-        std::cout<< "No index.xml file found" << udafilename << std::endl;
-        
-        std::vector<double> times = reader->getTimes();
-        
-        for(int i=0; i< times.size(); i++)
-            timeIndex.push_back(times.at(i));
-        
-        return;
-    }
-    else{
-        
-        std::cout << "Found index.xml file" << std::endl;
-
-        vtkXMLDataElement *root = parser->GetRootElement();
-        vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
-        int ntimesteps = level->GetNumberOfNestedElements();
-        
-        std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
-        
-        for(int i=0; i < ntimesteps; i++){
+        parser->SetFileName(metadata_filename.c_str());
+        //std::cout << "trying metadata " << idxmetadata << std::endl;
+        if (!parser->Parse()){
+            std::cout<< "No metadata XML file found" << udafilename << std::endl;
             
-            vtkXMLDataElement *xmltime = level->GetNestedElement(i);
-            String timestr(xmltime->GetAttribute("time"));
-        //    std::cout << "time " << timestr << std::endl;
+            std::vector<double> times = reader->getTimes();
             
-            double time = cdouble(timestr);
-          
-            timeIndex.push_back(time);
+            for(int i=0; i< times.size(); i++)
+                timeIndex.push_back(times.at(i));
+            
+            return;
         }
-      
-        std::cout << "loaded " << timeIndex.size() << " timesteps from index.xml"<< std::endl;
-        std::cout << reader->getNTimesteps() << " timesteps in the IDX file" << std::endl;
-        if(timeIndex.size() != reader->getNTimesteps())
-          std::cout << "ERROR: the timesteps in the IDX file and in the index.xml are not consistent!\n You will not be able to use the physical time"<< std::endl;
     }
+
+    std::cout << "Found metadata file" << std::endl;
+
+    vtkXMLDataElement *root = parser->GetRootElement();
+    vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
+    int ntimesteps = level->GetNumberOfNestedElements();
+    
+    std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
+    
+    for(int i=0; i < ntimesteps; i++){
+        
+        vtkXMLDataElement *xmltime = level->GetNestedElement(i);
+        String timestr(xmltime->GetAttribute("time"));
+    //    std::cout << "time " << timestr << std::endl;
+        
+        double time = cdouble(timestr);
+      
+        timeIndex.push_back(time);
+    }
+  
+    std::cout << "loaded " << timeIndex.size() << " timesteps"<< std::endl;
+    std::cout << reader->getNTimesteps() << " timesteps in the IDX file" << std::endl;
+    if(timeIndex.size() != reader->getNTimesteps())
+      std::cout << "ERROR: the timesteps in the IDX file and in the index.xml are not consistent!\n You will not be able to use the physical time"<< std::endl;
+
+    return;
     
 }
 
@@ -559,6 +569,13 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     }
     
     dataset_filename = filename;
+
+    size_t folder_point = dataset_filename.find_last_of("/\\");
+    size_t ext_point = dataset_filename.find_last_of(".");
+    String folder = dataset_filename.substr(0,folder_point);
+    String dataset_name = dataset_filename.substr(folder_point,ext_point-folder_point);
+    
+    metadata_filename = folder + dataset_name+"/"+dataset_name+".xml";
     
 //    std::cout <<"dataset loaded";
     dim = reader->getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
@@ -566,7 +583,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     createBoxes();
     createTimeIndex();
 #ifdef PARALLEL
-    pidx_decomposition(nprocs);
+    //pidx_decomposition(nprocs);
 #endif
 #ifdef USE_VISUS
     loadBalance();
@@ -695,7 +712,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     md->Add(mesh);
   
 #ifdef PARALLEL // only PIDX
-    //md->SetFormatCanDoDomainDecomposition(true);
+    md->SetFormatCanDoDomainDecomposition(true);
 #endif
   
     const std::vector<Field>& fields = reader->getFields();
@@ -1044,7 +1061,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT32){
-
+        printf("FLOAT32 creating array ncomp %d tuples %d \n", ncomponents, ntuples);
         vtkFloatArray *rv = vtkFloatArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -1054,8 +1071,11 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             
             delete data;
         }
-        else
+        else{
+            printf("before set array\n");
             rv->SetArray((float*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+            printf("after set array\n");
+        }
         
         if(reverse_endian){
             float *buff = (float *) rv->GetVoidPointer(0);
@@ -1066,7 +1086,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
                 buff[i] = tmp;
             }
         }
-    
+        printf("before return array\n");
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT64){
@@ -1126,7 +1146,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 vtkDataArray *
 avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 {
-    //std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
+    std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
     
     return queryToVtk(timestate, domain, varname);
     
