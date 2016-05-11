@@ -154,7 +154,8 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
 
     Box box = boxes[0];
     int global_size[3] = {box.p2[0]-box.p1[0]+1,box.p2[1]-box.p1[1]+1,box.p2[2]-box.p1[2]+1};
-    printf("global box size %d %d %d\n", global_size[0],global_size[1],global_size[2]);
+    printf("global box size %d %d %d avg_ext %d res_ext %d max_dir %d\n", global_size[0],global_size[1],global_size[2], avg_ext, res_ext, maxdir);
+
 /*
   // Static decomposition 
   int local_size[3] = {32,32,32};
@@ -177,8 +178,8 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
             local_size[d] = avg_ext;
             if(r == process_count-1)
                 local_size[d] += res_ext;
-        }
-        local_size[d] = global_size[d];
+        }else
+            local_size[d] = global_size[d];
     }
 
    
@@ -188,12 +189,18 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
       sub_div[2] = (global_size[2] / local_size[2]);
     
     int local_offset[3];
-   
+    for (int k = 0; k < dim; k++){
+        if(k!=maxdir)
+            local_offset[k] = 0;
+        else 
+            local_offset[k] = r*avg_ext;
+    }
+ /*  
     local_offset[2] = (r / (sub_div[0] * sub_div[1])) * local_size[2];
     int slice = r % (sub_div[0] * sub_div[1]);
     local_offset[1] = (slice / sub_div[0]) * local_size[1];
     local_offset[0] = (slice % sub_div[0]) * local_size[0];
-    
+*/ 
     Box newbox;
     newbox.p1[0] = local_offset[0];
     newbox.p1[1] = local_offset[1];
@@ -209,9 +216,9 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     Point3d log2phy;
      
     for (int k = 0; k < dim; k++){
-      log2phy[k] = ((physicalBox.p2[k] - physicalBox.p1[k])/sub_div[k])/(newbox.p2[k] - newbox.p1[k]);
+      log2phy[k] = (physicalBox.p2[k] - physicalBox.p1[k])/(global_size[k]);
     }
-      
+     
     Point3d phyOffset = physicalBox.p1;
 //      std::cout << "log2phy " <<log2phy << std::endl;
                 
@@ -219,7 +226,14 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
   
     for (int k = 0; k < dim; k++){
       newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
-      newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + log2phy[k];
+
+      if(k != maxdir)
+        newphybox.p2[k] = physicalBox.p2[k];//newbox.p2[k] * log2phy[k] + phyOffset[k] + log2phy[k];
+      else{
+        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + 2*log2phy[k];
+        if(r == process_count-1)
+           newphybox.p2[k] = physicalBox.p2[k];
+      }
     }       
 
     std::cout << "New phy box p1: " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
