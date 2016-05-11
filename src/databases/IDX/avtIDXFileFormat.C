@@ -150,21 +150,40 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     newbox.p1[0] = local_offset[0];
     newbox.p1[1] = local_offset[1];
     newbox.p1[2] = local_offset[2];
-    newbox.p2[0] = local_offset[0]+local_size[0]+1;
-    newbox.p2[1] = local_offset[1]+local_size[1]+1;
-    newbox.p2[2] = local_offset[2]+local_size[2]+1;
+    newbox.p2[0] = local_offset[0]+local_size[0]-1;
+    newbox.p2[1] = local_offset[1]+local_size[1]-1;
+    newbox.p2[2] = local_offset[2]+local_size[2]-1;
     
     printf("%d: created box %d %d %d size %d %d %d\n", r, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
     
     boxes.push_back(newbox);
     
-    phyboxes.push_back(newbox);
-   // physicalBox = physicalBox.getUnion((const Box)phyboxes.at(r));
+    Point3d log2phy;
+     
+    for (int k = 0; k < dim; k++){
+      log2phy[k] = ((physicalBox.p2[k] - physicalBox.p1[k])/sub_div[k])/(newbox.p2[k] - newbox.p1[k]);
+    }
+      
+    Point3d phyOffset = physicalBox.p1;
+//      std::cout << "log2phy " <<log2phy << std::endl;
+                
+    Box newphybox;
+  
+    for (int k = 0; k < dim; k++){
+      newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
+      newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + 2*log2phy[k];
+    }       
+
+    std::cout << "New phy box p1: " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
+
+    phyboxes.push_back(newphybox);
+    //physicalBox = physicalBox.getUnion((const Box)phyboxes.at(r));
     
   }
 
-  physicalBox = reader->getLogicBox();
-  
+  /*if(process_count == 1)
+    physicalBox = reader->getLogicBox();
+  */
 }
 
 void avtIDXFileFormat::loadBalance(){
@@ -285,11 +304,6 @@ void avtIDXFileFormat::loadBalance(){
     }
     std::cout << "-------------------------" << std::endl;
     
-}
-
-void avtIDXFileFormat::ActivateTimestep(int ts){
-
-    std::cout << rank <<" activate timesteps " << std::endl;
 }
 
 template <typename Type>
@@ -461,7 +475,7 @@ void avtIDXFileFormat::createBoxes(){
                 }
               
                 p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
-                p2log[k] = p1log[k] + resdata[k] - 1;// +1;
+                p2log[k] = p1log[k] + resdata[k] - 1;
               
                 if (use_extracells)
                     p2log[k] += eCells[k];
@@ -544,6 +558,7 @@ void avtIDXFileFormat::createTimeIndex(){
 //  Creation:   Mon Dec 10 15:06:44 PST 2012
 //
 // ****************************************************************************
+bool avtIDXFileFormat::data_query = false;
 
 avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* attrs)
 : avtMTMDFileFormat(filename)
@@ -602,10 +617,13 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     dim = reader->getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
   
     createBoxes();
+
     createTimeIndex();
 #ifdef PARALLEL
-    //pidx_decomposition(nprocs);
+    pidx_decomposition(nprocs);
 #endif
+
+
 #ifdef USE_VISUS
     loadBalance();
 #endif
@@ -733,7 +751,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     md->Add(mesh);
   
 #ifdef PARALLEL // only PIDX
-    md->SetFormatCanDoDomainDecomposition(true);
+   // md->SetFormatCanDoDomainDecomposition(true);
 #endif
   
     const std::vector<Field>& fields = reader->getFields();
@@ -743,12 +761,14 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     {
         const Field& field = fields[i];
         
-        if (!field.isVector)
+        if (!field.isVector){
             md->Add(new avtScalarMetaData(field.name,mesh->name,AVT_ZONECENT));
+        }
         else
             md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
     }
-        
+ 
+ // #ifdef USE_VISUS       
     avtRectilinearDomainBoundaries *rdb =
     new avtRectilinearDomainBoundaries(true);
     rdb->SetNumDomains(phyboxes.size());
@@ -765,11 +785,30 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
         
         rdb->SetIndicesForRectGrid(i, extents);
     }
+// #else
+//     avtRectilinearDomainBoundaries *rdb =
+//     new avtRectilinearDomainBoundaries(true);
+//     rdb->SetNumDomains(1);
+    
+//     int extents[6];
+//     extents[0] = physicalBox.p1.x;
+//     extents[1] = physicalBox.p2.x;
+//     extents[2] = physicalBox.p1.y;
+//     extents[3] = physicalBox.p2.y;
+//     extents[4] = physicalBox.p1.z;
+//     extents[5] = physicalBox.p2.z;
+    
+//     rdb->SetIndicesForRectGrid(0, extents);
+    
+// #endif  
+
     rdb->CalculateBoundaries();
   
     void_ref_ptr vr = void_ref_ptr(rdb,
                                    avtStructuredDomainBoundaries::Destruct);
     cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
+
+    printf("%d: end meta\n", rank);
 
     return;
 }
@@ -801,7 +840,7 @@ vtkDataSet *
 avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 {
     std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
-    
+  
     Box slice_box;
   
     int* my_bounds = NULL;
@@ -821,9 +860,9 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     
     int my_dims[3];
     
-    my_dims[0] = my_bounds[0]+1;
-    my_dims[1] = my_bounds[1]+1;
-    my_dims[2] = my_bounds[2]+1;
+    my_dims[0] = my_bounds[0] +1;
+    my_dims[1] = my_bounds[1] +1;
+    my_dims[2] = my_bounds[2] +1;
   
     std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
     
@@ -836,7 +875,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     float steps[3];
     
     for (int i = 0; i < dim; i++){
-        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/my_dims[i];
+        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_dims[i]);
     }
     
     for (int i = 0; i < my_dims[0]; i++)
@@ -857,7 +896,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       arrayZ[i] = slice_box.p1.z + i*steps[2];
     rgrid->SetZCoordinates(coordsZ);
   
-  printf("end mesh\n");
+    printf("end mesh\n");
     return rgrid;
     
 }
@@ -866,15 +905,20 @@ void
 avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 {
 //  if(cycles.size() > 0) return;
-  
+  printf("%d: entering getcycles\n", rank);
   for(int i = 0; i < reader->getNTimesteps(); ++i)
       cycles.push_back(i);
+
+  printf("%d: exiting getcycles\n", rank);
 }
 
 void
 avtIDXFileFormat::GetTimes(std::vector<double> &times)
 {
+    printf("%d: entering gettimes\n", rank);
   times.swap(timeIndex);
+
+  printf("%d: exiting getcycles\n", rank);
 
 //    std::map<int, double> m;
 //    std::vector<double> v;
@@ -889,7 +933,6 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
 vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
     
     const Box& my_box = boxes.at(domain);
-    
     unsigned char* data = reader->getData(my_box, timestate, varname);
     
     if(data == NULL){
@@ -903,11 +946,13 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     int* my_bounds = boxes_bounds.at(domain);
     int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
     long long ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
-    
+
     int ncomponents = 1;
     
     bool isVector = field.isVector;
     
+   // printf("is vector? %d\n", isVector);
+
     if(isVector)
         ncomponents = 3; // Visit wants 3 components vectors
     
@@ -915,8 +960,6 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
   
     // do not reverse endianess if data is compressed
     reverse_endian = reverse_endian * !reader->isCompressed();
-  
-  printf("before convert to vtk\n");
   
     if(type == VisitIDXIO::IDX_UINT8){
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
@@ -1082,7 +1125,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT32){
-        printf("FLOAT32 creating array ncomp %d tuples %d \n", ncomponents, ntuples);
+      //  printf("FLOAT32 creating array ncomp %d tuples %d \n", ncomponents, ntuples);
         vtkFloatArray *rv = vtkFloatArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -1093,9 +1136,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             delete data;
         }
         else{
-            printf("before set array\n");
             rv->SetArray((float*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
-            printf("after set array\n");
         }
         
         if(reverse_endian){
@@ -1107,11 +1148,11 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
                 buff[i] = tmp;
             }
         }
-        printf("before return array\n");
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT64){
-      printf("DOUBLE creating array ncomp %d \n", ncomponents);
+        
+      //printf("DOUBLE creating array ncomp %d \n", ncomponents);
         vtkDoubleArray *rv = vtkDoubleArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
@@ -1123,7 +1164,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             delete data;
         }
         else{
-          printf("DOUBLE converting %d \n", ncomponents*ntuples);
+         // printf("DOUBLE converting %d \n", ncomponents*ntuples);
             rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
         }
       
@@ -1136,8 +1177,11 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
                 buff[i] = tmp;
             }
         }
-    
+       
         return rv;
+    }else{
+
+        fprintf(stderr, "Type %s not found\n", type);
     }
   
   return NULL;
@@ -1164,14 +1208,46 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 //
 // ****************************************************************************
 
+//vtkDataArray * avtIDXFileFormat::datatoreturn = NULL;
+//const char *avtIDXFileFormat::curr_varname = NULL;
+//int avtIDXFileFormat::activations = 0;
+
 vtkDataArray *
 avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 {
     std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
-    
+  //  curr_varname = varname;
+  //  data_query = true;
+   // ActivateTimestep(timestate);
+ //   data_query = false;
+
+  /*  if(datatoreturn == NULL)
+        printf("DATA NULL!!!\n");
+*/
     return queryToVtk(timestate, domain, varname);
     
 }
+
+void avtIDXFileFormat::ActivateTimestep(int ts){
+/*
+    std::cout << rank <<" activate timesteps, activations n: "<< activations << std::endl;
+   // if((rank == 0 && activations == 1 )|| (rank != 0 && activations == 0)){
+         printf("doing a query %d \n",rank );
+        datatoreturn = queryToVtk(ts, rank, curr_varname);
+   // }
+
+    activations++;
+*/
+}
+
+// vtkDataArray *
+// avtIDXFileFormat::GetVar(int timestate, const char *varname)
+// {
+//     std::cout<< rank << ": start getvar NEW!!! " << varname;
+    
+//     return NULL;
+    
+// }
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetVectorVar

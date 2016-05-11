@@ -142,6 +142,9 @@ bool PIDXIO::openDataset(const String filename){
   ret = PIDX_get_last_tstep(pidx_file, &last_tstep);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_get_last_tstep");
   
+  MPI_Bcast(&first_tstep, 1, MPI_INT, 0, NEW_COMM_WORLD);
+  MPI_Bcast(&last_tstep, 1, MPI_INT, 0, NEW_COMM_WORLD);
+
   for(int i=first_tstep; i <= last_tstep; i++)
     tsteps.push_back(i);
   
@@ -172,7 +175,7 @@ bool PIDXIO::openDataset(const String filename){
     ret = PIDX_default_bits_per_datatype(variable[var]->type_name, &bits_per_sample);
     if (ret != PIDX_success)  terminate_with_error_msg("PIDX_default_bytes_per_datatype");
     
-    if(rank == 0){    
+  //  if(rank == 0){    
       VisitIDXIO::Field my_field;
 
       my_field.ncomponents = atoi((const char*)(variable[var]->type_name)); // trick to resolve type easilty and get ncomponents
@@ -194,7 +197,7 @@ bool PIDXIO::openDataset(const String filename){
       ret = PIDX_read_next_variable(pidx_file, variable[var]);
       if (ret != PIDX_success)  terminate_with_error_msg("PIDX_read_next_variable");
       
-    }
+ //   }
   
   }
   
@@ -220,6 +223,11 @@ bool PIDXIO::openDataset(const String filename){
 unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, const char* varname){
   printf("-----PIDXIO getData %d \n", rank);
 
+// fake data
+  // void *datatemp = malloc(sizeof(double) * global_size[0] * global_size[1] * global_size[2]);
+  // memset(datatemp, 10, sizeof(double) * global_size[0] * global_size[1] * global_size[2]);
+  // return (unsigned char*)datatemp;
+  
   int ret = 0;
   
   int variable_index = -1;
@@ -237,10 +245,7 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   printf("var index %d\n", variable_index);
   
   curr_field = fields[variable_index];
-  
-  // double* datatemp = new double[global_size[0]*global_size[0]*global_size[0]];
-  // return (unsigned char*)datatemp;
-  
+/*  
 #ifdef PARALLEL
   local_size[0] = 32;
   local_size[1] = 32;
@@ -258,12 +263,12 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   local_offset[1] = (slice / sub_div[0]) * local_size[1];
   local_offset[0] = (slice % sub_div[0]) * local_size[0];
   
-#else
+#else*/
   for(int i=0; i< dims; i++){
       local_size[i] = box.p2[i] - box.p1[i] + 1;
       local_offset[i] = box.p1[i];
   }
-#endif
+//#endif
 
   local_size[3] = 1;
   local_size[4] = 1;

@@ -86,6 +86,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
 
     virtual vtkDataSet    *GetMesh(int, int, const char *);
     virtual vtkDataArray  *GetVar(int, int, const char *);
+    //virtual vtkDataArray  *GetVar(int timestate, const char *varname);
     virtual vtkDataArray  *GetVectorVar(int, int, const char *);
 
     virtual void GetCycles(std::vector<int> &);
@@ -94,6 +95,10 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual void           FreeUpResources(void);
     virtual void           ActivateTimestep(int ts);
 
+    static static bool data_query;
+    static static int activations;
+    static vtkDataArray * datatoreturn;
+    static const char *curr_varname;
   protected:
 
     std::string                   dataset_filename;
@@ -110,7 +115,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool use_extracells;
   
   private:
-    
+
     IDX_IO* reader;
     bool reverse_endian;
     
