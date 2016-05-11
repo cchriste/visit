@@ -123,21 +123,69 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
   
   if (process_count == 1) return;
   
-  // Single box
-  Box box = boxes[0];
+    int maxdir = 0; // largest extent axis
+    int maxextent = 0;
+    int maxbox = 0;
 
-  int global_size[3] = {box.p2[0]-box.p1[0]+1,box.p2[1]-box.p1[1]+1,box.p2[2]-box.p1[2]+1};
+    for(int i=0; i < boxes.size(); i++){
+        Box& box = boxes.at(i);
+        
+        for(int j=0; j < 3; j++){
+            int extent = box.p2[j]-box.p1[j];
+            if(extent > maxextent){
+                maxdir = j;
+                maxextent = extent;
+                maxbox = i;
+            }
+        }
+    }
+
+    int total_extent = 0;
+    int avg_ext = 0;
+    
+    for(int i=0; i < boxes.size(); i++){
+        Box& box = boxes.at(i);
+        
+        total_extent += box.p2[maxdir];
+    }
+   
+    avg_ext = total_extent / nprocs;
+    int res_ext = (total_extent % nprocs);
+
+    Box box = boxes[0];
+    int global_size[3] = {box.p2[0]-box.p1[0]+1,box.p2[1]-box.p1[1]+1,box.p2[2]-box.p1[2]+1};
+    printf("global box size %d %d %d\n", global_size[0],global_size[1],global_size[2]);
+/*
+  // Static decomposition 
   int local_size[3] = {32,32,32};
   printf("global box size %d %d %d\n", global_size[0],global_size[1],global_size[2]);
   int sub_div[3];
   sub_div[0] = (global_size[0] / local_size[0]);
   sub_div[1] = (global_size[1] / local_size[1]);
   sub_div[2] = (global_size[2] / local_size[2]);
-  
+*/
+
   boxes.clear();
   phyboxes.clear();
   
   for(int r=0; r < process_count; r++){
+    
+    int local_size[3];
+
+    for(int d=0; d < dim; d++){
+        if(d == maxdir){
+            local_size[d] = avg_ext;
+            if(r == process_count-1)
+                local_size[d] += res_ext;
+        }
+        local_size[d] = global_size[d];
+    }
+
+   
+      int sub_div[3];
+      sub_div[0] = (global_size[0] / local_size[0]);
+      sub_div[1] = (global_size[1] / local_size[1]);
+      sub_div[2] = (global_size[2] / local_size[2]);
     
     int local_offset[3];
    
@@ -171,7 +219,7 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
   
     for (int k = 0; k < dim; k++){
       newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
-      newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + 2*log2phy[k];
+      newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + log2phy[k];
     }       
 
     std::cout << "New phy box p1: " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
