@@ -625,20 +625,30 @@ bool avtIDXFileFormat::data_query = false;
 avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* attrs)
 : avtMTMDFileFormat(filename)
 {
+
     for (int i=0; attrs!=0 && i<attrs->GetNumberOfOptions(); ++i) {
+        printf("reading option %d %s\n",i, attrs->GetName(i).c_str() );
         if (attrs->GetName(i) == "Big Endian") {
             reverse_endian = attrs->GetBool("Big Endian");
         }
         else if (attrs->GetName(i) == "Use extra cells") {
-            use_extracells = attrs->GetBool("Use extra cells");
+            use_extracells = attrs->GetBool("Use RAW format");
+        }else if (attrs->GetName(i) == "Use RAW format") {
+            use_raw = attrs->GetBool("Use RAW format");
         }
     }
     
+    printf("AFTER OPTIONS <<<<<<<< \n");
     if(use_extracells)
         std::cout << "Using extra cells" << std::endl;
     else
         std::cout << "Not using extra cells" << std::endl;
-        
+    
+    if(use_raw)
+        std::cout << "Using RAW format" << std::endl;
+    else
+        std::cout << "Not using RAW format" << std::endl;
+
     if(reverse_endian)
         std::cout << "Using Big Endian";
     else
@@ -657,7 +667,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 #ifdef USE_VISUS
     reader = new VisusIDXIO(); // USE VISUS
 #else
-    reader = new PIDXIO();     // USE PIDX
+    reader = new PIDXIO(use_raw);     // USE PIDX
 #endif
   
     if (!reader->openDataset(filename))

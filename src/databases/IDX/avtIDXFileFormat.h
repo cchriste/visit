@@ -113,6 +113,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     std::vector<int*>             boxes_bounds;
     bool multibox;
     bool use_extracells;
+    bool use_raw;
   
   private:
 
