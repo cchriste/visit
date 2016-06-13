@@ -95,8 +95,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual void           FreeUpResources(void);
     virtual void           ActivateTimestep(int ts);
 
-    static static bool data_query;
-    static static int activations;
+    static bool data_query;
+    static int activations;
     static vtkDataArray * datatoreturn;
     static const char *curr_varname;
   protected:
