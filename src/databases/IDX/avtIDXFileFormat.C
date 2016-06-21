@@ -97,6 +97,8 @@
 
 typedef std::string String;
 
+bool debug_format = true;
+
 using namespace VisitIDXIO;
 
 int        cint   (String s) {int    value;std::istringstream iss(s);iss>>value;return value;}
@@ -154,7 +156,8 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
 
     Box box = boxes[0];
     int global_size[3] = {box.p2[0]-box.p1[0]+1,box.p2[1]-box.p1[1]+1,box.p2[2]-box.p1[2]+1};
-    printf("global box size %d %d %d avg_ext %d res_ext %d max_dir %d\n", global_size[0],global_size[1],global_size[2], avg_ext, res_ext, maxdir);
+    if(debug_format)
+      printf("global box size %d %d %d avg_ext %d res_ext %d max_dir %d\n", global_size[0],global_size[1],global_size[2], avg_ext, res_ext, maxdir);
 
 /*
   // Static decomposition 
@@ -209,7 +212,8 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     newbox.p2[1] = local_offset[1]+local_size[1]-1;
     newbox.p2[2] = local_offset[2]+local_size[2]-1;
     
-    printf("%d: created box %d %d %d size %d %d %d\n", r, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
+    if(debug_format)
+      printf("%d: created box %d %d %d size %d %d %d\n", r, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
     
     boxes.push_back(newbox);
     
@@ -627,7 +631,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 {
 
     for (int i=0; attrs!=0 && i<attrs->GetNumberOfOptions(); ++i) {
-        printf("reading option %d %s\n",i, attrs->GetName(i).c_str() );
+       // printf("reading option %d %s\n",i, attrs->GetName(i).c_str() );
         if (attrs->GetName(i) == "Big Endian") {
             reverse_endian = attrs->GetBool("Big Endian");
         }
@@ -638,7 +642,6 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         }
     }
     
-    printf("AFTER OPTIONS <<<<<<<< \n");
     if(use_extracells)
         std::cout << "Using extra cells" << std::endl;
     else
@@ -880,7 +883,8 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
                                    avtStructuredDomainBoundaries::Destruct);
     cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
 
-    printf("%d: end meta\n", rank);
+    if(debug_format)
+      printf("%d: end meta\n", rank);
 
     return;
 }
@@ -967,8 +971,9 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     for (int i = 0; i < my_dims[2]; i++)
       arrayZ[i] = slice_box.p1.z + i*steps[2];
     rgrid->SetZCoordinates(coordsZ);
-  
-    printf("end mesh\n");
+    
+    if(debug_format)
+      printf("end mesh\n");
     return rgrid;
     
 }
@@ -977,20 +982,24 @@ void
 avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 {
 //  if(cycles.size() > 0) return;
-  printf("%d: entering getcycles\n", rank);
+  if(debug_format)
+    printf("%d: entering getcycles\n", rank);
   for(int i = 0; i < reader->getNTimesteps(); ++i)
       cycles.push_back(i);
 
-  printf("%d: exiting getcycles\n", rank);
+  if(debug_format)
+    printf("%d: exiting getcycles\n", rank);
 }
 
 void
 avtIDXFileFormat::GetTimes(std::vector<double> &times)
 {
+  if(debug_format)
     printf("%d: entering gettimes\n", rank);
   times.swap(timeIndex);
 
-  printf("%d: exiting getcycles\n", rank);
+  if(debug_format)
+    printf("%d: exiting getcycles\n", rank);
 
 //    std::map<int, double> m;
 //    std::vector<double> v;
@@ -1287,7 +1296,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 vtkDataArray *
 avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 {
-    std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
+  //  std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
   //  curr_varname = varname;
   //  data_query = true;
    // ActivateTimestep(timestate);
@@ -1301,25 +1310,8 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 }
 
 void avtIDXFileFormat::ActivateTimestep(int ts){
-/*
-    std::cout << rank <<" activate timesteps, activations n: "<< activations << std::endl;
-   // if((rank == 0 && activations == 1 )|| (rank != 0 && activations == 0)){
-         printf("doing a query %d \n",rank );
-        datatoreturn = queryToVtk(ts, rank, curr_varname);
-   // }
 
-    activations++;
-*/
 }
-
-// vtkDataArray *
-// avtIDXFileFormat::GetVar(int timestate, const char *varname)
-// {
-//     std::cout<< rank << ": start getvar NEW!!! " << varname;
-    
-//     return NULL;
-    
-// }
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetVectorVar
