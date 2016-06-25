@@ -234,7 +234,7 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
       if(k != maxdir)
         newphybox.p2[k] = physicalBox.p2[k];//newbox.p2[k] * log2phy[k] + phyOffset[k] + log2phy[k];
       else{
-        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + 2*log2phy[k];
+        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + 4*log2phy[k];
         if(r == process_count-1)
            newphybox.p2[k] = physicalBox.p2[k];
       }
@@ -551,7 +551,10 @@ void avtIDXFileFormat::createBoxes(){
             std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
             
             phyboxes.push_back(Box(p1phy, p2phy));
-            physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
+            if(phyboxes.size()==1)
+	      physicalBox = phyboxes[0];
+	    else
+	      physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
             boxes.push_back(Box(p1log,p2log));
             
         }
