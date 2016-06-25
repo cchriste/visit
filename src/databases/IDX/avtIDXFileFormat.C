@@ -593,6 +593,7 @@ void avtIDXFileFormat::createTimeIndex(){
 
     vtkXMLDataElement *root = parser->GetRootElement();
     vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
+    if(level != NULL){
     int ntimesteps = level->GetNumberOfNestedElements();
     
     std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
@@ -606,6 +607,17 @@ void avtIDXFileFormat::createTimeIndex(){
         double time = cdouble(timestr);
       
         timeIndex.push_back(time);
+    }
+    }
+    else{
+      fprintf(stderr, "No timesteps field found in index.xml, no physical time available\n");
+    
+      std::vector<double> times = reader->getTimes();
+            
+      for(int i=0; i< times.size(); i++)
+          timeIndex.push_back(times.at(i));
+            
+           
     }
   
     std::cout << "loaded " << timeIndex.size() << " timesteps"<< std::endl;
