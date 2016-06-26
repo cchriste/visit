@@ -130,6 +130,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
   
     
     std::vector<double> timeIndex;
+    std::vector<int> logTimeIndex;
     
     inline int
     int16_Reverse_Endian(short val, unsigned char *output)
