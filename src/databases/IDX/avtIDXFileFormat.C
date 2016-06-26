@@ -240,7 +240,8 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
       }
     }       
 
-    std::cout << "New phy box p1: " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
+    if(debug_format)
+        std::cout << "New phy box p1: " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
 
     phyboxes.push_back(newphybox);
     //physicalBox = physicalBox.getUnion((const Box)phyboxes.at(r));
@@ -340,7 +341,8 @@ void avtIDXFileFormat::loadBalance(){
           
             newphyboxes.push_back(newphybox);
             
-            std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
+            if(debug_format)
+                std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
           
             part_p1 += loc_avg_ext;
             part_p2 += loc_avg_ext;
@@ -353,7 +355,8 @@ void avtIDXFileFormat::loadBalance(){
           
             Box& phyboxres = newphyboxes.at(newphyboxes.size()-1);
             phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
-          
+            
+            if(debug_format)         
               std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
         }
 
@@ -362,14 +365,15 @@ void avtIDXFileFormat::loadBalance(){
     boxes.swap(newboxes);
     phyboxes.swap(newphyboxes);
   
-    std::cout << "Total number of boxes/domains: " << boxes.size() << std::endl;
-    std::cout << "----------Boxes----------" << std::endl;
-    for(int i=0; i< boxes.size(); i++){
-        std::cout << i << " = "<< boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
-          << phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl;
+    if(debug_format){
+        std::cout << "Total number of boxes/domains: " << boxes.size() << std::endl;
+        std::cout << "----------Boxes----------" << std::endl;
+        for(int i=0; i< boxes.size(); i++){
+            std::cout << i << " = "<< boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
+              << phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl;
+        }
+        std::cout << "-------------------------" << std::endl;
     }
-    std::cout << "-------------------------" << std::endl;
-    
 }
 
 template <typename Type>
@@ -378,10 +382,7 @@ Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncom
     int m=dst_ncomponents;
     int ncomponents=std::min(m,n);
     
-    std::cout << "n " << n << " m " << m << " ncomp " << ncomponents;
-    
     Type* dst = (Type*)calloc(totsamples*m, sizeof(Type));
-    std::cout << "new vector size " << totsamples << std::endl;
     
     //for each component...
     for (int C=0;C<ncomponents;C++)
@@ -397,7 +398,7 @@ Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncom
         
     }
     
-    std::cout << "data converted " << std::endl;
+    //std::cout << "data converted " << std::endl;
     
     return dst;
 }
@@ -680,7 +681,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     nprocs = 1;
 #endif
     
-    std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
+    //std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
   
 #ifdef USE_VISUS
     reader = new VisusIDXIO(); // USE VISUS
@@ -732,7 +733,8 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 
 avtIDXFileFormat::~avtIDXFileFormat()
 {
-    std::cout<<"(avtIDXFileFormat destructor)" << std::endl;
+    if(debug_format)
+        std::cout<<"(avtIDXFileFormat destructor)" << std::endl;
 
     for(int i=0; i < boxes_bounds.size(); i++)
         if(boxes_bounds.at(i) != NULL)
@@ -805,7 +807,8 @@ void
 avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     int timestate) 
 {
-    std::cout << rank << ": Meta data" << std::endl;
+    if(debug_format)
+        std::cout << rank << ": Meta data" << std::endl;
 
     avtMeshMetaData *mesh = new avtMeshMetaData;
     mesh->name = "Mesh";
@@ -930,7 +933,8 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
 vtkDataSet *
 avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 {
-    std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
+    if(debug_format)
+        std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
   
     Box slice_box;
   
