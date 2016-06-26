@@ -98,6 +98,7 @@
 typedef std::string String;
 
 bool debug_format = true;
+bool debug_input = true;
 
 using namespace VisitIDXIO;
 
@@ -314,8 +315,8 @@ void avtIDXFileFormat::loadBalance(){
 
         Point3d log2phy;
         Box& phybox = phyboxes.at(i);
-      
-        std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
+        if(debug_format)
+            std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
       
         for (int k = 0; k < dim; k++){
           log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
@@ -435,14 +436,16 @@ void avtIDXFileFormat::createBoxes(){
             String name(ent->d_name);
             if(name.substr(name.find_last_of(".") + 1) == "ups"){
                 upsfilename = name;
-                std::cout<< ".ups file found " << upsfilename << std::endl;
+                if(debug_input)
+                    std::cout<< ".ups file found " << upsfilename << std::endl;
                 upsfilename = folder + "/" +upsfilename;
                 break;
             }
         }
         closedir (dir);
     } else {
-        std::cout<< "No .ups file found" << std::endl;
+        if(debug_input)
+            std::cout<< "No .ups file found" << std::endl;
     }
     
     vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
@@ -454,13 +457,15 @@ void avtIDXFileFormat::createBoxes(){
     parser->SetFileName(upsfilename.c_str());
     if (!parser->Parse())
     {
-        std::cout<< "No .ups file found (Uintah only)" << std::endl;
+        if(debug_input)
+            std::cout<< "No .ups file found (Uintah only)" << std::endl;
 
         parser->SetFileName(metadata_filename.c_str());
         //std::cout << "trying metadata " << idxmetadata << std::endl;
         if (!parser->Parse()){        
             multibox = false;
-            std::cout << "Single-box mode" << std::endl;
+            if(debug_input)
+             std::cout << "Single-box mode" << std::endl;
         }else{
             multibox = true;
         }       
@@ -468,7 +473,8 @@ void avtIDXFileFormat::createBoxes(){
     }else{
         uintah_metadata = true;
         multibox = true;
-        std::cout << "Multi-box mode" << std::endl;
+        if(debug_input)
+            std::cout << "Multi-box mode" << std::endl;
     }
     
     if(multibox){
@@ -482,7 +488,8 @@ void avtIDXFileFormat::createBoxes(){
 
         int nboxes = level->GetNumberOfNestedElements();
         
-        std::cout << "Found " << nboxes << " boxes" << std::endl;
+        if(debug_input)
+            std::cout << "Found " << nboxes << " boxes" << std::endl;
         
         for(int i=0; i < nboxes; i++){
             
@@ -508,7 +515,8 @@ void avtIDXFileFormat::createBoxes(){
             extra_cells = extra_cells.substr(1,extra_cells.length()-2);
             resolution = resolution.substr(1,resolution.length()-2);
             
-            std::cout<< "lower " << lower << " upper " << upper << " resolution " << resolution << std::endl;
+            if(debug_input)
+                std::cout<< "lower " << lower << " upper " << upper << " resolution " << resolution << std::endl;
           
             Point3d p1phy(0,0,0), p1log(0,0,0);
             Point3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
@@ -547,10 +555,11 @@ void avtIDXFileFormat::createBoxes(){
                 if (use_extracells)
                     p2log[k] += eCells[k];
             }
-        
-            std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
-            std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
-            
+            if(debug_input){
+                std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
+                std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
+            }
+
             phyboxes.push_back(Box(p1phy, p2phy));
             if(phyboxes.size()==1)
 	      physicalBox = phyboxes[0];
@@ -570,6 +579,9 @@ void avtIDXFileFormat::createBoxes(){
 }
 
 void avtIDXFileFormat::createTimeIndex(){
+    timeIndex.clear();
+    logTimeIndex.clear();
+
     vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
     size_t folder_point = dataset_filename.find_last_of("/\\");
     String folder = dataset_filename.substr(0,folder_point);
@@ -582,12 +594,14 @@ void avtIDXFileFormat::createTimeIndex(){
         parser->SetFileName(metadata_filename.c_str());
         //std::cout << "trying metadata " << idxmetadata << std::endl;
         if (!parser->Parse()){
-            std::cout<< "No metadata XML file found" << udafilename << std::endl;
+            std::cout<< "No metadata XML file found " << udafilename << std::endl;
             
             std::vector<double> times = reader->getTimes();
             
-            for(int i=0; i< times.size(); i++)
+            for(int i=0; i< times.size(); i++){
                 timeIndex.push_back(times.at(i));
+                logTimeIndex.push_back(times.at(i));
+            }
             
             return;
         }
@@ -600,15 +614,22 @@ void avtIDXFileFormat::createTimeIndex(){
     if(level != NULL){
     int ntimesteps = level->GetNumberOfNestedElements();
     
-    std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
+    if(debug_format)
+        std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
     
     for(int i=0; i < ntimesteps; i++){
         
         vtkXMLDataElement *xmltime = level->GetNestedElement(i);
         String timestr(xmltime->GetAttribute("time"));
-    //    std::cout << "time " << timestr << std::endl;
+        String logtimestr(xmltime->GetCharacterData());
+
+        if(debug_input)
+            std::cout << "time " << timestr << " index " << logtimestr << std::endl;
         
         double time = cdouble(timestr);
+        int logtime = cint(logtimestr);
+
+        logTimeIndex.push_back(logtime);
       
         timeIndex.push_back(time);
     }
@@ -618,16 +639,19 @@ void avtIDXFileFormat::createTimeIndex(){
     
       std::vector<double> times = reader->getTimes();
             
-      for(int i=0; i< times.size(); i++)
+      for(int i=0; i< times.size(); i++){
           timeIndex.push_back(times.at(i));
-            
+          logTimeIndex.push_back(times.at(i));            
+      }
            
     }
   
-    std::cout << "loaded " << timeIndex.size() << " timesteps"<< std::endl;
-    std::cout << reader->getNTimesteps() << " timesteps in the IDX file" << std::endl;
-    if(timeIndex.size() != reader->getNTimesteps())
-      std::cout << "ERROR: the timesteps in the IDX file and in the index.xml are not consistent!\n You will not be able to use the physical time"<< std::endl;
+    if(debug_input){
+        std::cout << "loaded " << timeIndex.size() << " timesteps"<< std::endl;
+        std::cout << reader->getNTimesteps() << " in the timesteps range of the IDX file" << std::endl;
+    }
+    //if(timeIndex.size() != reader->getNTimesteps())
+    //  std::cout << "ERROR: the timesteps in the IDX file and in the index.xml are not consistent!\n You will not be able to use the physical time"<< std::endl;
 
     return;
     
@@ -658,6 +682,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         }
     }
     
+    std::cout << "--------------------------" << std::endl;
     if(use_extracells)
         std::cout << "Using extra cells" << std::endl;
     else
@@ -669,10 +694,11 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         std::cout << "Not using RAW format" << std::endl;
 
     if(reverse_endian)
-        std::cout << "Using Big Endian";
+        std::cout << "Using Big Endian" << std::endl;
     else
-        std::cout << "Using Little Endian";
-    
+        std::cout << "Using Little Endian" << std::endl;
+    std::cout << "--------------------------" << std::endl;
+
 #ifdef PARALLEL
     rank = PAR_Rank();
     nprocs = PAR_Size();
@@ -759,7 +785,11 @@ avtIDXFileFormat::~avtIDXFileFormat()
 int
 avtIDXFileFormat::GetNTimesteps(void)
 {
-    return reader->getNTimesteps();
+    if(timeIndex.size() == 0)
+        createTimeIndex();
+
+    //printf("Ntimesteps %d \n", timeIndex.size());
+    return timeIndex.size();// reader->getNTimesteps();
 }
 
 
@@ -780,7 +810,8 @@ avtIDXFileFormat::GetNTimesteps(void)
 void
 avtIDXFileFormat::FreeUpResources(void)
 {
-    std::cout<<"avtIDXFileFormat::FreeUpResources..." << std::endl;
+    if(debug_format)
+        std::cout<<"avtIDXFileFormat::FreeUpResources..." << std::endl;
     //<ctc> todo... something (is destructor also called?)
 }
 
@@ -959,7 +990,8 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     my_dims[1] = my_bounds[1] +1;
     my_dims[2] = my_bounds[2] +1;
   
-    std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
+    if(debug_format)
+        std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
     
     rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
     
@@ -1000,25 +1032,24 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 void
 avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 {
-//  if(cycles.size() > 0) return;
-  if(debug_format)
-    printf("%d: entering getcycles\n", rank);
+  // if(debug_format)
+  //   printf("%d: entering getcycles\n", rank);
   for(int i = 0; i < reader->getNTimesteps(); ++i)
       cycles.push_back(i);
 
-  if(debug_format)
-    printf("%d: exiting getcycles\n", rank);
+  // if(debug_format)
+  //   printf("%d: exiting getcycles\n", rank);
 }
 
 void
 avtIDXFileFormat::GetTimes(std::vector<double> &times)
 {
-  if(debug_format)
-    printf("%d: entering gettimes\n", rank);
+  // if(debug_format)
+  //   printf("%d: entering gettimes\n", rank);
   times.swap(timeIndex);
 
-  if(debug_format)
-    printf("%d: exiting getcycles\n", rank);
+  // if(debug_format)
+  //   printf("%d: exiting getcycles\n", rank);
 
 //    std::map<int, double> m;
 //    std::vector<double> v;
@@ -1315,16 +1346,14 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 vtkDataArray *
 avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 {
-  //  std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
-  //  curr_varname = varname;
-  //  data_query = true;
-   // ActivateTimestep(timestate);
- //   data_query = false;
+    //std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
+  
+  // get correspondig logic time
+  if(debug_format)
+   printf("Requested index time %d using logical time (IDX) %d\n", timestate, logTimeIndex[timestate]);
 
-  /*  if(datatoreturn == NULL)
-        printf("DATA NULL!!!\n");
-*/
-    return queryToVtk(timestate, domain, varname);
+  timestate = logTimeIndex[timestate];
+  return queryToVtk(timestate, domain, varname);
     
 }
 
@@ -1357,8 +1386,8 @@ vtkDataArray *
 avtIDXFileFormat::GetVectorVar(int timestate, int domain, const char *varname)
 {
 
-  //std::cout<< rank << ": start getVectorVar " << varname << " domain "<< domain;
-    
+  std::cout<< rank << ": start getVectorVar " << varname << " domain "<< domain;
+    timestate = logTimeIndex[timestate];
     return queryToVtk(timestate, domain, varname);
     
 }
