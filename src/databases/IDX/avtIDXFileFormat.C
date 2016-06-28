@@ -209,9 +209,9 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     newbox.p1[0] = local_offset[0];
     newbox.p1[1] = local_offset[1];
     newbox.p1[2] = local_offset[2];
-    newbox.p2[0] = local_offset[0]+local_size[0]-1;
-    newbox.p2[1] = local_offset[1]+local_size[1]-1;
-    newbox.p2[2] = local_offset[2]+local_size[2]-1;
+    newbox.p2[0] = local_offset[0]+local_size[0];//-1;
+    newbox.p2[1] = local_offset[1]+local_size[1];//-1;
+    newbox.p2[2] = local_offset[2]+local_size[2];//-1;
     
     if(debug_format)
       printf("%d: created box %d %d %d size %d %d %d\n", r, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);

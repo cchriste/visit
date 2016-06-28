@@ -136,7 +136,7 @@ bool PIDXIO::openDataset(const String filename){
   
   for(int i=0; i < dims; i++){
     logic_box.p1[i] = 0;
-    logic_box.p2[i] = global_size[i]-1;
+    logic_box.p2[i] = global_size[i];//-1;
   }
   
   if(debug)
@@ -178,6 +178,7 @@ bool PIDXIO::openDataset(const String filename){
   PIDX_variable* variable = (PIDX_variable*)malloc(sizeof(*variable) * variable_count);
   memset(variable, 0, sizeof(*variable) * variable_count);
   
+  fields.clear();
   for (int var = 0; var < variable_count; var++)
   {
     ret = PIDX_get_next_variable(pidx_file, &variable[var]);
@@ -249,7 +250,7 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   int variable_index = -1;
   
   for(int i=0; i<fields.size(); i++){
-    if(strcmp(fields[i].name.c_str(),varname) == 0)
+    if(strcmp(fields[i].name.c_str(),varname) == 0 && strlen(fields[i].name.c_str()) == strlen(varname))
       variable_index = i;
   }
   
@@ -315,7 +316,10 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
    PIDX_enable_raw_io(pidx_file);
 
   ret = PIDX_set_current_time_step(pidx_file, timestate);
-  if (ret != PIDX_success)  terminate_with_error_msg("PIDX_set_current_time_step");
+  if (ret != PIDX_success) {
+    //terminate_with_error_msg("PIDX_set_current_time_step");
+    return NULL;
+  }
 //   PIDX_debug_output(pidx_file);
   PIDX_variable variable;
   
