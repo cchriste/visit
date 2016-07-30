@@ -124,7 +124,7 @@ bool PIDXIO::openDataset(const String filename){
   input_filename = filename;
   
   ret = PIDX_file_open(filename.c_str(), PIDX_MODE_RDONLY, pidx_access, &pidx_file);
-  if (ret != PIDX_success)  terminate_with_error_msg("PIDX_file_create");
+  if (ret != PIDX_success)  terminate_with_error_msg("PIDX_file_open");
   
   if(use_raw)
     PIDX_enable_raw_io(pidx_file);
@@ -155,7 +155,8 @@ bool PIDXIO::openDataset(const String filename){
   MPI_Bcast(&first_tstep, 1, MPI_INT, 0, NEW_COMM_WORLD);
   MPI_Bcast(&last_tstep, 1, MPI_INT, 0, NEW_COMM_WORLD);
 #endif
-
+  
+  tsteps.clear();
   for(int i=first_tstep; i <= last_tstep; i++)
     tsteps.push_back(i);
   
@@ -290,6 +291,8 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
 
   local_size[3] = 1;
   local_size[4] = 1;
+  local_offset[3] = 0;
+  local_offset[4] = 0;
   
   if(debug)
     printf("local box %lld %lld %lld size %lld %lld %lld time %d\n", local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2], timestate);
@@ -336,8 +339,11 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   if(debug)
     printf("reading %lldx%lldx%lld bps %d\n", local_size[0], local_size[1], local_size[2], bits_per_sample);
   
-  void *data = malloc((bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * variable->values_per_sample);
-  memset(data, 0, (bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * variable->values_per_sample);
+  int v_per_sample = 0;
+  PIDX_values_per_datatype(variable->type_name, &v_per_sample, &bits_per_sample);
+
+  void *data = malloc((bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * v_per_sample);//variable->values_per_sample);
+  memset(data, 0, (bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * v_per_sample);//variable->values_per_sample);
 
   ret = PIDX_variable_read_data_layout(variable, local_offset, local_size, data, PIDX_row_major);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_variable_read_data_layout");

@@ -187,10 +187,10 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     }
 
    
-      int sub_div[3];
-      sub_div[0] = (global_size[0] / local_size[0]);
-      sub_div[1] = (global_size[1] / local_size[1]);
-      sub_div[2] = (global_size[2] / local_size[2]);
+    int sub_div[3];
+    sub_div[0] = (global_size[0] / local_size[0]);
+    sub_div[1] = (global_size[1] / local_size[1]);
+    sub_div[2] = (global_size[2] / local_size[2]);
     
     int local_offset[3];
     for (int k = 0; k < dim; k++){
@@ -637,11 +637,21 @@ void avtIDXFileFormat::createTimeIndex(){
     else{
       fprintf(stderr, "No timesteps field found in index.xml, no physical time available\n");
     
-      std::vector<double> times = reader->getTimes();
-            
-      for(int i=0; i< times.size(); i++){
-          timeIndex.push_back(times.at(i));
-          logTimeIndex.push_back(times.at(i));            
+      if(is_gidx)
+      {
+        for(int i=0; i< gidx_datasets.size(); i++){
+         timeIndex.push_back(gidx_datasets[i].log_time);
+         logTimeIndex.push_back(gidx_datasets[i].log_time);            
+        } 
+
+      }else
+      {
+          std::vector<double> times = reader->getTimes();
+                
+          for(int i=0; i< times.size(); i++){
+            timeIndex.push_back(times.at(i));
+            logTimeIndex.push_back(times.at(i));            
+          }
       }
            
     }
@@ -714,22 +724,72 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 #else
     reader = new PIDXIO(use_raw);     // USE PIDX
 #endif
-  
-    if (!reader->openDataset(filename))
-    {
-        std::cout <<"could not load "<<filename << std::endl;
-        return;
-    }
     
     dataset_filename = filename;
 
     size_t folder_point = dataset_filename.find_last_of("/\\");
     size_t ext_point = dataset_filename.find_last_of(".");
-    String folder = dataset_filename.substr(0,folder_point);
-    String dataset_name = dataset_filename.substr(folder_point,ext_point-folder_point);
+    String extension = dataset_filename.substr(ext_point+1, dataset_filename.size());
+    is_gidx = extension.compare("gidx") == 0;
     
-    metadata_filename = folder + dataset_name+"/"+dataset_name+".xml";
+    if(is_gidx){
+        std::cout << "Using GIDX file" << std::endl;
+
+        vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
     
+        parser->SetFileName(dataset_filename.c_str());
+        if (parser->Parse()){
+            vtkXMLDataElement *root = parser->GetRootElement();
+
+            int ntimesteps = root->GetNumberOfNestedElements();
+    
+            if(debug_format)
+                std::cout << "Found " << ntimesteps << " timesteps in GIDX file" << std::endl;
+    
+            for(int i=0; i < ntimesteps; i++){
+        
+                vtkXMLDataElement *xmltime = root->GetNestedElement(i);
+                String urlstr(xmltime->GetAttribute("url"));
+                String timestr(xmltime->GetAttribute("log_time"));
+
+                gidx_info ginfo;
+                ginfo.url = urlstr.substr(7);
+                ginfo.log_time = cint(timestr.c_str());
+                gidx_datasets.push_back(ginfo);
+
+                if(debug_input)
+                    std::cout << "added dataset " << ginfo.url << " time " << ginfo.log_time << std::endl;
+
+                logTimeIndex.push_back(ginfo.log_time);
+                timeIndex.push_back(ginfo.log_time);
+             }
+
+             if(ntimesteps > 0)
+                if (!reader->openDataset(gidx_datasets[0].url)) // open first dataset 
+                {
+                    std::cout <<"could not load "<<filename << std::endl;
+                    return;
+                }
+
+        }else{
+            std::cerr << "Cannot parse GIDX file " << dataset_filename << std::endl;
+        }
+
+    }
+    else
+    {
+        String folder = dataset_filename.substr(0,folder_point);
+        String dataset_name = dataset_filename.substr(folder_point,ext_point-folder_point);
+        
+        // "Standard" IDX metadata file (not yet standardized)
+        metadata_filename = folder + dataset_name+"/"+dataset_name+".xml";
+
+        if (!reader->openDataset(filename))
+        {
+            std::cout <<"could not load "<<filename << std::endl;
+            return;
+        }
+    }
 //    std::cout <<"dataset loaded";
     dim = reader->getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
   
@@ -739,7 +799,6 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 #ifdef PARALLEL
     pidx_decomposition(nprocs);
 #endif
-
 
 #ifdef USE_VISUS
     loadBalance();
@@ -841,6 +900,11 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     if(debug_format)
         std::cout << rank << ": Meta data" << std::endl;
 
+    md->ClearMeshes();
+    md->ClearScalars(); 
+    md->ClearVectors();
+    md->ClearLabels();
+
     avtMeshMetaData *mesh = new avtMeshMetaData;
     mesh->name = "Mesh";
     
@@ -877,22 +941,28 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
 #ifdef PARALLEL // only PIDX
    // md->SetFormatCanDoDomainDecomposition(true);
 #endif
-  
+   
+    //if(timestate == 0){
     const std::vector<Field>& fields = reader->getFields();
-    
+    if(debug_format)
+        std::cout << "adding " << fields.size() << "fields" << std::endl;
     int ndtype;
+    // char testvar[128];
+    // sprintf(testvar, "AA_var_%d",timestate);
+    // AddScalarVarToMetaData(md, testvar, mesh->name, AVT_ZONECENT);
     for (int i = 0; i < (int) fields.size(); i++)
     {
         const Field& field = fields[i];
-        
+        // printf("adding field %s\n", field.name.c_str());
         if (!field.isVector){
-            md->Add(new avtScalarMetaData(field.name,mesh->name,AVT_ZONECENT));
+            AddScalarVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT);
+            //md->Add(new avtScalarMetaData(field.name,mesh->name,AVT_ZONECENT));
         }
         else
-            md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
+            AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
+            //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
     }
- 
- // #ifdef USE_VISUS       
+     //}
     avtRectilinearDomainBoundaries *rdb =
     new avtRectilinearDomainBoundaries(true);
     rdb->SetNumDomains(phyboxes.size());
@@ -909,22 +979,6 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
         
         rdb->SetIndicesForRectGrid(i, extents);
     }
-// #else
-//     avtRectilinearDomainBoundaries *rdb =
-//     new avtRectilinearDomainBoundaries(true);
-//     rdb->SetNumDomains(1);
-    
-//     int extents[6];
-//     extents[0] = physicalBox.p1.x;
-//     extents[1] = physicalBox.p2.x;
-//     extents[2] = physicalBox.p1.y;
-//     extents[3] = physicalBox.p2.y;
-//     extents[4] = physicalBox.p1.z;
-//     extents[5] = physicalBox.p2.z;
-    
-//     rdb->SetIndicesForRectGrid(0, extents);
-    
-// #endif  
 
     rdb->CalculateBoundaries();
   
@@ -1272,12 +1326,25 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(reverse_endian){
             float *buff = (float *) rv->GetVoidPointer(0);
+
+            float min_value = 99999999999999.f;
+            float max_value = -99999999999999.f;
+
             for (long long i = 0 ; i < ntotal ; i++)
             {
                 float tmp;
                 float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
                 buff[i] = tmp;
+
+                float value = buff[i];
+                if(value < min_value)
+                  min_value = value;
+
+                if(value > max_value)
+                  max_value = value;
             }
+            printf("range %f , %f\n", min_value, max_value);
+            
         }
         return rv;
     }
@@ -1312,7 +1379,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         return rv;
     }else{
 
-        fprintf(stderr, "Type %s not found\n", type);
+        fprintf(stderr, "Type %d not found\n", type);
     }
   
   return NULL;
@@ -1352,12 +1419,25 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
   if(debug_format)
    printf("Requested index time %d using logical time (IDX) %d\n", timestate, logTimeIndex[timestate]);
 
+  if(is_gidx){
+//     delete reader;
+
+// #ifdef USE_VISUS
+//     reader = new VisusIDXIO(); // USE VISUS
+// #else
+//     reader = new PIDXIO(use_raw);     // USE PIDX
+// #endif
+    reader->openDataset(gidx_datasets[timestate].url);
+  }
+
   timestate = logTimeIndex[timestate];
   return queryToVtk(timestate, domain, varname);
     
 }
 
 void avtIDXFileFormat::ActivateTimestep(int ts){
+    //printf("Activate timestep\n");
+
 
 }
 

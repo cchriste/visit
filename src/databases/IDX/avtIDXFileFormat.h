@@ -63,6 +63,11 @@ typedef std::string String;
 //
 // ****************************************************************************
 
+struct gidx_info{
+    String url;
+    int log_time;
+};
+
 class avtIDXFileFormat : public avtMTMDFileFormat
 {
   public:
@@ -114,6 +119,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool multibox;
     bool use_extracells;
     bool use_raw;
+    bool is_gidx;
+    std::vector<gidx_info> gidx_datasets;
   
   private:
 

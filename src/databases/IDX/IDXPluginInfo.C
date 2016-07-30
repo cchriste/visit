@@ -168,6 +168,7 @@ IDXGeneralPluginInfo::GetDefaultFilePatterns() const
     std::vector<std::string> defaultPatterns;
     defaultPatterns.push_back("*.idx");
     defaultPatterns.push_back("*.midx");
+    defaultPatterns.push_back("*.gidx");
 
     return defaultPatterns;
 }
