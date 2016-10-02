@@ -550,7 +550,7 @@ void avtIDXFileFormat::createBoxes(){
                 }
               
                 p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
-                p2log[k] = p1log[k] + resdata[k];
+                p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
               
                 if (use_extracells)
                     p2log[k] += eCells[k];
@@ -733,6 +733,19 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     size_t ext_point = dataset_filename.find_last_of(".");
     String extension = dataset_filename.substr(ext_point+1, dataset_filename.size());
     is_gidx = extension.compare("gidx") == 0;
+
+    memset(sfc_offset,0,sizeof(int)*3);
+
+    if(dataset_filename.substr(folder_point+1,3).compare("SFC")==0){
+      const char* sfc_v = dataset_filename.substr(folder_point+4,1).c_str();
+      std::cout << "Use SFC "<< sfc_v << std::endl;
+      if(*sfc_v == 'X')
+	sfc_offset[0] = 1;
+      else if(*sfc_v == 'Y')
+        sfc_offset[1] = 1;
+      else if(*sfc_v == 'Z')
+        sfc_offset[2] = 1;
+    }
     
     if(is_gidx){
         std::cout << "Using GIDX file" << std::endl;

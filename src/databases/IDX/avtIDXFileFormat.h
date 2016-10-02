@@ -120,6 +120,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool use_extracells;
     bool use_raw;
     bool is_gidx;
+    int sfc_offset[3];
     std::vector<gidx_info> gidx_datasets;
   
   private:

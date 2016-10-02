@@ -2,6 +2,16 @@
 
 in_dataset="CCVars.idx"
 out_dataset="CCVars.gidx"
+
+if [ "$#" -ne 1 ]; then
+    echo "Generate CCVars.gidx"
+else
+    in_dataset="$1.idx"
+    out_dataset="$1.gidx"
+    echo "Generate $1.gidx"
+    
+fi
+
 filename="${in_dataset%.*}"
 
 echo "<?xml version='1.0' encoding='utf-8'?>" > $out_dataset
