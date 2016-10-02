@@ -320,6 +320,7 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
 
   ret = PIDX_set_current_time_step(pidx_file, timestate);
   if (ret != PIDX_success) {
+    fprintf(stderr, "ERROR: PIDX_set_current_time_step\n");
     //terminate_with_error_msg("PIDX_set_current_time_step");
     return NULL;
   }

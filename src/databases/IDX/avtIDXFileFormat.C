@@ -550,10 +550,12 @@ void avtIDXFileFormat::createBoxes(){
                 }
               
                 p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
-                p2log[k] = p1log[k] + resdata[k] - 1;
+                p2log[k] = p1log[k] + resdata[k];
               
                 if (use_extracells)
                     p2log[k] += eCells[k];
+		else
+		    p2log[k] -= eCells[k];
             }
             if(debug_input){
                 std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
@@ -686,7 +688,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
             reverse_endian = attrs->GetBool("Big Endian");
         }
         else if (attrs->GetName(i) == "Use extra cells") {
-            use_extracells = attrs->GetBool("Use RAW format");
+            use_extracells = attrs->GetBool("Use extra cells");
         }else if (attrs->GetName(i) == "Use RAW format") {
             use_raw = attrs->GetBool("Use RAW format");
         }
@@ -1040,15 +1042,17 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     
     int my_dims[3];
     
-    my_dims[0] = my_bounds[0] +1;
-    my_dims[1] = my_bounds[1] +1;
-    my_dims[2] = my_bounds[2] +1;
+    int offset = 1; // always one for non-node-centered
+
+    my_dims[0] = my_bounds[0]+offset;
+    my_dims[1] = my_bounds[1]+offset;
+    my_dims[2] = my_bounds[2]+offset;
   
     if(debug_format)
         std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
-    
+
+#if 1
     rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
-    
     coordsX = vtkFloatArray::New();
     coordsX->SetNumberOfTuples(my_dims[0]);
     arrayX = (float *) coordsX->GetVoidPointer(0);
@@ -1056,7 +1060,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     float steps[3];
     
     for (int i = 0; i < dim; i++){
-        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_dims[i]);
+        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_dims[i]-1);
     }
     
     for (int i = 0; i < my_dims[0]; i++)
@@ -1077,6 +1081,59 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       arrayZ[i] = slice_box.p1.z + i*steps[2];
     rgrid->SetZCoordinates(coordsZ);
     
+#else
+
+        for (int c=0; c<3; c++) {
+      vtkFloatArray *coords = vtkFloatArray::New(); 
+      coords->SetNumberOfTuples(my_dims[c]); 
+      float *array = (float *)coords->GetVoidPointer(0); 
+
+      float step = (slice_box.p2[c] - slice_box.p1[c])/(my_dims[c]);
+
+      for (int i=0; i<my_dims[c]; i++)
+	{
+	  // Face centered data gets shifted towards -inf by half a cell.
+	  // Boundary patches are special shifted to preserve global domain.
+	  // Internal patches are always just shifted.
+	  float face_offset=0;
+	  /*  if (sfck[c]) 
+	    {
+	      if (i==0)
+		if (low[c]==glow[c]) // patch is on low boundary
+		  face_offset = 0.0;
+		else
+		  face_offset = -0.5;       // patch boundary is internal to the domain
+	      else if (i==dims[c]-1)
+		if (high[c]==ghigh[c]) // patch is on high boundary
+		  if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
+		    face_offset = 0.0;
+		  else
+		    face_offset = -1;
+		else                        // patch boundary is internal to the domain
+		  face_offset = -0.5;
+	      else
+		face_offset = -0.5;
+		}*/
+	  //array[i] = levelInfo.anchor[c] +
+          //(i + low[c] + face_offset) * levelInfo.spacing[c];
+	  
+	  array[i] = slice_box.p1[c] + step*i;
+	}
+
+      switch(c) {
+      case 0:
+        rgrid->SetXCoordinates(coords); break;
+      case 1:
+        rgrid->SetYCoordinates(coords); break;
+      case 2:
+        rgrid->SetZCoordinates(coords); break;
+      }
+
+      coords->Delete();
+    }
+
+#endif
+
     if(debug_format)
       printf("end mesh\n");
     return rgrid;
