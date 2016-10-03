@@ -235,7 +235,7 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
       if(k != maxdir)
         newphybox.p2[k] = physicalBox.p2[k];//newbox.p2[k] * log2phy[k] + phyOffset[k] + log2phy[k];
       else{
-        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k] + 4*log2phy[k];
+        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k];// + log2phy[k];
         if(r == process_count-1)
            newphybox.p2[k] = physicalBox.p2[k];
       }
@@ -544,10 +544,10 @@ void avtIDXFileFormat::createBoxes(){
               
                 phy2log[k] = (p2phy[k]-p1phy[k])/(resdata[k]);
                 //p2phy[k] += phy2log[k];
-              
+		/*
                 if(boxes.size() == 0){
                   logOffset[k] = std::abs(p1phy[k]) / phy2log[k];
-                }
+		  }*/
               
                 p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
                 p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
@@ -811,9 +811,17 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     createBoxes();
 
     createTimeIndex();
+
+    int old_size = boxes.size();
 #ifdef PARALLEL
+    //loadBalance();
     pidx_decomposition(nprocs);
 #endif
+
+    if(boxes.size()>old_size)
+      parallel_boxes = true;
+    else
+      parallel_boxes = false;
 
 #ifdef USE_VISUS
     loadBalance();
@@ -1073,7 +1081,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     float steps[3];
     
     for (int i = 0; i < dim; i++){
-        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_dims[i]-1);
+        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_bounds[i]);
     }
     
     for (int i = 0; i < my_dims[0]; i++)
@@ -1189,7 +1197,23 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     
     const Box& my_box = boxes.at(domain);
     unsigned char* data = reader->getData(my_box, timestate, varname);
-    
+    /*
+    std::ofstream out;
+    char outname[128];
+    sprintf(outname, "out_%d.raw", domain);
+    out.open(outname);
+
+    uint buffer_size = sizeof(int)*(my_box.p2.x-my_box.p1.x+1)*(my_box.p2.y-my_box.p1.y+1)*(my_box.p2.z-my_box.p1.z+1);
+    printf("dumping domain %d size %d\n", domain, buffer_size);
+  
+    //  for(int i = 0; i< exp_size/sizeof(float); i++){
+    //    //if((double)data[i] != 0.0)
+    //      printf("d %f\n", (float)data[i]);
+    //  }
+  
+    out.write((const char*)data, buffer_size);
+    out.close();
+    */
     if(data == NULL){
         std::cout << " NO DATA " << std::endl;
         return NULL;
