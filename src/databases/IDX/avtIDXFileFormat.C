@@ -544,18 +544,20 @@ void avtIDXFileFormat::createBoxes(){
               
                 phy2log[k] = (p2phy[k]-p1phy[k])/(resdata[k]);
                 //p2phy[k] += phy2log[k];
-		/*
+		
                 if(boxes.size() == 0){
-                  logOffset[k] = std::abs(p1phy[k]) / phy2log[k];
-		  }*/
+                  logOffset[k] = phy2log[k];//std::abs(p1phy[k]) / phy2log[k];
+		  }
               
                 p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
                 p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
               
-                if (use_extracells)
+                if (use_extracells){
                     p2log[k] += eCells[k];
-		else
-		    p2log[k] -= eCells[k];
+		    p2phy[k] += phy2log[k];
+		}
+		/*else
+		  p2log[k] -= eCells[k];*/
             }
             if(debug_input){
                 std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
