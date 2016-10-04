@@ -149,34 +149,34 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     for(int i=0; i < boxes.size(); i++){
         Box& box = boxes.at(i);
         
-        total_extent += box.p2[maxdir];
+        total_extent += box.p2[maxdir]-box.p1[maxdir];
     }
+
+    if(debug_format)
+      printf("total_extent %d\n", total_extent);
    
-    avg_ext = total_extent / nprocs;
-    int res_ext = (total_extent % nprocs);
+    avg_ext = (total_extent+1) / nprocs;
+    int res_ext = (total_extent+1) % nprocs;
 
     Box box = boxes[0];
-    int global_size[3] = {box.p2[0]-box.p1[0]+1,box.p2[1]-box.p1[1]+1,box.p2[2]-box.p1[2]+1};
+    int global_size[3] = {box.p2.x-box.p1.x+1,box.p2.y-box.p1.y+1,box.p2.z-box.p1.z+1};
     if(debug_format)
       printf("global box size %d %d %d avg_ext %d res_ext %d max_dir %d\n", global_size[0],global_size[1],global_size[2], avg_ext, res_ext, maxdir);
 
-/*
-  // Static decomposition 
-  int local_size[3] = {32,32,32};
-  printf("global box size %d %d %d\n", global_size[0],global_size[1],global_size[2]);
-  int sub_div[3];
-  sub_div[0] = (global_size[0] / local_size[0]);
-  sub_div[1] = (global_size[1] / local_size[1]);
-  sub_div[2] = (global_size[2] / local_size[2]);
-*/
 
   boxes.clear();
   phyboxes.clear();
   
+  Point3d log2phy;
+     
+  for (int k = 0; k < dim; k++){
+    log2phy[k] = (physicalBox.p2[k] - physicalBox.p1[k])/(global_size[k]-1);
+  }
+    
   for(int r=0; r < process_count; r++){
     
     int local_size[3];
-
+    /*
     for(int d=0; d < dim; d++){
         if(d == maxdir){
             local_size[d] = avg_ext;
@@ -186,63 +186,57 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
             local_size[d] = global_size[d];
     }
 
-   
-    int sub_div[3];
-    sub_div[0] = (global_size[0] / local_size[0]);
-    sub_div[1] = (global_size[1] / local_size[1]);
-    sub_div[2] = (global_size[2] / local_size[2]);
-    
-    int local_offset[3];
-    for (int k = 0; k < dim; k++){
-        if(k!=maxdir)
-            local_offset[k] = 0;
-        else 
-            local_offset[k] = r*avg_ext;
-    }
- /*  
-    local_offset[2] = (r / (sub_div[0] * sub_div[1])) * local_size[2];
-    int slice = r % (sub_div[0] * sub_div[1]);
-    local_offset[1] = (slice / sub_div[0]) * local_size[1];
-    local_offset[0] = (slice % sub_div[0]) * local_size[0];
-*/ 
+    int local_offset[3];*/
+
     Box newbox;
+    for (int k = 0; k < dim; k++){
+      if(k!=maxdir){
+            newbox.p1[k] = 0;
+	    newbox.p2[k] = global_size[k]-1;
+      }
+      else {
+	newbox.p1[k] = r*avg_ext;
+	//if(boxes.size()>1)
+	//  newbox.p1[k]--;
+	newbox.p2[k] = newbox.p1[k] + avg_ext +1;
+	if(r == process_count-1){
+	   newbox.p2[k] = global_size[k]-1; 
+	}
+      }
+    }
+
+    /*
     newbox.p1[0] = local_offset[0];
     newbox.p1[1] = local_offset[1];
     newbox.p1[2] = local_offset[2];
     newbox.p2[0] = local_offset[0]+local_size[0];//-1;
     newbox.p2[1] = local_offset[1]+local_size[1];//-1;
     newbox.p2[2] = local_offset[2]+local_size[2];//-1;
-    
+    */
     if(debug_format)
-      printf("%d: created box %d %d %d size %d %d %d\n", r, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2]);
+      printf("%d: created p1 %f %f %f p2 %f %f %f\n", r, newbox.p1[0],newbox.p1[1],newbox.p1[2], newbox.p2[0],newbox.p2[1],newbox.p2[2]);
     
     boxes.push_back(newbox);
-    
-    Point3d log2phy;
-     
-    for (int k = 0; k < dim; k++){
-      log2phy[k] = (physicalBox.p2[k] - physicalBox.p1[k])/(global_size[k]);
-    }
-     
+         
     Point3d phyOffset = physicalBox.p1;
 //      std::cout << "log2phy " <<log2phy << std::endl;
                 
     Box newphybox;
-  
+    
     for (int k = 0; k < dim; k++){
       newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
 
       if(k != maxdir)
         newphybox.p2[k] = physicalBox.p2[k];//newbox.p2[k] * log2phy[k] + phyOffset[k] + log2phy[k];
       else{
-        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k];// + log2phy[k];
+        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k];//newphybox.p1[k] + (avg_ext)*log2phy[k];// +log2phy[k];
         if(r == process_count-1)
            newphybox.p2[k] = physicalBox.p2[k];
       }
     }       
 
     if(debug_format)
-        std::cout << "New phy box p1: " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
+      printf("New phy box p1: %f %f %f p2: %f %f %f\n", newphybox.p1.x,newphybox.p1.y,newphybox.p1.z ,newphybox.p2.x,newphybox.p2.y,newphybox.p2.z);
 
     phyboxes.push_back(newphybox);
     //physicalBox = physicalBox.getUnion((const Box)phyboxes.at(r));
@@ -283,13 +277,14 @@ void avtIDXFileFormat::loadBalance(){
     for(int i=0; i < boxes.size(); i++){
         Box& box = boxes.at(i);
         
-        total_extent += box.p2[maxdir];
+        total_extent += box.p2[maxdir] - box.p1[maxdir];
     }
     //total_extent++; // DIM
     avg_ext = total_extent / nprocs;
     int res_ext = (total_extent % nprocs);
     
-    //  std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext;
+    if(debug_format && rank==0)
+      std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext << " n boxes " << boxes.size() <<std::endl;
     
     std::vector<Box> newboxes;
     std::vector<Box> newphyboxes;
@@ -304,8 +299,9 @@ void avtIDXFileFormat::loadBalance(){
             loc_res = loc_avg_ext % avg_ext;
             loc_avg_ext = avg_ext;
         }
-        
-        //        std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
+
+        if(debug_format && rank==0)
+	  std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
         
         int part_p1 = box.p1[maxdir];
         int part_p2 = box.p1[maxdir] + loc_avg_ext;
@@ -315,14 +311,14 @@ void avtIDXFileFormat::loadBalance(){
 
         Point3d log2phy;
         Box& phybox = phyboxes.at(i);
-        if(debug_format)
-            std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl;
+        if(debug_format && rank==0)
+	  std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl<< std::flush;
       
         for (int k = 0; k < dim; k++){
           log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
        }
       
-        Point3d phyOffset = phyboxes.at(0).p1;
+        //Point3d phyOffset = phybox.p1;
 //      std::cout << "log2phy " <<log2phy << std::endl;
       
         while(part_p2 <= box.p2[maxdir]){
@@ -336,14 +332,14 @@ void avtIDXFileFormat::loadBalance(){
             Box newphybox;
           
             for (int k = 0; k < dim; k++){
-              newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
-              newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k];;
+              newphybox.p1[k] = newbox.p1[k] * log2phy[k];// + phyOffset[k];
+              newphybox.p2[k] = newbox.p2[k] * log2phy[k];// + phyOffset[k];;
             }
           
             newphyboxes.push_back(newphybox);
             
-            if(debug_format)
-                std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl;
+            if(debug_format && rank ==0)
+	      std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl << std::flush;
           
             part_p1 += loc_avg_ext;
             part_p2 += loc_avg_ext;
@@ -357,7 +353,7 @@ void avtIDXFileFormat::loadBalance(){
             Box& phyboxres = newphyboxes.at(newphyboxes.size()-1);
             phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
             
-            if(debug_format)         
+            if(debug_format && rank ==0)       
               std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
         }
 
@@ -366,14 +362,14 @@ void avtIDXFileFormat::loadBalance(){
     boxes.swap(newboxes);
     phyboxes.swap(newphyboxes);
   
-    if(debug_format){
-        std::cout << "Total number of boxes/domains: " << boxes.size() << std::endl;
-        std::cout << "----------Boxes----------" << std::endl;
+    if(debug_format && rank == 0){
+      std::cout << "Total number of boxes/domains: " << boxes.size() << std::endl<< std::flush;
+      std::cout << "----------Boxes----------" << std::endl<< std::flush;
         for(int i=0; i< boxes.size(); i++){
             std::cout << i << " = "<< boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
-              << phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl;
+		      << phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl<< std::flush;
         }
-        std::cout << "-------------------------" << std::endl;
+        std::cout << "-------------------------" << std::endl<< std::flush;
     }
 }
 
@@ -545,11 +541,11 @@ void avtIDXFileFormat::createBoxes(){
                 phy2log[k] = (p2phy[k]-p1phy[k])/(resdata[k]);
                 //p2phy[k] += phy2log[k];
 		
-                if(boxes.size() == 0){
+                /*if(boxes.size() == 0){
                   logOffset[k] = phy2log[k];//std::abs(p1phy[k]) / phy2log[k];
 		  }
-              
-                p1log[k] += std::abs(p1phy[k]) / phy2log[k] - logOffset[k];
+		*/
+                p1log[k] += int(std::abs(p1phy[k]) / phy2log[k]) - logOffset[k];
                 p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
               
                 if (use_extracells){
@@ -816,8 +812,10 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 
     int old_size = boxes.size();
 #ifdef PARALLEL
-    //loadBalance();
-    pidx_decomposition(nprocs);
+    if(boxes.size()>1)
+      loadBalance();
+    else
+      pidx_decomposition(nprocs);
 #endif
 
     if(boxes.size()>old_size)
@@ -1066,7 +1064,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     int my_dims[3];
     
     int offset = 1; // always one for non-node-centered
-
+    
     my_dims[0] = my_bounds[0]+offset;
     my_dims[1] = my_bounds[1]+offset;
     my_dims[2] = my_bounds[2]+offset;
@@ -1083,11 +1081,19 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     float steps[3];
     
     for (int i = 0; i < dim; i++){
-        steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_bounds[i]);
+      //if(!parallel_boxes)
+         steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_bounds[i]);
+      //else
+      //   steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_bounds[i]-4);
     }
     
-    for (int i = 0; i < my_dims[0]; i++)
+    for (int i = 0; i < my_dims[0]; i++){
       arrayX[i] = slice_box.p1.x + i*steps[0];
+      //if(domain > 0)
+      //  arrayX[i] -= steps[0]/2;
+      /*else if(domain == boxes.size()-1)
+	arrayX[i] += steps[0]/2;*/
+    }
     rgrid->SetXCoordinates(coordsX);
     
     coordsY = vtkFloatArray::New();
@@ -1198,6 +1204,7 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
 vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
     
     const Box& my_box = boxes.at(domain);
+    
     unsigned char* data = reader->getData(my_box, timestate, varname);
     /*
     std::ofstream out;
