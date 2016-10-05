@@ -486,7 +486,7 @@ void avtIDXFileFormat::createBoxes(){
         
         if(debug_input)
             std::cout << "Found " << nboxes << " boxes" << std::endl;
-        
+        int last_log = 0;
         for(int i=0; i < nboxes; i++){
             
             vtkXMLDataElement *xmlbox = level->GetNestedElement(i);
@@ -542,15 +542,31 @@ void avtIDXFileFormat::createBoxes(){
                 //p2phy[k] += phy2log[k];
 		
                 /*if(boxes.size() == 0){
-                  logOffset[k] = phy2log[k];//std::abs(p1phy[k]) / phy2log[k];
+                  logOffset[k] = std::abs(p1phy[k]) / phy2log[k];//phy2log[k];
+		  }*/
+		
+		if(nboxes == 1) // single box case
+		  p1log[k] = 0;
+		else // multibox case (all inside the same domain)
+		  p1log[k] += int(std::abs(p1phy[k]) / phy2log[k]) - logOffset[k];
+                
+		if(nboxes == 1)
+		  p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
+	        else{
+		  if (k == 0 && i > 0){
+		    p1log[k] = last_log;//+1; 
+		    
 		  }
-		*/
-                p1log[k] += int(std::abs(p1phy[k]) / phy2log[k]) - logOffset[k];
-                p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
-              
+		  p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
+		  
+		  if(k==0)
+		    last_log = p2log[k];
+		  
+		}
+		
                 if (use_extracells){
                     p2log[k] += eCells[k];
-		    p2phy[k] += phy2log[k];
+		    //    p2phy[k] += phy2log[k];
 		}
 		/*else
 		  p2log[k] -= eCells[k];*/
@@ -1072,8 +1088,9 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     if(debug_format)
         std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
 
-#if 1
     rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
+
+#if 0
     coordsX = vtkFloatArray::New();
     coordsX->SetNumberOfTuples(my_dims[0]);
     arrayX = (float *) coordsX->GetVoidPointer(0);
@@ -1112,19 +1129,28 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     
 #else
 
-        for (int c=0; c<3; c++) {
+    Box log_box = boxes.at(domain);
+    float anchor[3] = {0,0,0}; //ONE{7.5,0,0};
+    float spacing[3] = {0.02, 0.020000000000000004, 0.02};//{0.21845486111111112, 0.2058888888888889, 0.20424999999999999};
+     
+    float low[3] = {log_box.p1[0],log_box.p1[1],log_box.p1[2]};
+      
+     for (int c=0; c<3; c++) {
       vtkFloatArray *coords = vtkFloatArray::New(); 
       coords->SetNumberOfTuples(my_dims[c]); 
       float *array = (float *)coords->GetVoidPointer(0); 
-
-      float step = (slice_box.p2[c] - slice_box.p1[c])/(my_dims[c]);
-
+          
+      //      float step = (slice_box.p2[c] - slice_box.p1[c])/(my_dims[c]);
       for (int i=0; i<my_dims[c]; i++)
 	{
 	  // Face centered data gets shifted towards -inf by half a cell.
 	  // Boundary patches are special shifted to preserve global domain.
 	  // Internal patches are always just shifted.
-	  float face_offset=0;
+	  float face_offset= -1.f;
+	  
+	  //if(domain %2 != 0 && c == 0)
+	  //  face_offset = 0;
+
 	  /*  if (sfck[c]) 
 	    {
 	      if (i==0)
@@ -1143,10 +1169,12 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 	      else
 		face_offset = -0.5;
 		}*/
-	  //array[i] = levelInfo.anchor[c] +
-          //(i + low[c] + face_offset) * levelInfo.spacing[c];
+
+	  array[i] = anchor[c] + (i + low[c] + face_offset) * spacing[c];
 	  
-	  array[i] = slice_box.p1[c] + step*i;
+	  //array[i] = levelInfo.anchor[c] + (i + low[c] + face_offset) * levelInfo.spacing[c];
+	  
+	  // array[i] = slice_box.p1[c] + step*i;
 	}
 
       switch(c) {
@@ -1212,7 +1240,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     sprintf(outname, "out_%d.raw", domain);
     out.open(outname);
 
-    uint buffer_size = sizeof(int)*(my_box.p2.x-my_box.p1.x+1)*(my_box.p2.y-my_box.p1.y+1)*(my_box.p2.z-my_box.p1.z+1);
+    uint buffer_size = sizeof(float)*(my_box.p2.x-my_box.p1.x+1)*(my_box.p2.y-my_box.p1.y+1)*(my_box.p2.z-my_box.p1.z+1);
     printf("dumping domain %d size %d\n", domain, buffer_size);
   
     //  for(int i = 0; i< exp_size/sizeof(float); i++){
