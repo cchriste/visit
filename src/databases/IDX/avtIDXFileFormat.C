@@ -482,6 +482,37 @@ void avtIDXFileFormat::createBoxes(){
         else 
             level = root->FindNestedElementWithName("level");
 
+	if(uintah_metadata){
+
+	vtkXMLDataElement *anchor_el = NULL;
+	anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
+
+	if(anchor_el == NULL){
+	  std::cout << "anchor not found" << std::endl;
+	  anchor[0]=0;
+	  anchor[1]=0;
+	  anchor[2]=0;
+	 }
+	else{
+	  String anchor_str(anchor_el->GetCharacterData());
+	  std::cout << "found " << anchor_str << std::endl;
+	  anchor_str = trim(anchor_str);
+	  String anchor_vals = anchor_str.substr(1,anchor_str.length()-2);
+	  
+	  std::cout << "Found anchor " << anchor_vals << std::endl;
+	  std::string anchs;
+	  std::stringstream anch_ss(anchor_vals);
+	  for (int k=0; k < dim; k++){
+	    std::getline(anch_ss, anchs, ',');
+	   
+	    anchor[k] = cfloat(anchs);
+	  }
+
+	  std::cout << "read " << anchor[0] << " "<< anchor[1] << " " << anchor[2] << std::endl;
+	}
+	}
+
+
         int nboxes = level->GetNumberOfNestedElements();
         
         if(debug_input)
@@ -585,6 +616,37 @@ void avtIDXFileFormat::createBoxes(){
             
         }
         
+	//cellspacing
+	if(uintah_metadata){
+
+	vtkXMLDataElement *cellspacing_el = NULL;
+	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
+
+	if(cellspacing_el == NULL){
+	  std::cout << "cellspacing not found" << std::endl;
+	  cellspacing[0]=(phyboxes[0].p2[0]-phyboxes[0].p1[0])/(boxes[0].p2[0]-boxes[0].p1[0]+1);
+	  cellspacing[1]=(phyboxes[0].p2[1]-phyboxes[0].p1[1])/(boxes[0].p2[1]-boxes[0].p1[1]+1);
+	  cellspacing[2]=(phyboxes[0].p2[2]-phyboxes[0].p1[2])/(boxes[0].p2[2]-boxes[0].p1[2]+1);
+	 }
+	else{
+	  String cellspacing_str(cellspacing_el->GetCharacterData());
+	  std::cout << "found " << cellspacing_str << std::endl;
+	  cellspacing_str = trim(cellspacing_str);
+	  String cellspacing_vals = cellspacing_str.substr(1,cellspacing_str.length()-2);
+	  
+	  std::cout << "Found cellspacing " << cellspacing_vals << std::endl;
+	  std::string anchs;
+	  std::stringstream anch_ss(cellspacing_vals);
+	  for (int k=0; k < dim; k++){
+	    std::getline(anch_ss, anchs, ',');
+	   
+	    cellspacing[k] = cfloat(anchs);
+	  }
+
+	  std::cout << "read " << cellspacing[0] << " "<< cellspacing[1] << " " << cellspacing[2] << std::endl;
+	}
+	}
+
     }
     else{
         boxes.push_back(reader->getLogicBox());
@@ -1130,8 +1192,11 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 #else
 
     Box log_box = boxes.at(domain);
-    float anchor[3] = {0,0,0}; //ONE{7.5,0,0};
-    float spacing[3] = {0.02, 0.020000000000000004, 0.02};//{0.21845486111111112, 0.2058888888888889, 0.20424999999999999};
+    //anchor[3] = {7.5,0,0};//MB {0,0,0};
+    //float cellspacing[3] = //singel big {0.052958754208754212, 0.051472222222222225, 0.051990909090909088};//MB{0.02, 0.020000000000000004, 0.02};
+
+   //single_small
+    //cellspacing[3] = {0.21845486111111112, 0.2058888888888889, 0.20424999999999999};
      
     float low[3] = {log_box.p1[0],log_box.p1[1],log_box.p1[2]};
       
@@ -1170,7 +1235,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 		face_offset = -0.5;
 		}*/
 
-	  array[i] = anchor[c] + (i + low[c] + face_offset) * spacing[c];
+	  array[i] = anchor[c] + (i + low[c] + face_offset) * cellspacing[c];
 	  
 	  //array[i] = levelInfo.anchor[c] + (i + low[c] + face_offset) * levelInfo.spacing[c];
 	  

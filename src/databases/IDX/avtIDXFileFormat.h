@@ -122,6 +122,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool is_gidx;
     bool parallel_boxes;
     int sfc_offset[3];
+    float anchor[3];
+    float cellspacing[3];
     std::vector<gidx_info> gidx_datasets;
   
   private:
