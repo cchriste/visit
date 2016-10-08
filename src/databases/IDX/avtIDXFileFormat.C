@@ -85,12 +85,6 @@
 #include <InvalidVariableException.h>
 #include <dirent.h>
 
-#ifdef USE_VISUS
-  #include <visus_idx_io.h>
-#else
-  #include <pidx_idx_io.h>
-#endif
-
 #ifdef PARALLEL
 #include <avtParallel.h>
 #endif
@@ -488,18 +482,19 @@ void avtIDXFileFormat::createBoxes(){
 	anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
 
 	if(anchor_el == NULL){
-	  std::cout << "anchor not found" << std::endl;
+	  if(debug_input)
+	    std::cout << "anchor not found" << std::endl;
 	  anchor[0]=0;
 	  anchor[1]=0;
 	  anchor[2]=0;
 	 }
 	else{
 	  String anchor_str(anchor_el->GetCharacterData());
-	  std::cout << "found " << anchor_str << std::endl;
+	  
 	  anchor_str = trim(anchor_str);
 	  String anchor_vals = anchor_str.substr(1,anchor_str.length()-2);
-	  
-	  std::cout << "Found anchor " << anchor_vals << std::endl;
+	  if(debug_input)
+	    std::cout << "Found anchor " << anchor_vals << std::endl;
 	  std::string anchs;
 	  std::stringstream anch_ss(anchor_vals);
 	  for (int k=0; k < dim; k++){
@@ -507,8 +502,8 @@ void avtIDXFileFormat::createBoxes(){
 	   
 	    anchor[k] = cfloat(anchs);
 	  }
-
-	  std::cout << "read " << anchor[0] << " "<< anchor[1] << " " << anchor[2] << std::endl;
+	  if(debug_input)
+	    std::cout << "read " << anchor[0] << " "<< anchor[1] << " " << anchor[2] << std::endl;
 	}
 	}
 
@@ -582,13 +577,13 @@ void avtIDXFileFormat::createBoxes(){
 		  p1log[k] += int(std::abs(p1phy[k]) / phy2log[k]) - logOffset[k];
                 
 		if(nboxes == 1)
-		  p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
+		  p2log[k] = p1log[k] + resdata[k];// + sfc_offset[k];
 	        else{
 		  if (k == 0 && i > 0){
 		    p1log[k] = last_log;//+1; 
 		    
 		  }
-		  p2log[k] = p1log[k] + resdata[k] + sfc_offset[k];
+		  p2log[k] = p1log[k] + resdata[k];// + sfc_offset[k];
 		  
 		  if(k==0)
 		    last_log = p2log[k];
@@ -623,18 +618,19 @@ void avtIDXFileFormat::createBoxes(){
 	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
 
 	if(cellspacing_el == NULL){
-	  std::cout << "cellspacing not found" << std::endl;
+	  if(debug_input)
+	    std::cout << "cellspacing not found" << std::endl;
 	  cellspacing[0]=(phyboxes[0].p2[0]-phyboxes[0].p1[0])/(boxes[0].p2[0]-boxes[0].p1[0]+1);
 	  cellspacing[1]=(phyboxes[0].p2[1]-phyboxes[0].p1[1])/(boxes[0].p2[1]-boxes[0].p1[1]+1);
 	  cellspacing[2]=(phyboxes[0].p2[2]-phyboxes[0].p1[2])/(boxes[0].p2[2]-boxes[0].p1[2]+1);
 	 }
 	else{
 	  String cellspacing_str(cellspacing_el->GetCharacterData());
-	  std::cout << "found " << cellspacing_str << std::endl;
+	  if(debug_input)
+	    std::cout << "found " << cellspacing_str << std::endl;
 	  cellspacing_str = trim(cellspacing_str);
 	  String cellspacing_vals = cellspacing_str.substr(1,cellspacing_str.length()-2);
-	  
-	  std::cout << "Found cellspacing " << cellspacing_vals << std::endl;
+	  	  
 	  std::string anchs;
 	  std::stringstream anch_ss(cellspacing_vals);
 	  for (int k=0; k < dim; k++){
@@ -642,8 +638,8 @@ void avtIDXFileFormat::createBoxes(){
 	   
 	    cellspacing[k] = cfloat(anchs);
 	  }
-
-	  std::cout << "read " << cellspacing[0] << " "<< cellspacing[1] << " " << cellspacing[2] << std::endl;
+	  if(debug_input)
+	    std::cout << "read " << cellspacing[0] << " "<< cellspacing[1] << " " << cellspacing[2] << std::endl;
 	}
 	}
 
@@ -685,7 +681,8 @@ void avtIDXFileFormat::createTimeIndex(){
         }
     }
 
-    std::cout << "Found metadata file" << std::endl;
+    if(debug_input)
+      std::cout << "Found metadata file" << std::endl;
 
     vtkXMLDataElement *root = parser->GetRootElement();
     vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
@@ -1031,11 +1028,11 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->minSpatialExtents[2] = physicalBox.p1.z;
     mesh->maxSpatialExtents[2] = physicalBox.p2.z;
 
-    Box logicBox = reader->getLogicBox();
+    global_logic_box = reader->getLogicBox();
     mesh->hasLogicalBounds = true;
-    mesh->logicalBounds[0] = logicBox.p2.x - logicBox.p1.x+1;
-    mesh->logicalBounds[1] = logicBox.p2.y - logicBox.p1.y+1;
-    mesh->logicalBounds[2] = logicBox.p2.z - logicBox.p1.z+1;
+    mesh->logicalBounds[0] = global_logic_box.p2.x - global_logic_box.p1.x+1;
+    mesh->logicalBounds[1] = global_logic_box.p2.y - global_logic_box.p1.y+1;
+    mesh->logicalBounds[2] = global_logic_box.p2.z - global_logic_box.p1.z+1;
     
     md->Add(mesh);
   
@@ -1199,7 +1196,11 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     //cellspacing[3] = {0.21845486111111112, 0.2058888888888889, 0.20424999999999999};
      
     float low[3] = {log_box.p1[0],log_box.p1[1],log_box.p1[2]};
-      
+    float high[3] = {log_box.p2[0],log_box.p2[1],log_box.p2[2]};
+    float glow[3] = {global_logic_box.p1[0],global_logic_box.p1[1],global_logic_box.p1[2]};
+    float ghigh[3] = {global_logic_box.p2[0],global_logic_box.p2[1],global_logic_box.p2[2]};
+    printf("global %f %f %f - %f %f %f local %f %f %f - %f %f %f\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
+
      for (int c=0; c<3; c++) {
       vtkFloatArray *coords = vtkFloatArray::New(); 
       coords->SetNumberOfTuples(my_dims[c]); 
@@ -1213,27 +1214,24 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 	  // Internal patches are always just shifted.
 	  float face_offset= -1.f;
 	  
-	  //if(domain %2 != 0 && c == 0)
-	  //  face_offset = 0;
-
-	  /*  if (sfck[c]) 
-	    {
+	  if (sfc_offset[c]) 
+	  {
 	      if (i==0)
 		if (low[c]==glow[c]) // patch is on low boundary
-		  face_offset = 0.0;
+		  face_offset += 0.0;
 		else
-		  face_offset = -0.5;       // patch boundary is internal to the domain
-	      else if (i==dims[c]-1)
-		if (high[c]==ghigh[c]) // patch is on high boundary
-		  if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
-		    face_offset = 0.0;
-		  else
-		    face_offset = -1;
+		  face_offset += -0.5;       // patch boundary is internal to the domain
+	      else if (i==my_dims[c]-1)
+		if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
+		  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
+		  //  face_offset += 0.0;
+	          //else
+	          face_offset += -1;
 		else                        // patch boundary is internal to the domain
-		  face_offset = -0.5;
+		  face_offset += -0.5;
 	      else
-		face_offset = -0.5;
-		}*/
+	        face_offset += -0.5;
+	   }
 
 	  array[i] = anchor[c] + (i + low[c] + face_offset) * cellspacing[c];
 	  
@@ -1299,6 +1297,9 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     const Box& my_box = boxes.at(domain);
     
     unsigned char* data = reader->getData(my_box, timestate, varname);
+
+    if(debug_format)
+      printf("read data done\n");
     /*
     std::ofstream out;
     char outname[128];
@@ -1541,7 +1542,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             }
             printf("range %f , %f\n", min_value, max_value);
             
-        }
+	    }
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT64){
@@ -1578,6 +1579,8 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         fprintf(stderr, "Type %d not found\n", type);
     }
   
+    if(debug_format)
+      printf("done data loading\n");
   return NULL;
 }
 

@@ -50,6 +50,12 @@
 #include <visit_idx_io.h>
 #include <string>
 
+#ifdef USE_VISUS
+  #include <visus_idx_io.h>
+#else
+  #include <pidx_idx_io.h>
+#endif
+
 typedef std::string String;
 
 // ****************************************************************************
@@ -125,7 +131,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     float anchor[3];
     float cellspacing[3];
     std::vector<gidx_info> gidx_datasets;
-  
+    Box global_logic_box;
+
   private:
 
     IDX_IO* reader;
