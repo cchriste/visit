@@ -49,6 +49,7 @@
 #include <DBOptionsAttributes.h>
 #include <visit_idx_io.h>
 #include <string>
+#include <vtkXMLDataElement.h>
 
 #ifdef USE_VISUS
   #include <visus_idx_io.h>
@@ -128,8 +129,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool is_gidx;
     bool parallel_boxes;
     int sfc_offset[3];
-    float anchor[3];
-    float cellspacing[3];
+    Point3d anchor;
+    Point3d cellspacing;
     std::vector<gidx_info> gidx_datasets;
     Box global_logic_box;
 
@@ -145,8 +146,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     void calculateBoundsAndExtents();
     void loadBalance();
     void pidx_decomposition(int nprocs);
-  
-    
+    void parseVector(vtkXMLDataElement *el, Point3d& vec);
+       
     std::vector<double> timeIndex;
     std::vector<int> logTimeIndex;
     

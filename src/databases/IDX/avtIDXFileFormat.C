@@ -412,6 +412,25 @@ void avtIDXFileFormat::calculateBoundsAndExtents(){
     
 }
 
+void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, Point3d& vec){
+  String el_str(el->GetCharacterData());
+	  
+  el_str = trim(el_str);
+  String el_vals = el_str.substr(1,el_str.length()-2);
+  if(debug_input)
+    std::cout << "Found vec " << el_vals << std::endl;
+  std::string anchs;
+  std::stringstream anch_ss(el_vals);
+  for (int k=0; k < dim; k++){
+    std::getline(anch_ss, anchs, ',');
+	   
+    vec[k] = cfloat(anchs);
+  }
+  if(debug_input)
+    std::cout << "read " << vec[0] << " "<< vec[1] << " " << vec[2] << std::endl;
+}
+
+
 void avtIDXFileFormat::createBoxes(){
     
     size_t found = dataset_filename.find_last_of("/\\");
@@ -489,24 +508,24 @@ void avtIDXFileFormat::createBoxes(){
 	  anchor[2]=0;
 	 }
 	else{
-	  String anchor_str(anchor_el->GetCharacterData());
-	  
-	  anchor_str = trim(anchor_str);
-	  String anchor_vals = anchor_str.substr(1,anchor_str.length()-2);
-	  if(debug_input)
-	    std::cout << "Found anchor " << anchor_vals << std::endl;
-	  std::string anchs;
-	  std::stringstream anch_ss(anchor_vals);
-	  for (int k=0; k < dim; k++){
-	    std::getline(anch_ss, anchs, ',');
-	   
-	    anchor[k] = cfloat(anchs);
-	  }
-	  if(debug_input)
-	    std::cout << "read " << anchor[0] << " "<< anchor[1] << " " << anchor[2] << std::endl;
+	  parseVector(anchor_el, anchor);	   
 	}
-	}
+	
+	//cellspacing
+	vtkXMLDataElement *cellspacing_el = NULL;
+	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
 
+	if(cellspacing_el == NULL){
+	  if(debug_input)
+	    std::cout << "cellspacing not found" << std::endl;
+	  cellspacing[0]=(phyboxes[0].p2[0]-phyboxes[0].p1[0])/(boxes[0].p2[0]-boxes[0].p1[0]+1);
+	  cellspacing[1]=(phyboxes[0].p2[1]-phyboxes[0].p1[1])/(boxes[0].p2[1]-boxes[0].p1[1]+1);
+	  cellspacing[2]=(phyboxes[0].p2[2]-phyboxes[0].p1[2])/(boxes[0].p2[2]-boxes[0].p1[2]+1);
+	 }
+	else{
+	  parseVector(cellspacing_el, cellspacing);
+	}
+	}
 
         int nboxes = level->GetNumberOfNestedElements();
         
@@ -519,6 +538,9 @@ void avtIDXFileFormat::createBoxes(){
             String lower(xmlbox->FindNestedElementWithName("lower")->GetCharacterData());
             String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
             
+	    vtkXMLDataElement* p1log_el = xmlbox->FindNestedElementWithName("p1log");
+	    vtkXMLDataElement* p2log_el = xmlbox->FindNestedElementWithName("p2log");
+
             String extra_cells = "[0 0 0]";
 
             if(uintah_metadata)
@@ -570,12 +592,16 @@ void avtIDXFileFormat::createBoxes(){
                 /*if(boxes.size() == 0){
                   logOffset[k] = std::abs(p1phy[k]) / phy2log[k];//phy2log[k];
 		  }*/
-		
+	       
 		if(nboxes == 1) // single box case
 		  p1log[k] = 0;
-		else // multibox case (all inside the same domain)
-		  p1log[k] += int(std::abs(p1phy[k]) / phy2log[k]) - logOffset[k];
-                
+		else{ // multibox case (all inside the same domain)
+
+                  p1log[k] += std::ceil(std::fabs(p1phy[k]-anchor[k]) / phy2log[k]) - logOffset[k];
+		    //    printf("phy %f fabs %f cells %f fract %f int %d\n", p1phy[k],std::fabs(p1phy[k]),cellspacing[k],std::fabs(p1phy[k]) / cellspacing[k],std::ceil(std::fabs(p1phy[k]) / cellspacing[k])); 
+		  
+                }
+
 		if(nboxes == 1)
 		  p2log[k] = p1log[k] + resdata[k];// + sfc_offset[k];
 	        else{
@@ -583,8 +609,9 @@ void avtIDXFileFormat::createBoxes(){
 		    p1log[k] = last_log;//+1; 
 		    
 		  }
-		  p2log[k] = p1log[k] + resdata[k];// + sfc_offset[k];
-		  
+
+		  p2log[k] = std::ceil(std::fabs(p2phy[k]-anchor[k]) / phy2log[k]) - logOffset[k];
+
 		  if(k==0)
 		    last_log = p2log[k];
 		  
@@ -594,8 +621,12 @@ void avtIDXFileFormat::createBoxes(){
                     p2log[k] += eCells[k];
 		    //    p2phy[k] += phy2log[k];
 		}
-		/*else
-		  p2log[k] -= eCells[k];*/
+		
+		if(p1log_el != NULL)
+		  parseVector(p1log_el, p1log);
+		if(p2log_el != NULL)
+		  parseVector(p2log_el, p2log);
+		
             }
             if(debug_input){
                 std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
@@ -611,38 +642,6 @@ void avtIDXFileFormat::createBoxes(){
             
         }
         
-	//cellspacing
-	if(uintah_metadata){
-
-	vtkXMLDataElement *cellspacing_el = NULL;
-	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
-
-	if(cellspacing_el == NULL){
-	  if(debug_input)
-	    std::cout << "cellspacing not found" << std::endl;
-	  cellspacing[0]=(phyboxes[0].p2[0]-phyboxes[0].p1[0])/(boxes[0].p2[0]-boxes[0].p1[0]+1);
-	  cellspacing[1]=(phyboxes[0].p2[1]-phyboxes[0].p1[1])/(boxes[0].p2[1]-boxes[0].p1[1]+1);
-	  cellspacing[2]=(phyboxes[0].p2[2]-phyboxes[0].p1[2])/(boxes[0].p2[2]-boxes[0].p1[2]+1);
-	 }
-	else{
-	  String cellspacing_str(cellspacing_el->GetCharacterData());
-	  if(debug_input)
-	    std::cout << "found " << cellspacing_str << std::endl;
-	  cellspacing_str = trim(cellspacing_str);
-	  String cellspacing_vals = cellspacing_str.substr(1,cellspacing_str.length()-2);
-	  	  
-	  std::string anchs;
-	  std::stringstream anch_ss(cellspacing_vals);
-	  for (int k=0; k < dim; k++){
-	    std::getline(anch_ss, anchs, ',');
-	   
-	    cellspacing[k] = cfloat(anchs);
-	  }
-	  if(debug_input)
-	    std::cout << "read " << cellspacing[0] << " "<< cellspacing[1] << " " << cellspacing[2] << std::endl;
-	}
-	}
-
     }
     else{
         boxes.push_back(reader->getLogicBox());
