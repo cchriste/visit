@@ -138,7 +138,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
 
     IDX_IO* reader;
     bool reverse_endian;
-    
+    std::map<std::string, void_ref_ptr> mesh_boundaries;
+
     vtkDataArray* queryToVtk(int timestate, int domain, const char *varname);
     
     void createBoxes();
@@ -147,6 +148,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     void loadBalance();
     void pidx_decomposition(int nprocs);
     void parseVector(vtkXMLDataElement *el, Point3d& vec);
+    void CalculateDomainBoundaries(int timestate, const std::string &meshname);
        
     std::vector<double> timeIndex;
     std::vector<int> logTimeIndex;

@@ -597,29 +597,42 @@ void avtIDXFileFormat::createBoxes(){
 		  p1log[k] = 0;
 		else{ // multibox case (all inside the same domain)
 
-                  p1log[k] += std::ceil(std::fabs(p1phy[k]-anchor[k]) / phy2log[k]) - logOffset[k];
-		    //    printf("phy %f fabs %f cells %f fract %f int %d\n", p1phy[k],std::fabs(p1phy[k]),cellspacing[k],std::fabs(p1phy[k]) / cellspacing[k],std::ceil(std::fabs(p1phy[k]) / cellspacing[k])); 
+                  p1log[k] = std::fabs(p1phy[k]-anchor[k]) / cellspacing[k];
+		  printf("phy %f - anchor %f fabs %f cells %f fract %f int %d\n", p1phy[k],anchor[k],std::fabs(p1phy[k]),cellspacing[k],std::fabs(p1phy[k]-anchor[k]) / cellspacing[k], int(std::fabs(p1phy[k]) / cellspacing[k])); 
 		  
                 }
 
 		if(nboxes == 1)
 		  p2log[k] = p1log[k] + resdata[k];// + sfc_offset[k];
 	        else{
+		  /*
+		  if(k == 0 && boxes.size() > 0){
+		    p1log[k] = boxes.back().p2[k];
+		  }*/
+		  		
+		  p2log[k] = p1log[k] + resdata[k] - 1;
+		  
+		  /*
 		  if (k == 0 && i > 0){
 		    p1log[k] = last_log;//+1; 
 		    
-		  }
+		    }
 
-		  p2log[k] = std::ceil(std::fabs(p2phy[k]-anchor[k]) / phy2log[k]) - logOffset[k];
-
-		  if(k==0)
-		    last_log = p2log[k];
+		  //p2log[k] = std::ceil(std::fabs(p2phy[k]-anchor[k]) / phy2log[k]) - logOffset[k];
+		  
+		  if(k==0){
+		    p2log[k]++;
+		    last_log = p2log[k]+1;
+		    
+		    }*/
 		  
 		}
 		
                 if (use_extracells){
-                    p2log[k] += eCells[k];
-		    //    p2phy[k] += phy2log[k];
+		    if(k == 0 && (boxes.size() == 0 || boxes.size()==nboxes-1))
+		      p2log[k] += eCells[k];
+		    else if (k != 0)
+		      p2log[k] += eCells[k]*2;
 		}
 		
 		if(p1log_el != NULL)
@@ -647,6 +660,10 @@ void avtIDXFileFormat::createBoxes(){
         boxes.push_back(reader->getLogicBox());
         physicalBox = reader->getLogicBox();
         phyboxes.push_back(physicalBox);
+	cellspacing[0]=(phyboxes[0].p2[0]-phyboxes[0].p1[0])/(boxes[0].p2[0]-boxes[0].p1[0]+1);
+	cellspacing[1]=(phyboxes[0].p2[1]-phyboxes[0].p1[1])/(boxes[0].p2[1]-boxes[0].p1[1]+1);
+	cellspacing[2]=(phyboxes[0].p2[2]-phyboxes[0].p1[2])/(boxes[0].p2[2]-boxes[0].p1[2]+1);
+	 
     }
 
 }
@@ -1089,6 +1106,44 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     return;
 }
 
+void avtIDXFileFormat::CalculateDomainBoundaries(int timestate, const std::string &meshname){
+   if (*this->mesh_boundaries[meshname]==NULL)
+     {
+
+       if(debug_format)
+	 std::cout<< " create mesh boundaries" << std::endl;
+
+       avtRectilinearDomainBoundaries *rdb = new avtRectilinearDomainBoundaries(true);
+       rdb->SetNumDomains(phyboxes.size());
+
+       for (int i=0; i< phyboxes.size(); i++) {
+	 Box& box = phyboxes[i];
+
+	 int e[6] = { box.p1[0],box.p2[0],
+		   box.p1[1],box.p2[1],
+		   box.p1[2],box.p2[2]};
+     
+	 rdb->SetIndicesForRectGrid(i,e); //SetIndicesForAMRPatch(i, 0, e);
+       }
+
+       rdb->CalculateBoundaries();
+
+       this->mesh_boundaries[meshname]=void_ref_ptr(rdb,avtStructuredDomainBoundaries::Destruct);
+    
+     }
+    
+    cache->CacheVoidRef("any_mesh", // key MUST be called any_mesh
+			AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+			timestate, -1, this->mesh_boundaries[meshname]);
+
+    void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
+					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+					   timestate, -1);
+    if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
+      fprintf(stderr,"pidx boundary mesh not registered");
+
+}
+
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetMesh
@@ -1117,7 +1172,9 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 {
     if(debug_format)
         std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
-  
+    
+    CalculateDomainBoundaries(timestate, meshname);
+
     Box slice_box;
   
     int* my_bounds = NULL;
@@ -1212,7 +1269,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 	  // Boundary patches are special shifted to preserve global domain.
 	  // Internal patches are always just shifted.
 	  float face_offset= -1.f;
-	  
+	 
 	  if (sfc_offset[c]) 
 	  {
 	      if (i==0)
@@ -1232,6 +1289,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 	        face_offset += -0.5;
 	   }
 
+    
 	  array[i] = anchor[c] + (i + low[c] + face_offset) * cellspacing[c];
 	  
 	  //array[i] = levelInfo.anchor[c] + (i + low[c] + face_offset) * levelInfo.spacing[c];
