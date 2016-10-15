@@ -49,6 +49,7 @@
 #include <DBOptionsAttributes.h>
 #include <visit_idx_io.h>
 #include <string>
+#include <LevelInfo.h>
 #include <vtkXMLDataElement.h>
 
 #ifdef USE_VISUS
@@ -119,20 +120,20 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     int                           rank;
     int                           dim;         //2d or 3d
 
-    std::vector<VisitIDXIO::Box>  boxes;
-    std::vector<VisitIDXIO::Box>  phyboxes;
-    VisitIDXIO::Box               physicalBox;
-    std::vector<int*>             boxes_bounds;
+    // std::vector<VisitIDXIO::Box>  boxes;
+    // std::vector<VisitIDXIO::Box>  phyboxes;
+    // VisitIDXIO::Box               physicalBox;
+    // std::vector<int*>             boxes_bounds;
     bool multibox;
     bool use_extracells;
     bool use_raw;
     bool is_gidx;
     bool parallel_boxes;
     int sfc_offset[3];
-    Point3d anchor;
-    Point3d cellspacing;
+    // Point3d anchor;
+    // Point3d cellspacing;
     std::vector<gidx_info> gidx_datasets;
-    Box global_logic_box;
+    //Box global_logic_box;
 
   private:
 
@@ -140,15 +141,17 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool reverse_endian;
     std::map<std::string, void_ref_ptr> mesh_boundaries;
 
+    LevelInfo level_info;
+
     vtkDataArray* queryToVtk(int timestate, int domain, const char *varname);
     
     void createBoxes();
     void createTimeIndex();
-    void calculateBoundsAndExtents();
+    //void calculateBoundsAndExtents();
     void loadBalance();
     void pidx_decomposition(int nprocs);
-    void parseVector(vtkXMLDataElement *el, Point3d& vec);
-    void CalculateDomainBoundaries(int timestate, const std::string &meshname);
+    void parseVector(vtkXMLDataElement *el, double* vec);
+    void parseVector(vtkXMLDataElement *el, int* vec);
        
     std::vector<double> timeIndex;
     std::vector<int> logTimeIndex;

@@ -117,7 +117,7 @@ static inline std::string &trim(std::string &s) {
 }
 
 void avtIDXFileFormat::pidx_decomposition(int process_count){
-  
+#if 0  
   if (process_count == 1) return;
   
     int maxdir = 0; // largest extent axis
@@ -240,10 +240,11 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
   /*if(process_count == 1)
     physicalBox = reader->getLogicBox();
   */
+#endif
 }
 
 void avtIDXFileFormat::loadBalance(){
-    
+#if 0    
   //std::cout << "Load balancing";
     
     int maxdir = 0; // largest extent axis
@@ -365,6 +366,8 @@ void avtIDXFileFormat::loadBalance(){
         }
         std::cout << "-------------------------" << std::endl<< std::flush;
     }
+
+#endif
 }
 
 template <typename Type>
@@ -395,24 +398,24 @@ Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncom
 }
 
 // TODO consider the physical box
-void avtIDXFileFormat::calculateBoundsAndExtents(){
+// void avtIDXFileFormat::calculateBoundsAndExtents(){
     
-    // TODO deallocate this stuff
-    for(int i=0; i< boxes.size(); i++){
-        Box& box = boxes.at(i);
-        int* my_bounds = new int[3];
+//     // TODO deallocate this stuff
+//     for(int i=0; i< boxes.size(); i++){
+//         Box& box = boxes.at(i);
+//         int* my_bounds = new int[3];
             
-        my_bounds[0] = box.p2.x-box.p1.x+1;
-        my_bounds[1] = box.p2.y-box.p1.y+1;
-        my_bounds[2] = box.p2.z-box.p1.z+1;
+//         my_bounds[0] = box.p2.x-box.p1.x+1;
+//         my_bounds[1] = box.p2.y-box.p1.y+1;
+//         my_bounds[2] = box.p2.z-box.p1.z+1;
         
-        boxes_bounds.push_back(my_bounds);
+//         boxes_bounds.push_back(my_bounds);
         
-    }
+//     }
     
-}
+// }
 
-void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, Point3d& vec){
+void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, double* vec){
   String el_str(el->GetCharacterData());
 	  
   el_str = trim(el_str);
@@ -430,12 +433,32 @@ void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, Point3d& vec){
     std::cout << "read " << vec[0] << " "<< vec[1] << " " << vec[2] << std::endl;
 }
 
+void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, int* vec){
+  String el_str(el->GetCharacterData());
+      
+  el_str = trim(el_str);
+  String el_vals = el_str.substr(1,el_str.length()-2);
+  if(debug_input)
+    std::cout << "Found vec " << el_vals << std::endl;
+  std::string anchs;
+  std::stringstream anch_ss(el_vals);
+  for (int k=0; k < dim; k++){
+    std::getline(anch_ss, anchs, ',');
+       
+    vec[k] = cint(anchs);
+  }
+  if(debug_input)
+    std::cout << "read " << vec[0] << " "<< vec[1] << " " << vec[2] << std::endl;
+}
+
 
 void avtIDXFileFormat::createBoxes(){
     
     size_t found = dataset_filename.find_last_of("/\\");
     String folder = dataset_filename.substr(0,found);
     
+    bool found_cellspacing = false;
+
     String upsfilename = "noupsfile.ups";
     DIR *dir;
     struct dirent *ent;
@@ -495,37 +518,35 @@ void avtIDXFileFormat::createBoxes(){
         else 
             level = root->FindNestedElementWithName("level");
 
-	if(uintah_metadata){
+    	if(uintah_metadata){
 
-	vtkXMLDataElement *anchor_el = NULL;
-	anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
+        	vtkXMLDataElement *anchor_el = NULL;
+        	anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
 
-	if(anchor_el == NULL){
-	  if(debug_input)
-	    std::cout << "anchor not found" << std::endl;
-	  anchor[0]=0;
-	  anchor[1]=0;
-	  anchor[2]=0;
-	 }
-	else{
-	  parseVector(anchor_el, anchor);	   
-	}
-	
-	//cellspacing
-	vtkXMLDataElement *cellspacing_el = NULL;
-	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
+        	if(anchor_el == NULL){
+        	  if(debug_input)
+        	    std::cout << "anchor not found" << std::endl;
+        	  level_info.anchor[0]=0;
+        	  level_info.anchor[1]=0;
+        	  level_info.anchor[2]=0;
+        	 }
+        	else{
+        	  parseVector(anchor_el, level_info.anchor);	   
+        	}
+        	
+        	//cellspacing
+        	vtkXMLDataElement *cellspacing_el = NULL;
+        	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
 
-	if(cellspacing_el == NULL){
-	  if(debug_input)
-	    std::cout << "cellspacing not found" << std::endl;
-	  cellspacing[0]=(phyboxes[0].p2[0]-phyboxes[0].p1[0])/(boxes[0].p2[0]-boxes[0].p1[0]+1);
-	  cellspacing[1]=(phyboxes[0].p2[1]-phyboxes[0].p1[1])/(boxes[0].p2[1]-boxes[0].p1[1]+1);
-	  cellspacing[2]=(phyboxes[0].p2[2]-phyboxes[0].p1[2])/(boxes[0].p2[2]-boxes[0].p1[2]+1);
-	 }
-	else{
-	  parseVector(cellspacing_el, cellspacing);
-	}
-	}
+        	if(cellspacing_el == NULL){
+        	  if(debug_input)
+        	    std::cout << "cellspacing not found" << std::endl;}
+        	else{
+        	  parseVector(cellspacing_el, level_info.spacing);
+              found_cellspacing = true;
+
+        	}
+    	}
 
         int nboxes = level->GetNumberOfNestedElements();
         
@@ -533,13 +554,13 @@ void avtIDXFileFormat::createBoxes(){
             std::cout << "Found " << nboxes << " boxes" << std::endl;
         int last_log = 0;
         for(int i=0; i < nboxes; i++){
-            
+
             vtkXMLDataElement *xmlbox = level->GetNestedElement(i);
             String lower(xmlbox->FindNestedElementWithName("lower")->GetCharacterData());
             String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
             
-	    vtkXMLDataElement* p1log_el = xmlbox->FindNestedElementWithName("p1log");
-	    vtkXMLDataElement* p2log_el = xmlbox->FindNestedElementWithName("p2log");
+    	    vtkXMLDataElement* p1log_el = xmlbox->FindNestedElementWithName("p1log");
+    	    vtkXMLDataElement* p2log_el = xmlbox->FindNestedElementWithName("p2log");
 
             String extra_cells = "[0 0 0]";
 
@@ -562,10 +583,15 @@ void avtIDXFileFormat::createBoxes(){
             if(debug_input)
                 std::cout<< "lower " << lower << " upper " << upper << " resolution " << resolution << std::endl;
           
-            Point3d p1phy(0,0,0), p1log(0,0,0);
-            Point3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
+            // Point3d p1phy(0,0,0), p1log(0,0,0);
+            // Point3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
+
+            Point3d p1phy(0,0,0), p2phy(0,0,0);
+
+            int low[3];
+            int high[3];
           
-            int eCells[3];
+            int eCells[6];
             int resdata[3];
             double phy2log[3];
             
@@ -591,79 +617,101 @@ void avtIDXFileFormat::createBoxes(){
 		
                 /*if(boxes.size() == 0){
                   logOffset[k] = std::abs(p1phy[k]) / phy2log[k];//phy2log[k];
-		  }*/
+		        }*/
 	       
-		if(nboxes == 1) // single box case
-		  p1log[k] = 0;
-		else{ // multibox case (all inside the same domain)
+        		if(nboxes == 1) // single box case
+        		  low[k] = 0;
+        		else{ // multibox case (all inside the same domain)
 
-                  p1log[k] = std::fabs(p1phy[k]-anchor[k]) / cellspacing[k];
-		  printf("phy %f - anchor %f fabs %f cells %f fract %f int %d\n", p1phy[k],anchor[k],std::fabs(p1phy[k]),cellspacing[k],std::fabs(p1phy[k]-anchor[k]) / cellspacing[k], int(std::fabs(p1phy[k]) / cellspacing[k])); 
-		  
+                  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k];
+    		      printf("phy %f - anchor %f fabs %f cells %f fract %f int %d\n", p1phy[k],level_info.anchor[k],std::fabs(p1phy[k]),phy2log[k],std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k], int(std::fabs(p1phy[k]) / phy2log[k])); 
+    		  
                 }
 
-		if(nboxes == 1)
-		  p2log[k] = p1log[k] + resdata[k];// + sfc_offset[k];
-	        else{
-		  /*
-		  if(k == 0 && boxes.size() > 0){
-		    p1log[k] = boxes.back().p2[k];
-		  }*/
-		  		
-		  p2log[k] = p1log[k] + resdata[k] - 1;
-		  
-		  /*
-		  if (k == 0 && i > 0){
-		    p1log[k] = last_log;//+1; 
-		    
-		    }
+    		    high[k] = low[k] + resdata[k] - 1;
 
-		  //p2log[k] = std::ceil(std::fabs(p2phy[k]-anchor[k]) / phy2log[k]) - logOffset[k];
-		  
-		  if(k==0){
-		    p2log[k]++;
-		    last_log = p2log[k]+1;
-		    
-		    }*/
-		  
-		}
+      //       if (use_extracells){
+		    // if(k == 0 && (boxes.size() == 0 || boxes.size()==nboxes-1))
+		    //   p2log[k] += eCells[k];
+		    // else if (k != 0)
+		    //   p2log[k] += eCells[k]*2;
+		    // }
 		
-                if (use_extracells){
-		    if(k == 0 && (boxes.size() == 0 || boxes.size()==nboxes-1))
-		      p2log[k] += eCells[k];
-		    else if (k != 0)
-		      p2log[k] += eCells[k]*2;
-		}
-		
-		if(p1log_el != NULL)
-		  parseVector(p1log_el, p1log);
-		if(p2log_el != NULL)
-		  parseVector(p2log_el, p2log);
+        		if(p1log_el != NULL)
+        		  parseVector(p1log_el, low);
+        		if(p2log_el != NULL)
+        		  parseVector(p2log_el, high);   
 		
             }
-            if(debug_input){
-                std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
-                std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
-            }
-
-            phyboxes.push_back(Box(p1phy, p2phy));
-            if(phyboxes.size()==1)
-	      physicalBox = phyboxes[0];
-	    else
-	      physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
-            boxes.push_back(Box(p1log,p2log));
             
-        }
+            PatchInfo box;
+            // Simmetric extracells !!!! Not true
+            eCells[3] = eCells[0];
+            eCells[4] = eCells[1];
+            eCells[5] = eCells[2];
+            box.setBounds(low,high,eCells,"CC");
+
+            level_info.patchInfo.push_back(box);
+
+            if(debug_input){
+              std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
+              std::cout << level_info.patchInfo.back().toString();
+              //std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
+            }
+
+
+
+     //    phyboxes.push_back(Box(p1phy, p2phy));
+     //    if(phyboxes.size()==1)
+	    //   physicalBox = phyboxes[0];
+	    // else
+	    //   physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
+     //      boxes.push_back(Box(p1log,p2log));
+            
+      }
+
+      if(!found_cellspacing){
+        PatchInfo& box = level_info.patchInfo[0];
+
+        double box_min[3]; double box_max[3];
+        level_info.getExtents(box_min, box_max);
+
+        int low[3];
+        int high[3];
+        box.getBounds(low,high,"CC",use_extracells);
+
+        for(int k=0; k<3; k++)
+          level_info.spacing[k]=(box_max[k]-box_min[k])/(high[k]-low[k]+1);
+      }
         
     }
     else{
-        boxes.push_back(reader->getLogicBox());
-        physicalBox = reader->getLogicBox();
-        phyboxes.push_back(physicalBox);
-	cellspacing[0]=(phyboxes[0].p2[0]-phyboxes[0].p1[0])/(boxes[0].p2[0]-boxes[0].p1[0]+1);
-	cellspacing[1]=(phyboxes[0].p2[1]-phyboxes[0].p1[1])/(boxes[0].p2[1]-boxes[0].p1[1]+1);
-	cellspacing[2]=(phyboxes[0].p2[2]-phyboxes[0].p1[2])/(boxes[0].p2[2]-boxes[0].p1[2]+1);
-	 
+
+        Box log_box = reader->getLogicBox();
+        int low[3];
+        int high[3];
+        int eCells[6] = {0,0,0,0,0,0};
+
+        low[0] = log_box.p1[0];
+        low[1] = log_box.p1[1];
+        low[2] = log_box.p1[2];
+        high[0] = log_box.p2[0];
+        high[1] = log_box.p2[1];
+        high[2] = log_box.p2[2];
+
+        PatchInfo box;
+        box.setBounds(low,high,eCells,"CC");
+        level_info.patchInfo.push_back(box);
+
+        double box_min[3]; double box_max[3];
+        level_info.getExtents(box_min, box_max);
+
+        for(int k=0; k<3; k++){
+          level_info.spacing[k]=(box_max[k]-box_min[k])/(high[k]-low[k]+1);
+          level_info.anchor[k] = 0;
+        }
+        std::cout << "Single Box: ";
+        std::cout << level_info.patchInfo.back().toString();
     }
 
 }
@@ -829,7 +877,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
       const char* sfc_v = dataset_filename.substr(folder_point+4,1).c_str();
       std::cout << "Use SFC "<< sfc_v << std::endl;
       if(*sfc_v == 'X')
-	sfc_offset[0] = 1;
+	    sfc_offset[0] = 1;
       else if(*sfc_v == 'Y')
         sfc_offset[1] = 1;
       else if(*sfc_v == 'Z')
@@ -901,24 +949,25 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 
     createTimeIndex();
 
-    int old_size = boxes.size();
+    //int old_size = boxes.size();
 #ifdef PARALLEL
-    if(boxes.size()>1)
-      loadBalance();
-    else
-      pidx_decomposition(nprocs);
+    // if(boxes.size()>1)
+    //   loadBalance();
+    // else
+    //   pidx_decomposition(nprocs);
+    fprintf(stderr,"NO PARALLEL YET\n");
 #endif
 
-    if(boxes.size()>old_size)
-      parallel_boxes = true;
-    else
-      parallel_boxes = false;
+    // if(boxes.size()>old_size)
+    //   parallel_boxes = true;
+    // else
+    //   parallel_boxes = false;
 
-#ifdef USE_VISUS
-    loadBalance();
-#endif
+// #ifdef USE_VISUS
+//     loadBalance();
+// #endif
   
-    calculateBoundsAndExtents();
+   // calculateBoundsAndExtents();
 }
 
 
@@ -935,9 +984,9 @@ avtIDXFileFormat::~avtIDXFileFormat()
     if(debug_format)
         std::cout<<"(avtIDXFileFormat destructor)" << std::endl;
 
-    for(int i=0; i < boxes_bounds.size(); i++)
-        if(boxes_bounds.at(i) != NULL)
-            delete [] boxes_bounds.at(i);
+    // for(int i=0; i < boxes_bounds.size(); i++)
+    //     if(boxes_bounds.at(i) != NULL)
+    //         delete [] boxes_bounds.at(i);
   
     if(reader != NULL)
       delete reader;
@@ -1020,15 +1069,17 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     md->ClearLabels();
 
     avtMeshMetaData *mesh = new avtMeshMetaData;
-    mesh->name = "Mesh";
+    mesh->name = "CC_Mesh";
     
     mesh->meshType = AVT_RECTILINEAR_MESH;
     
-    mesh->numBlocks = boxes.size();
+    mesh->numBlocks = level_info.patchInfo.size();
     mesh->blockOrigin = 0;
     mesh->LODs = reader->getMaxResolution();
     mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
+    mesh->numGroups = 1; // n AMR levels
+    mesh->containsExteriorBoundaryGhosts = false;
     
     mesh->blockTitle = "box";
     mesh->blockPieceName = "box";
@@ -1037,6 +1088,35 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     // TODO use the physical box (logic_to_physic)
     mesh->hasSpatialExtents = true;
 
+    int low[3],high[3];
+    level_info.getBounds(low,high,"CC_Mesh",use_extracells);
+
+  //this can be done once for everything because the spatial range is the same for all meshes
+    double box_min[3] = { level_info.anchor[0] + low[0] * level_info.spacing[0],
+                            level_info.anchor[1] + low[1] * level_info.spacing[1],
+                            level_info.anchor[2] + low[2] * level_info.spacing[2] };
+    double box_max[3] = { level_info.anchor[0] + high[0] * level_info.spacing[0],
+                        level_info.anchor[1] + high[1] * level_info.spacing[1],
+                        level_info.anchor[2] + high[2] * level_info.spacing[2] };
+
+    int logical[3];
+    for (int i=0; i<3; i++)
+        logical[i] = high[i]-low[i];
+
+    mesh->hasSpatialExtents = true; 
+    mesh->minSpatialExtents[0] = box_min[0];
+    mesh->maxSpatialExtents[0] = box_max[0];
+    mesh->minSpatialExtents[1] = box_min[1];
+    mesh->maxSpatialExtents[1] = box_max[1];
+    mesh->minSpatialExtents[2] = box_min[2];
+    mesh->maxSpatialExtents[2] = box_max[2];
+
+    mesh->hasLogicalBounds = true;
+    mesh->logicalBounds[0] = logical[0];
+    mesh->logicalBounds[1] = logical[1];
+    mesh->logicalBounds[2] = logical[2];
+
+#if 0 
     mesh->minSpatialExtents[0] = physicalBox.p1.x;
     mesh->maxSpatialExtents[0] = physicalBox.p2.x;
     mesh->minSpatialExtents[1] = physicalBox.p1.y;
@@ -1049,7 +1129,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->logicalBounds[0] = global_logic_box.p2.x - global_logic_box.p1.x+1;
     mesh->logicalBounds[1] = global_logic_box.p2.y - global_logic_box.p1.y+1;
     mesh->logicalBounds[2] = global_logic_box.p2.z - global_logic_box.p1.z+1;
-    
+#endif   
     md->Add(mesh);
   
 #ifdef PARALLEL // only PIDX
@@ -1079,19 +1159,18 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
      //}
     avtRectilinearDomainBoundaries *rdb =
     new avtRectilinearDomainBoundaries(true);
-    rdb->SetNumDomains(phyboxes.size());
+    rdb->SetNumDomains(level_info.patchInfo.size());
     
-    for (long long i = 0 ; i < phyboxes.size() ; i++)
+    for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
     {
-        int extents[6];
-        extents[0] = phyboxes.at(i).p1.x;
-        extents[1] = phyboxes.at(i).p2.x;
-        extents[2] = phyboxes.at(i).p1.y;
-        extents[3] = phyboxes.at(i).p2.y;
-        extents[4] = phyboxes.at(i).p1.z;
-        extents[5] = phyboxes.at(i).p2.z;
+        int low[3],high[3];
+        level_info.patchInfo[i].getBounds(low,high,mesh->name, use_extracells);
+
+        int e[6] = { low[0], high[0],
+                   low[1], high[1],
+                   low[2], high[2] };
         
-        rdb->SetIndicesForRectGrid(i, extents);
+        rdb->SetIndicesForRectGrid(i, e);
     }
 
     rdb->CalculateBoundaries();
@@ -1104,44 +1183,6 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
       printf("%d: end meta\n", rank);
 
     return;
-}
-
-void avtIDXFileFormat::CalculateDomainBoundaries(int timestate, const std::string &meshname){
-   if (*this->mesh_boundaries[meshname]==NULL)
-     {
-
-       if(debug_format)
-	 std::cout<< " create mesh boundaries" << std::endl;
-
-       avtRectilinearDomainBoundaries *rdb = new avtRectilinearDomainBoundaries(true);
-       rdb->SetNumDomains(phyboxes.size());
-
-       for (int i=0; i< phyboxes.size(); i++) {
-	 Box& box = phyboxes[i];
-
-	 int e[6] = { box.p1[0],box.p2[0],
-		   box.p1[1],box.p2[1],
-		   box.p1[2],box.p2[2]};
-     
-	 rdb->SetIndicesForRectGrid(i,e); //SetIndicesForAMRPatch(i, 0, e);
-       }
-
-       rdb->CalculateBoundaries();
-
-       this->mesh_boundaries[meshname]=void_ref_ptr(rdb,avtStructuredDomainBoundaries::Destruct);
-    
-     }
-    
-    cache->CacheVoidRef("any_mesh", // key MUST be called any_mesh
-			AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-			timestate, -1, this->mesh_boundaries[meshname]);
-
-    void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-					   timestate, -1);
-    if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
-      fprintf(stderr,"pidx boundary mesh not registered");
-
 }
 
 
@@ -1173,143 +1214,82 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     if(debug_format)
         std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
     
-    CalculateDomainBoundaries(timestate, meshname);
-
     Box slice_box;
-  
-    int* my_bounds = NULL;
-    int* my_extents = NULL;
-
-    slice_box = phyboxes.at(domain);
-    my_bounds = boxes_bounds.at(domain);
     
     vtkRectilinearGrid *rgrid = vtkRectilinearGrid::New();
-    int dims[3];
+    int my_dims[3];
     float *arrayX;
     float *arrayZ;
     float *arrayY;
     vtkFloatArray *coordsX;
     vtkFloatArray *coordsY;
     vtkFloatArray *coordsZ;
-    
-    int my_dims[3];
-    
-    int offset = 1; // always one for non-node-centered
-    
-    my_dims[0] = my_bounds[0]+offset;
-    my_dims[1] = my_bounds[1]+offset;
-    my_dims[2] = my_bounds[2]+offset;
-  
+
+    //get global bounds
+    int glow[3], ghigh[3];
+    level_info.getBounds(glow,ghigh,meshname,use_extracells);
+
+    //get patch bounds
+    int low[3], high[3];
+    level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
+
+    for(int k=0; k<3; k++)
+        my_dims[k] = high[k]-low[k]+1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
+
     if(debug_format)
         std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
 
     rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
-
-#if 0
-    coordsX = vtkFloatArray::New();
-    coordsX->SetNumberOfTuples(my_dims[0]);
-    arrayX = (float *) coordsX->GetVoidPointer(0);
-    
-    float steps[3];
-    
-    for (int i = 0; i < dim; i++){
-      //if(!parallel_boxes)
-         steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_bounds[i]);
-      //else
-      //   steps[i] = (slice_box.p2[i] - slice_box.p1[i])/(my_bounds[i]-4);
-    }
-    
-    for (int i = 0; i < my_dims[0]; i++){
-      arrayX[i] = slice_box.p1.x + i*steps[0];
-      //if(domain > 0)
-      //  arrayX[i] -= steps[0]/2;
-      /*else if(domain == boxes.size()-1)
-	arrayX[i] += steps[0]/2;*/
-    }
-    rgrid->SetXCoordinates(coordsX);
-    
-    coordsY = vtkFloatArray::New();
-    coordsY->SetNumberOfTuples(my_dims[1]);
-    arrayY = (float *) coordsY->GetVoidPointer(0);
-    for (int i = 0; i < my_dims[1]; i++)
-      arrayY[i] = slice_box.p1.y + i*steps[1];
-    rgrid->SetYCoordinates(coordsY);
-    
-    coordsZ = vtkFloatArray::New();
-    coordsZ->SetNumberOfTuples(my_dims[2]);
-    arrayZ = (float *) coordsZ->GetVoidPointer(0);
-    for (int i = 0; i < my_dims[2]; i++)
-      arrayZ[i] = slice_box.p1.z + i*steps[2];
-    rgrid->SetZCoordinates(coordsZ);
-    
-#else
-
-    Box log_box = boxes.at(domain);
-    //anchor[3] = {7.5,0,0};//MB {0,0,0};
-    //float cellspacing[3] = //singel big {0.052958754208754212, 0.051472222222222225, 0.051990909090909088};//MB{0.02, 0.020000000000000004, 0.02};
-
-   //single_small
-    //cellspacing[3] = {0.21845486111111112, 0.2058888888888889, 0.20424999999999999};
      
-    float low[3] = {log_box.p1[0],log_box.p1[1],log_box.p1[2]};
-    float high[3] = {log_box.p2[0],log_box.p2[1],log_box.p2[2]};
-    float glow[3] = {global_logic_box.p1[0],global_logic_box.p1[1],global_logic_box.p1[2]};
-    float ghigh[3] = {global_logic_box.p2[0],global_logic_box.p2[1],global_logic_box.p2[2]};
     printf("global %f %f %f - %f %f %f local %f %f %f - %f %f %f\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
 
-     for (int c=0; c<3; c++) {
+    for (int c=0; c<3; c++) {
       vtkFloatArray *coords = vtkFloatArray::New(); 
       coords->SetNumberOfTuples(my_dims[c]); 
       float *array = (float *)coords->GetVoidPointer(0); 
           
       //      float step = (slice_box.p2[c] - slice_box.p1[c])/(my_dims[c]);
-      for (int i=0; i<my_dims[c]; i++)
-	{
-	  // Face centered data gets shifted towards -inf by half a cell.
-	  // Boundary patches are special shifted to preserve global domain.
-	  // Internal patches are always just shifted.
-	  float face_offset= -1.f;
-	 
-	  if (sfc_offset[c]) 
-	  {
-	      if (i==0)
-		if (low[c]==glow[c]) // patch is on low boundary
-		  face_offset += 0.0;
-		else
-		  face_offset += -0.5;       // patch boundary is internal to the domain
-	      else if (i==my_dims[c]-1)
-		if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
-		  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
-		  //  face_offset += 0.0;
-	          //else
-	          face_offset += -1;
-		else                        // patch boundary is internal to the domain
-		  face_offset += -0.5;
-	      else
-	        face_offset += -0.5;
-	   }
-
+        for (int i=0; i<my_dims[c]; i++)
+    	{
+    	  // Face centered data gets shifted towards -inf by half a cell.
+    	  // Boundary patches are special shifted to preserve global domain.
+    	  // Internal patches are always just shifted.
+    	  float face_offset= -1.f;
+    	 
+    	  if (sfc_offset[c]) 
+    	  {
+    	      if (i==0)
+    		if (low[c]==glow[c]) // patch is on low boundary
+    		  face_offset += 0.0;
+    		else
+    		  face_offset += -0.5;       // patch boundary is internal to the domain
+    	      else if (i==my_dims[c]-1)
+    		if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
+    		  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
+    		  //  face_offset += 0.0;
+    	          //else
+    	          face_offset += -1;
+    		else                        // patch boundary is internal to the domain
+    		  face_offset += -0.5;
+    	      else
+    	        face_offset += -0.5;
+    	   }
     
-	  array[i] = anchor[c] + (i + low[c] + face_offset) * cellspacing[c];
+	       array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
 	  
-	  //array[i] = levelInfo.anchor[c] + (i + low[c] + face_offset) * levelInfo.spacing[c];
-	  
-	  // array[i] = slice_box.p1[c] + step*i;
-	}
+	    }
 
-      switch(c) {
-      case 0:
-        rgrid->SetXCoordinates(coords); break;
-      case 1:
-        rgrid->SetYCoordinates(coords); break;
-      case 2:
-        rgrid->SetZCoordinates(coords); break;
-      }
+        switch(c) {
+          case 0:
+            rgrid->SetXCoordinates(coords); break;
+          case 1:
+            rgrid->SetYCoordinates(coords); break;
+          case 2:
+            rgrid->SetZCoordinates(coords); break;
+        }
 
       coords->Delete();
     }
-
-#endif
 
     if(debug_format)
       printf("end mesh\n");
@@ -1337,21 +1317,21 @@ avtIDXFileFormat::GetTimes(std::vector<double> &times)
   times.swap(timeIndex);
 
   // if(debug_format)
-  //   printf("%d: exiting getcycles\n", rank);
+  //   printf("%d: exiting gettimes\n", rank);
 
-//    std::map<int, double> m;
-//    std::vector<double> v;
-//    for(std::map<int,double>::iterator it = m.begin(); it != m.end(); ++it) {
-//        times.push_back(it->second);
-//    }
-    
-//    std::vector<double> tsteps = reader->getTimes();
-//    times.swap(tsteps);
 }
 
 vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
     
-    const Box& my_box = boxes.at(domain);
+    Box my_box;
+    int low[3];
+    int high[3];
+    level_info.patchInfo[domain].getBounds(low,high,"CC_Mesh", use_extracells);
+
+    for(int k=0; k<3; k++){    
+        my_box.p1[k] = low[k];
+        my_box.p2[k] = high[k];
+    }
     
     unsigned char* data = reader->getData(my_box, timestate, varname);
 
@@ -1382,7 +1362,10 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     Field field = reader->getCurrField();
     DTypes type = field.type;
     
-    int* my_bounds = boxes_bounds.at(domain);
+    int my_bounds[3];
+    for(int k=0; k<3; k++)
+     my_bounds [k] = high[k]-low[k]+1;
+
     int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
     long long ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
 
