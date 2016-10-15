@@ -623,12 +623,12 @@ void avtIDXFileFormat::createBoxes(){
         		  low[k] = 0;
         		else{ // multibox case (all inside the same domain)
 
-                  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k];
+                  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
     		      printf("phy %f - anchor %f fabs %f cells %f fract %f int %d\n", p1phy[k],level_info.anchor[k],std::fabs(p1phy[k]),phy2log[k],std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k], int(std::fabs(p1phy[k]) / phy2log[k])); 
     		  
                 }
 
-    		    high[k] = low[k] + resdata[k] - 1;
+		high[k] = low[k] + resdata[k] - 1;
 
       //       if (use_extracells){
 		    // if(k == 0 && (boxes.size() == 0 || boxes.size()==nboxes-1))
@@ -1071,19 +1071,36 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     avtMeshMetaData *mesh = new avtMeshMetaData;
     mesh->name = "CC_Mesh";
     
-    mesh->meshType = AVT_RECTILINEAR_MESH;
-    
-    mesh->numBlocks = level_info.patchInfo.size();
-    mesh->blockOrigin = 0;
-    mesh->LODs = reader->getMaxResolution();
+    mesh->meshType = AVT_AMR_MESH; //AVT_RECTILINEAR_MESH;
+    int totalPatches = level_info.patchInfo.size();
+    mesh->numBlocks = totalPatches;
+    //mesh->blockOrigin = 0;
+    //mesh->LODs = reader->getMaxResolution();
     mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
-    // mesh->numGroups = 1; // n AMR levels
-    // mesh->containsExteriorBoundaryGhosts = false;
-    
     mesh->blockTitle = "patches";
     mesh->blockPieceName = "patch";
 
+    
+    std::vector<int> groupIds(totalPatches);
+    std::vector<std::string> pieceNames(totalPatches);
+    
+    int numLevels = 1;
+    for (int i = 0; i < mesh->numBlocks; i++) {
+      char tmpName[64];
+      int level = 0; // only 1 level
+      int local_patch = i;
+      sprintf(tmpName,"level%d, patch%d", level, local_patch);
+
+      groupIds[i] = level;
+      pieceNames[i] = tmpName;
+    }
+    mesh->groupTitle = "levels";
+    mesh->groupPieceName = "level";
+    mesh->numGroups = numLevels; // n AMR levels
+    mesh->containsExteriorBoundaryGhosts = false;
+    mesh->blockNames = pieceNames;
+    
     int low[3],high[3];
     level_info.getBounds(low,high,"CC_Mesh",use_extracells);
 
@@ -1119,22 +1136,12 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->logicalBounds[1] = logical[1];
     mesh->logicalBounds[2] = logical[2];
 
-#if 0 
-    mesh->minSpatialExtents[0] = physicalBox.p1.x;
-    mesh->maxSpatialExtents[0] = physicalBox.p2.x;
-    mesh->minSpatialExtents[1] = physicalBox.p1.y;
-    mesh->maxSpatialExtents[1] = physicalBox.p2.y;
-    mesh->minSpatialExtents[2] = physicalBox.p1.z;
-    mesh->maxSpatialExtents[2] = physicalBox.p2.z;
-
-    global_logic_box = reader->getLogicBox();
-    mesh->hasLogicalBounds = true;
-    mesh->logicalBounds[0] = global_logic_box.p2.x - global_logic_box.p1.x+1;
-    mesh->logicalBounds[1] = global_logic_box.p2.y - global_logic_box.p1.y+1;
-    mesh->logicalBounds[2] = global_logic_box.p2.z - global_logic_box.p1.z+1;
-#endif   
     md->Add(mesh);
-  
+    
+    md->AddGroupInformation(numLevels, totalPatches, groupIds);
+    md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
+
+
 #ifdef PARALLEL // only PIDX
    // md->SetFormatCanDoDomainDecomposition(true);
 #endif
@@ -1159,29 +1166,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
             AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
             //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
     }
-    /*
-    avtRectilinearDomainBoundaries *rdb =
-    new avtRectilinearDomainBoundaries(true);
-    rdb->SetNumDomains(level_info.patchInfo.size());
     
-    for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
-    {
-        int low[3],high[3];
-        level_info.patchInfo[i].getBounds(low,high,mesh->name, use_extracells);
-
-        int e[6] = { low[0], high[0],
-                   low[1], high[1],
-                   low[2], high[2] };
-        
-        rdb->SetIndicesForRectGrid(i, e);
-    }
-
-    rdb->CalculateBoundaries();
-  
-    void_ref_ptr vr = void_ref_ptr(rdb,
-                                   avtStructuredDomainBoundaries::Destruct);
-    cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
-*/
     if(debug_format)
       printf("%d: end meta\n", rank);
 
@@ -1216,7 +1201,98 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 {
     if(debug_format)
         std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
+   
+    avtRectilinearDomainBoundaries *rdb =
+    new avtRectilinearDomainBoundaries(true);
+    rdb->SetNumDomains(level_info.patchInfo.size());
     
+    for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
+    {
+        int low[3],high[3];
+        level_info.patchInfo[i].getBounds(low,high,meshname, use_extracells);
+
+        int e[6] = { low[0], high[0],
+                   low[1], high[1],
+                   low[2], high[2] };
+        
+        rdb->SetIndicesForAMRPatch(i,0,e);//SetIndicesForRectGrid(i, e);
+    }
+
+    rdb->CalculateBoundaries();
+  
+    void_ref_ptr vr = void_ref_ptr(rdb,
+                                   avtStructuredDomainBoundaries::Destruct);
+    cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, vr);
+
+    void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
+					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+					   timestate, -1);
+    if (*vrTmp == NULL || *vrTmp != *vr)
+      fprintf(stderr,"pidx boundary mesh not registered\n");
+    
+
+    /*
+    int totalPatches = level_info.patchInfo.size();
+    int num_levels = 1;
+    avtStructuredDomainNesting *dn = new avtStructuredDomainNesting(totalPatches, num_levels);
+    
+    dn->SetNumDimensions(3);
+    
+    std::vector< std::vector<int> > childPatches(totalPatches);
+    for (int level = num_levels-1 ; level > 0 ; level--) {
+      int prev_level = level-1;
+      LevelInfo &levelInfoParent = stepInfo->levelInfo[prev_level];
+      LevelInfo &levelInfoChild = stepInfo->levelInfo[level];
+
+      for (int child=0; child<(int)levelInfoChild.patchInfo.size(); child++) {
+        PatchInfo &childPatchInfo = levelInfoChild.patchInfo[child];
+        int child_low[3],child_high[3];
+        childPatchInfo.getBounds(child_low,child_high,meshname);
+
+        for (int parent=0; parent<(int)levelInfoParent.patchInfo.size(); parent++) {
+          PatchInfo &parentPatchInfo = levelInfoParent.patchInfo[parent];
+          int parent_low[3],parent_high[3];
+          parentPatchInfo.getBounds(parent_low,parent_high,meshname);
+
+          int mins[3], maxs[3];
+          for (int i=0; i<3; i++) {
+            mins[i] = max(child_low[i],  parent_low[i] *levelInfoChild.refinementRatio[i]);
+            maxs[i] = min(child_high[i], parent_high[i]*levelInfoChild.refinementRatio[i]);
+          }
+          bool overlap = (mins[0]<maxs[0] &&
+                          mins[1]<maxs[1] &&
+                          mins[2]<maxs[2]);
+
+          if (overlap) {
+            int child_gpatch = GetGlobalDomainNumber(level, child);
+            int parent_gpatch = GetGlobalDomainNumber(prev_level, parent);
+            childPatches[parent_gpatch].push_back(child_gpatch);
+          }
+        }
+      }
+    }
+
+    for (int p=0; p<totalPatches ; p++) {
+      int my_level =0;
+      int local_patch = p;
+
+      PatchInfo &patchInfo = level_info.patchInfo[local_patch];
+      int low[3],high[3];
+      patchInfo.getBounds(low,high,meshname,use_extracells);
+
+      std::vector<int> e(6);
+      for (int i=0; i<3; i++) {
+        e[i+0] = low[i];
+        e[i+3] = high[i]-1;
+      }
+    
+      
+      dn->SetNestingForDomain(p, my_level, childPatches[p], e);
+    }
+
+    this->mesh_domains[meshname]=void_ref_ptr(dn, avtStructuredDomainNesting::Destruct);
+    */
+
     Box slice_box;
     
     vtkRectilinearGrid *rgrid = vtkRectilinearGrid::New();
@@ -1257,7 +1333,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     	  // Face centered data gets shifted towards -inf by half a cell.
     	  // Boundary patches are special shifted to preserve global domain.
     	  // Internal patches are always just shifted.
-    	  float face_offset= 0;//-1.f;
+    	  float face_offset= -1.f;
     	 
     	  if (sfc_offset[c]) 
     	  {
