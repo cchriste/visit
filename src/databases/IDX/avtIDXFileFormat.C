@@ -695,9 +695,9 @@ void avtIDXFileFormat::createBoxes(){
         low[0] = log_box.p1[0];
         low[1] = log_box.p1[1];
         low[2] = log_box.p1[2];
-        high[0] = log_box.p2[0];
-        high[1] = log_box.p2[1];
-        high[2] = log_box.p2[2];
+        high[0] = log_box.p2[0]-1;
+        high[1] = log_box.p2[1]-1;
+        high[2] = log_box.p2[2]-1;
 
         PatchInfo box;
         box.setBounds(low,high,eCells,"CC");
@@ -707,8 +707,8 @@ void avtIDXFileFormat::createBoxes(){
         level_info.getExtents(box_min, box_max);
 
         for(int k=0; k<3; k++){
-          level_info.spacing[k]=(box_max[k]-box_min[k])/(high[k]-low[k]+1);
-          level_info.anchor[k] = 0;
+          level_info.spacing[k]= 1.f;
+          level_info.anchor[k] = 0.f;
         }
         std::cout << "Single Box: ";
         std::cout << level_info.patchInfo.back().toString();
@@ -1073,31 +1073,34 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     
     mesh->meshType = AVT_RECTILINEAR_MESH;
     
-    mesh->numBlocks = level_info.patchInfo.size();
-    mesh->blockOrigin = 0;
+    // mesh->numBlocks = level_info.patchInfo.size();
+    //mesh->blockOrigin = 0;
     mesh->LODs = reader->getMaxResolution();
     mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
-    mesh->numGroups = 1; // n AMR levels
-    mesh->containsExteriorBoundaryGhosts = false;
+    // mesh->numGroups = 1; // n AMR levels
+    // mesh->containsExteriorBoundaryGhosts = false;
     
-    mesh->blockTitle = "box";
-    mesh->blockPieceName = "box";
-    
-    // Set bounds and extents for SLIVR rendering
-    // TODO use the physical box (logic_to_physic)
-    mesh->hasSpatialExtents = true;
+    mesh->blockTitle = "patches";
+    mesh->blockPieceName = "patch";
 
     int low[3],high[3];
     level_info.getBounds(low,high,"CC_Mesh",use_extracells);
 
-  //this can be done once for everything because the spatial range is the same for all meshes
+    //this can be done once for everything because the spatial range is the same for all meshes
     double box_min[3] = { level_info.anchor[0] + low[0] * level_info.spacing[0],
                             level_info.anchor[1] + low[1] * level_info.spacing[1],
                             level_info.anchor[2] + low[2] * level_info.spacing[2] };
     double box_max[3] = { level_info.anchor[0] + high[0] * level_info.spacing[0],
                         level_info.anchor[1] + high[1] * level_info.spacing[1],
                         level_info.anchor[2] + high[2] * level_info.spacing[2] };
+
+    if(debug_format){
+        printf("Dimensions %d\n", dim);
+        printf("anchor %f %f %f spacing %f %f %f\n",level_info.anchor[0],level_info.anchor[1],level_info.anchor[2], level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
+        printf("global log %d %d %d - %d %d %d\n", low[0],low[1],low[2],high[0],high[1],high[2]);
+        printf("global phy %f %f %f - %f %f %f\n", box_min[0],box_min[1],box_min[2],box_max[0],box_max[1],box_max[2]);
+    }
 
     int logical[3];
     for (int i=0; i<3; i++)
@@ -1156,7 +1159,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
             AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
             //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
     }
-     //}
+    /*
     avtRectilinearDomainBoundaries *rdb =
     new avtRectilinearDomainBoundaries(true);
     rdb->SetNumDomains(level_info.patchInfo.size());
@@ -1178,7 +1181,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     void_ref_ptr vr = void_ref_ptr(rdb,
                                    avtStructuredDomainBoundaries::Destruct);
     cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
-
+*/
     if(debug_format)
       printf("%d: end meta\n", rank);
 
@@ -1234,27 +1237,27 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
 
     for(int k=0; k<3; k++)
-        my_dims[k] = high[k]-low[k]+1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
+        my_dims[k] = high[k]-low[k]+1+1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
 
     if(debug_format)
         std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
 
     rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
      
-    printf("global %f %f %f - %f %f %f local %f %f %f - %f %f %f\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
+    printf("global %d %d %d - %d %d %d local %d %d %d - %d %d %d\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
+    printf("cellspacing %f %f %f\n", level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
 
     for (int c=0; c<3; c++) {
       vtkFloatArray *coords = vtkFloatArray::New(); 
       coords->SetNumberOfTuples(my_dims[c]); 
       float *array = (float *)coords->GetVoidPointer(0); 
           
-      //      float step = (slice_box.p2[c] - slice_box.p1[c])/(my_dims[c]);
         for (int i=0; i<my_dims[c]; i++)
     	{
     	  // Face centered data gets shifted towards -inf by half a cell.
     	  // Boundary patches are special shifted to preserve global domain.
     	  // Internal patches are always just shifted.
-    	  float face_offset= -1.f;
+    	  float face_offset= 0;//-1.f;
     	 
     	  if (sfc_offset[c]) 
     	  {
@@ -1277,6 +1280,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     
 	       array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
 	  
+            //printf("c %d: %f\n", c, array[i]);
 	    }
 
         switch(c) {
@@ -1328,6 +1332,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     int high[3];
     level_info.patchInfo[domain].getBounds(low,high,"CC_Mesh", use_extracells);
 
+    std::cout << "read data " << level_info.patchInfo[domain].toString();
     for(int k=0; k<3; k++){    
         my_box.p1[k] = low[k];
         my_box.p2[k] = high[k];

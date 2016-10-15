@@ -100,9 +100,9 @@ public:
     }
 
     if(extra){
-      low[0] += extra_cells[0];
-      low[1] += extra_cells[1];
-      low[2] += extra_cells[2];
+      low[0] -= extra_cells[0];
+      low[1] -= extra_cells[1];
+      low[2] -= extra_cells[2];
     }
   }
 
@@ -233,7 +233,7 @@ public:
   std::string toString() const
   {
     std::ostringstream str;
-    str<<"CC: <"<<cc_low[0]<<","<<cc_low[1]<<","<<cc_low[2]<<"> to <"<<cc_high[0]<<","<<cc_high[1]<<","<<cc_high[2]<<">"<<std::endl;
+    str<<"CC: <"<<cc_low[0]<<","<<cc_low[1]<<","<<cc_low[2]<<"> to <"<<cc_high[0]<<","<<cc_high[1]<<","<<cc_high[2]<<"> eCell <"<<extra_cells[0]<<","<<extra_cells[1]<<","<<extra_cells[2]<<","<<extra_cells[3]<<","<<extra_cells[4]<<","<<extra_cells[5]<<">"<<std::endl;
     // str<<"NC: <"<<nc_low[0]<<","<<nc_low[1]<<","<<nc_low[2]<<"> to <"<<nc_high[0]<<","<<nc_high[1]<<","<<nc_high[2]<<">"<<std::endl;
     // str<<"SFCX: <"<<sfcx_low[0]<<","<<sfcx_low[1]<<","<<sfcx_low[2]<<"> to <"<<sfcx_high[0]<<","<<sfcx_high[1]<<","<<sfcx_high[2]<<">"<<std::endl;
     // str<<"SFCY: <"<<sfcy_low[0]<<","<<sfcy_low[1]<<","<<sfcy_low[2]<<"> to <"<<sfcy_high[0]<<","<<sfcy_high[1]<<","<<sfcy_high[2]<<">"<<std::endl;
