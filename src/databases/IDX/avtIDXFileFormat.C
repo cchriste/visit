@@ -1073,8 +1073,8 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     
     mesh->meshType = AVT_RECTILINEAR_MESH;
     
-    // mesh->numBlocks = level_info.patchInfo.size();
-    //mesh->blockOrigin = 0;
+    mesh->numBlocks = level_info.patchInfo.size();
+    mesh->blockOrigin = 0;
     mesh->LODs = reader->getMaxResolution();
     mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
@@ -1331,6 +1331,11 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     int low[3];
     int high[3];
     level_info.patchInfo[domain].getBounds(low,high,"CC_Mesh", use_extracells);
+
+    if(use_extracells){
+      for(int k=0;k<3;k++)
+	 if(low[k]<0) low[k]++;
+    }
 
     std::cout << "read data " << level_info.patchInfo[domain].toString();
     for(int k=0; k<3; k++){    
