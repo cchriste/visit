@@ -140,6 +140,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     IDX_IO* reader;
     bool reverse_endian;
     std::map<std::string, void_ref_ptr> mesh_boundaries;
+    std::map<std::string, void_ref_ptr> mesh_domains;
 
     LevelInfo level_info;
 
