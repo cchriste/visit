@@ -120,20 +120,12 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     int                           rank;
     int                           dim;         //2d or 3d
 
-    // std::vector<VisitIDXIO::Box>  boxes;
-    // std::vector<VisitIDXIO::Box>  phyboxes;
-    // VisitIDXIO::Box               physicalBox;
-    // std::vector<int*>             boxes_bounds;
-    bool multibox;
     bool use_extracells;
     bool use_raw;
     bool is_gidx;
     bool parallel_boxes;
     int sfc_offset[3];
-    // Point3d anchor;
-    // Point3d cellspacing;
     std::vector<gidx_info> gidx_datasets;
-    //Box global_logic_box;
 
   private:
 

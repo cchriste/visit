@@ -58,6 +58,14 @@ public:
     GridType type=str2GridType(typestr);
     getLow(low,type,extra);
     getHigh(high,type,extra);
+  }
+
+  void getBounds(int low[3],int high[3], int extraCells[3], const std::string &typestr, bool extra=false) const 
+  {
+    GridType type=str2GridType(typestr);
+    getLow(low,type,extra);
+    getHigh(high,type,extra);
+    getExtraCells(extraCells);
   } 
 
   //getLow
@@ -150,6 +158,15 @@ public:
       high[1] += extra_cells[4];
       high[2] += extra_cells[5];
     }
+  }
+
+  void getExtraCells(int extra[6]) const{
+    extra[0] = extra_cells[0];
+    extra[1] = extra_cells[1];
+    extra[2] = extra_cells[2];
+    extra[3] = extra_cells[3];
+    extra[4] = extra_cells[4];
+    extra[5] = extra_cells[5];
   }
 
   //getProcId
@@ -262,9 +279,9 @@ private:
   int sfcz_low[3];
   int sfcz_high[3];
 
-  int proc_id;
-
   int extra_cells[6];
+
+  int proc_id;
 };
 
 

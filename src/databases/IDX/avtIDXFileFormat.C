@@ -245,18 +245,22 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
 }
 
 void avtIDXFileFormat::loadBalance(){
-#if 0    
+
   //std::cout << "Load balancing";
     
     int maxdir = 0; // largest extent axis
     int maxextent = 0;
     int maxbox = 0;
     
-    for(int i=0; i < boxes.size(); i++){
-        Box& box = boxes.at(i);
+    for(int i=0; i < level_info.patchInfo.size(); i++){
+        PatchInfo& box = level_info.patchInfo[i];
+        int box_low[3];
+        int box_high[3];
+
+        box.getBounds(box_low,box_high,"CC");
         
         for(int j=0; j < 3; j++){
-            int extent = box.p2[j]-box.p1[j];
+            int extent = box_high[j]-box_low[j];
             if(extent > maxextent){
                 maxdir = j;
                 maxextent = extent;
@@ -270,25 +274,33 @@ void avtIDXFileFormat::loadBalance(){
     int total_extent = 0;
     int avg_ext = 0;
     
-    for(int i=0; i < boxes.size(); i++){
-        Box& box = boxes.at(i);
+    for(int i=0; i < level_info.patchInfo.size(); i++){
+        PatchInfo& box = level_info.patchInfo[i];
+        int box_low[3];
+        int box_high[3];
+
+        box.getBounds(box_low,box_high,"CC");
         
-        total_extent += box.p2[maxdir] - box.p1[maxdir];
+        total_extent += box_high[maxdir] - box_low[maxdir];
     }
     //total_extent++; // DIM
     avg_ext = total_extent / nprocs;
     int res_ext = (total_extent % nprocs);
     
     if(debug_format && rank==0)
-      std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext << " n boxes " << boxes.size() <<std::endl;
+      std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext << " n boxes " << level_info.patchInfo.size() <<std::endl;
     
-    std::vector<Box> newboxes;
-    std::vector<Box> newphyboxes;
+    std::vector<PatchInfo> newboxes;
+    // std::vector<Box> newphyboxes;
     
-    for(int i=0; i < boxes.size(); i++){
-        Box& box = boxes.at(i);
-        
-        int loc_avg_ext = box.p2[maxdir] - box.p1[maxdir];
+    for(int i=0; i < level_info.patchInfo.size(); i++){
+        PatchInfo& box = level_info.patchInfo[i];
+        int box_low[3];
+        int box_high[3];
+
+        box.getBounds(box_low,box_high,"CC");
+
+        int loc_avg_ext = box_high[maxdir] - box_low[maxdir];
         int loc_res = 0;
         
         if(loc_avg_ext > avg_ext){
@@ -297,45 +309,55 @@ void avtIDXFileFormat::loadBalance(){
         }
 
         if(debug_format && rank==0)
-	  std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
+	       std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
         
-        int part_p1 = box.p1[maxdir];
-        int part_p2 = box.p1[maxdir] + loc_avg_ext;
+        int part_p1 = box_low[maxdir];
+        int part_p2 = box_low[maxdir] + loc_avg_ext;
         
-        Point3d p1(box.p1);
-        Point3d p2(box.p2);
+        int low[3]; 
+        int high[3];
+        int eCells[6];
+        box.getBounds(low,high,eCells,"CC");
 
-        Point3d log2phy;
-        Box& phybox = phyboxes.at(i);
-        if(debug_format && rank==0)
-	  std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl<< std::flush;
+        // Point3d p1(box.p1);
+        // Point3d p2(box.p2);
+
+        // Point3d log2phy;
+   //      Box& phybox = phyboxes.at(i);
+   //      if(debug_format && rank==0)
+	  // std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl<< std::flush;
       
-        for (int k = 0; k < dim; k++){
-          log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
-       }
+   //      for (int k = 0; k < dim; k++){
+   //        log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
+   //     }
       
         //Point3d phyOffset = phybox.p1;
 //      std::cout << "log2phy " <<log2phy << std::endl;
       
-        while(part_p2 <= box.p2[maxdir]){
+        while(part_p2 <= box_high[maxdir]){
             
-            p1[maxdir] = part_p1;
-            p2[maxdir] = (part_p2 < box.p2[maxdir]) ? part_p2+1 : part_p2;
+            low[maxdir] = part_p1;
+            high[maxdir] = (part_p2 < box_high[maxdir]) ? part_p2+1 : part_p2;
            
-            Box newbox(p1,p2);
+            PatchInfo newbox;
+
+            newbox.setBounds(low,high,eCells,"CC");
             newboxes.push_back(newbox);
+
+            // // Box newbox(p1,p2);
+            // // newboxes.push_back(newbox);
           
-            Box newphybox;
+            // Box newphybox;
           
-            for (int k = 0; k < dim; k++){
-              newphybox.p1[k] = newbox.p1[k] * log2phy[k];// + phyOffset[k];
-              newphybox.p2[k] = newbox.p2[k] * log2phy[k];// + phyOffset[k];;
-            }
+            // for (int k = 0; k < dim; k++){
+            //   newphybox.p1[k] = newbox.p1[k] * log2phy[k];// + phyOffset[k];
+            //   newphybox.p2[k] = newbox.p2[k] * log2phy[k];// + phyOffset[k];;
+            // }
           
-            newphyboxes.push_back(newphybox);
+            // newphyboxes.push_back(newphybox);
             
             if(debug_format && rank ==0)
-	      std::cout << "New box p1: " << p1 << " p2: "<< p2 << " phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl << std::flush;
+	           std::cout << "New box: " << newbox.toString();//p1 << " p2: "<< p2 << <<std:endl;//" phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl << std::flush;
           
             part_p1 += loc_avg_ext;
             part_p2 += loc_avg_ext;
@@ -343,33 +365,40 @@ void avtIDXFileFormat::loadBalance(){
         }
         
         if(loc_res > 0){
-            Box& boxres = newboxes.at(newboxes.size()-1);
-            boxres.p2[maxdir] += loc_res-1;
+            PatchInfo& boxres = newboxes[newboxes.size()-1];
+            int boxres_low[3];
+            int boxres_high[3];
+            int ecellres[6];
+
+            boxres.getBounds(boxres_low,boxres_high,ecellres,"CC");
+            boxres_high[maxdir] += loc_res-1;
+            boxres.setBounds(boxres_low,boxres_high,ecellres,"CC");
           
-            Box& phyboxres = newphyboxes.at(newphyboxes.size()-1);
-            phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
+            // Box& phyboxres = newphyboxes.at(newphyboxes.size()-1);
+            // phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
             
             if(debug_format && rank ==0)       
-              std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 <<" p1: " << boxres.p1 << " p2: "<< boxres.p2;
+              std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 << boxres.toString();
         }
 
     }
     
-    boxes.swap(newboxes);
-    phyboxes.swap(newphyboxes);
+    level_info.patchInfo.swap(newboxes);
+    // phyboxes.swap(newphyboxes);
   
     if(debug_format && rank == 0){
-      std::cout << "Total number of boxes/domains: " << boxes.size() << std::endl<< std::flush;
+      std::cout << "Total number of boxes/domains: " << level_info.patchInfo.size() << std::endl<< std::flush;
       std::cout << "----------Boxes----------" << std::endl<< std::flush;
-        for(int i=0; i< boxes.size(); i++){
-            std::cout << i << " = "<< boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
-		      << phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl<< std::flush;
+        for(int i=0; i< level_info.patchInfo.size(); i++){
+            std::cout << i << " = "<<level_info.patchInfo[i].toString();
+            //boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
+		      //<< phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl<< std::flush;
         }
         std::cout << "-------------------------" << std::endl<< std::flush;
     }
 
-#endif
 }
+
 
 template <typename Type>
 Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncomponents, int dst_ncomponents, long long totsamples){
@@ -460,6 +489,8 @@ void avtIDXFileFormat::createBoxes(){
     
     bool found_cellspacing = false;
 
+    bool use_boxes = false;
+
     String upsfilename = "noupsfile.ups";
     DIR *dir;
     struct dirent *ent;
@@ -496,21 +527,21 @@ void avtIDXFileFormat::createBoxes(){
         parser->SetFileName(metadata_filename.c_str());
         //std::cout << "trying metadata " << idxmetadata << std::endl;
         if (!parser->Parse()){        
-            multibox = false;
+            use_boxes = false;
             if(debug_input)
              std::cout << "Single-box mode" << std::endl;
         }else{
-            multibox = true;
+            use_boxes = true;
         }       
         
     }else{
         uintah_metadata = true;
-        multibox = true;
+        use_boxes = true;
         if(debug_input)
             std::cout << "Multi-box mode" << std::endl;
     }
     
-    if(multibox){
+    if(use_boxes){
         vtkXMLDataElement *root = parser->GetRootElement();
         vtkXMLDataElement *level = NULL;
 
@@ -519,7 +550,7 @@ void avtIDXFileFormat::createBoxes(){
         else 
             level = root->FindNestedElementWithName("level");
 
-    	if(uintah_metadata){
+        if(uintah_metadata){
 
         	vtkXMLDataElement *anchor_el = NULL;
         	anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
@@ -625,11 +656,11 @@ void avtIDXFileFormat::createBoxes(){
         		else{ // multibox case (all inside the same domain)
 
                   low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
-    		      printf("phy %f - anchor %f fabs %f cells %f fract %f int %d\n", p1phy[k],level_info.anchor[k],std::fabs(p1phy[k]),phy2log[k],std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k], int(std::fabs(p1phy[k]) / phy2log[k])); 
+    		          printf("phy %f - anchor %f fabs %f cells %f fract %f int %d\n", p1phy[k],level_info.anchor[k],std::fabs(p1phy[k]),phy2log[k],std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k], int(std::fabs(p1phy[k]) / phy2log[k])); 
     		  
                 }
 
-		high[k] = low[k] + resdata[k] - 1;
+		          high[k] = low[k] + resdata[k] - 1;
 
       //       if (use_extracells){
 		    // if(k == 0 && (boxes.size() == 0 || boxes.size()==nboxes-1))
@@ -703,9 +734,6 @@ void avtIDXFileFormat::createBoxes(){
         PatchInfo box;
         box.setBounds(low,high,eCells,"CC");
         level_info.patchInfo.push_back(box);
-
-        double box_min[3]; double box_max[3];
-        level_info.getExtents(box_min, box_max);
 
         for(int k=0; k<3; k++){
           level_info.spacing[k]= 1.f;
@@ -950,19 +978,19 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 
     createTimeIndex();
 
-    //int old_size = boxes.size();
+    int old_size = level_info.patchInfo.size();
 #ifdef PARALLEL
-    // if(boxes.size()>1)
-    //   loadBalance();
+    //if(boxes.size()>1)
+       loadBalance();
     // else
-    //   pidx_decomposition(nprocs);
+    //    pidx_decomposition(nprocs);
     fprintf(stderr,"NO PARALLEL YET\n");
 #endif
 
-    // if(boxes.size()>old_size)
-    //   parallel_boxes = true;
-    // else
-    //   parallel_boxes = false;
+    if(level_info.patchInfo.size()>old_size)
+      parallel_boxes = true;
+    else
+      parallel_boxes = false;
 
 // #ifdef USE_VISUS
 //     loadBalance();
@@ -1246,21 +1274,26 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       int child_low[3],child_high[3];                                                                     
       level_info.patchInfo[p1].getBounds(child_low,child_high,meshname,use_extracells);                                            
       for (int p2=0; p2<totalPatches; p2++) {
-	if(p1==p2) continue;
+	      if(p1==p2) continue;
 
-          PatchInfo &parentPatchInfo = level_info.patchInfo[p2];                                   
-          int parent_low[3],parent_high[3];                                                                 
-          parentPatchInfo.getBounds(parent_low,parent_high,meshname,use_extracells);                                 int mins[3], maxs[3];                                                                             
-          for (int i=0; i<3; i++) {                                                                        
-            mins[i] = std::max(child_low[i],  parent_low[i]);// *levelInfoChild.refinementRatio[i]);                   maxs[i] = std::min(child_high[i], parent_high[i]);// *levelInfoChild.refinementRatio[i]);     
-          }                                                                                                 
-          bool overlap = (mins[0]<maxs[0] &&                                                               
-                          mins[1]<maxs[1] &&                                                               
-                          mins[2]<maxs[2]);                                                                           if (overlap) {                                                                                    
-            int child_gpatch = p1;
-            int parent_gpatch = p2;
-            childPatches[parent_gpatch].push_back(child_gpatch);                                            
-	  }
+        PatchInfo &parentPatchInfo = level_info.patchInfo[p2];                                   
+        int parent_low[3],parent_high[3];                                                                 
+        parentPatchInfo.getBounds(parent_low,parent_high,meshname,use_extracells);                                 
+        int mins[3], maxs[3];                                                                             
+        for (int i=0; i<3; i++) {                                                                        
+          mins[i] = std::max(child_low[i],  parent_low[i]);
+          // *levelInfoChild.refinementRatio[i]);                   maxs[i] = std::min(child_high[i], parent_high[i]);// *levelInfoChild.refinementRatio[i]);     
+        } 
+
+        bool overlap = (mins[0]<maxs[0] &&
+                        mins[1]<maxs[1] &&
+                        mins[2]<maxs[2]);
+        
+        if (overlap) {
+          int child_gpatch = p1;
+          int parent_gpatch = p2;
+          childPatches[parent_gpatch].push_back(child_gpatch);                                            
+	      }
       }
     }
 
@@ -1277,7 +1310,6 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
         e[i+0] = low[i];
         e[i+3] = high[i]-1;
       }
-    
       
       dn->SetNestingForDomain(p, my_level, childPatches[p], e);
     }
