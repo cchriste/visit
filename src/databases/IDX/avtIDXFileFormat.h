@@ -140,7 +140,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     
     void createBoxes();
     void createTimeIndex();
-    //void calculateBoundsAndExtents();
+    void computeDomainBoundaries(const char* meshname, int timestate);
     void loadBalance();
     void pidx_decomposition(int nprocs);
     void parseVector(vtkXMLDataElement *el, double* vec);

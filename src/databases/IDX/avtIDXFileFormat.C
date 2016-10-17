@@ -651,28 +651,37 @@ void avtIDXFileFormat::createBoxes(){
                   logOffset[k] = std::abs(p1phy[k]) / phy2log[k];//phy2log[k];
 		        }*/
 	       
-        		if(nboxes == 1) // single box case
-        		  low[k] = 0;
-        		else{ // multibox case (all inside the same domain)
+        	if(nboxes == 1) // single box case
+        	  low[k] = 0;
+        	else{ // multibox case (all inside the same domain)
+		  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
+		  
+		  if(level_info.patchInfo.size() > 0){ 
 
-                  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
-    		          printf("phy %f - anchor %f fabs %f cells %f fract %f int %d\n", p1phy[k],level_info.anchor[k],std::fabs(p1phy[k]),phy2log[k],std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k], int(std::fabs(p1phy[k]) / phy2log[k])); 
-    		  
-                }
+		    if(k==0){
+		      int temp_low[3];
+		      int temp_high[3];
+		      level_info.patchInfo.back().getBounds(temp_low,temp_high,"CC");
+		      
+		      low[k] = temp_high[k]-1; // force overlap
+		    }
+		 
+		  }
 
-		          high[k] = low[k] + resdata[k] - 1;
-
-      //       if (use_extracells){
-		    // if(k == 0 && (boxes.size() == 0 || boxes.size()==nboxes-1))
-		    //   p2log[k] += eCells[k];
-		    // else if (k != 0)
-		    //   p2log[k] += eCells[k]*2;
-		    // }
+		  high[k] = low[k] + resdata[k];
+		  
+		  if(level_info.patchInfo.size() == nboxes-1){
+		    if(k==0){
+		      Box log_box = reader->getLogicBox();
+		      high[k] = log_box.p2[k]-1-eCells[k];
+		    }
+		  }
+		}
 		
-        		if(p1log_el != NULL)
-        		  parseVector(p1log_el, low);
-        		if(p2log_el != NULL)
-        		  parseVector(p2log_el, high);   
+    		if(p1log_el != NULL)
+       		  parseVector(p1log_el, low);
+       		if(p2log_el != NULL)
+       		  parseVector(p2log_el, high);   
 		
             }
             
@@ -1103,7 +1112,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->meshType = AVT_AMR_MESH; //AVT_RECTILINEAR_MESH;
     int totalPatches = level_info.patchInfo.size();
     mesh->numBlocks = totalPatches;
-    //mesh->blockOrigin = 0;
+    mesh->blockOrigin = 0;
     //mesh->LODs = reader->getMaxResolution();
     mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
@@ -1127,7 +1136,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->groupTitle = "levels";
     mesh->groupPieceName = "level";
     mesh->numGroups = numLevels; // n AMR levels
-    mesh->containsExteriorBoundaryGhosts = false;
+    mesh->containsExteriorBoundaryGhosts = true;//false;
     mesh->blockNames = pieceNames;
     
     int low[3],high[3];
@@ -1168,9 +1177,8 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     md->Add(mesh);
     
     md->AddGroupInformation(numLevels, totalPatches, groupIds);
-    md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
-
-
+    //md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
+    
 #ifdef PARALLEL // only PIDX
    // md->SetFormatCanDoDomainDecomposition(true);
 #endif
@@ -1199,7 +1207,116 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     if(debug_format)
       printf("%d: end meta\n", rank);
 
+    computeDomainBoundaries(mesh->name.c_str(), timestate);
+
     return;
+}
+
+void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timestate){
+  //if (!avtDatabase::OnlyServeUpMetaData() && level_info.patchInfo.size()>0 ){
+
+    avtRectilinearDomainBoundaries *rdb =
+    new avtRectilinearDomainBoundaries(true);
+    rdb->SetNumDomains(level_info.patchInfo.size());
+   
+    for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
+    {
+        int low[3],high[3];
+        level_info.patchInfo[i].getBounds(low,high,meshname, use_extracells);
+
+        int e[6] = { low[0], high[0],
+                   low[1], high[1],
+                   low[2], high[2] };
+        
+        rdb->SetIndicesForAMRPatch(i,0,e);//SetIndicesForRectGrid(i, e);
+
+    }
+
+    rdb->CalculateBoundaries();
+  
+    this->mesh_boundaries[meshname] = void_ref_ptr(rdb,
+                                   avtStructuredDomainBoundaries::Destruct);
+    cache->CacheVoidRef("CC_Mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
+
+    void_ref_ptr vrTmp = cache->GetVoidRef("CC_Mesh", // MUST be called any_mesh
+					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+					   timestate, -1);
+    if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
+      fprintf(stderr,"pidx boundary mesh not registered\n");
+    
+
+    
+    int totalPatches = level_info.patchInfo.size();
+    int num_levels = 1;
+    avtStructuredDomainNesting *dn = new avtStructuredDomainNesting(totalPatches, num_levels);
+    
+    dn->SetNumDimensions(3);
+    
+    std::vector< std::vector<int> > childPatches(totalPatches);
+  
+/*
+    for (int p1=0; p1<totalPatches ; p1++) {
+      int child_low[3],child_high[3];                                                                     
+      level_info.patchInfo[p1].getBounds(child_low,child_high,meshname,use_extracells);                                            
+      for (int p2=0; p2<totalPatches; p2++) {
+	      if(p1==p2) continue;
+
+        PatchInfo &parentPatchInfo = level_info.patchInfo[p2];                                   
+        int parent_low[3],parent_high[3];                                                                 
+        parentPatchInfo.getBounds(parent_low,parent_high,meshname,use_extracells);                                 
+        int mins[3], maxs[3];                                                                             
+        for (int i=0; i<3; i++) {                                                                        
+          mins[i] = std::max(child_low[i],  parent_low[i]);
+          // *levelInfoChild.refinementRatio[i]);
+          maxs[i] = std::min(child_high[i], parent_high[i]);// *levelInfoChild.refinementRatio[i]);     
+        } 
+
+        bool overlap = (mins[0]<maxs[0] &&
+                        mins[1]<maxs[1] &&
+                        mins[2]<maxs[2]);
+        
+        if (overlap) {
+	  printf("overlap %d %d \n", p1,p2); 
+          int child_gpatch = p1;
+          int parent_gpatch = p2;
+          childPatches[parent_gpatch].push_back(child_gpatch);                                            
+	}
+      }
+    }
+    */
+   
+    for (int p=0; p<totalPatches ; p++) {
+      int my_level =0;
+      int local_patch = p;
+
+      PatchInfo &patchInfo = level_info.patchInfo[local_patch];
+      int low[3],high[3];
+      patchInfo.getBounds(low,high,meshname,use_extracells);
+      
+      std::vector<int> e(6);
+      for (int i=0; i<3; i++) {
+        e[i+0] = low[i];
+        e[i+3] = high[i]-1;
+      }
+      
+      childPatches[p].push_back(p);
+
+      dn->SetNestingForDomain(p, my_level, childPatches[p], e);
+
+
+      
+    }
+
+    this->mesh_domains[meshname]=void_ref_ptr(dn, avtStructuredDomainNesting::Destruct);
+    vrTmp = cache->GetVoidRef("CC_Mesh", // MUST be called any_mesh
+			      AUXILIARY_DATA_DOMAIN_NESTING_INFORMATION,
+			      timestate, -1);
+    if (*vrTmp == NULL || *vrTmp != *this->mesh_domains[meshname])
+      fprintf(stderr,"pidx domain mesh not registered");
+
+    //}
+
+
 }
 
 
@@ -1229,99 +1346,9 @@ vtkDataSet *
 avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 {
     if(debug_format)
-        std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
-   
-    if(mesh_domains.find(meshname) == mesh_domains.end()){
-    avtRectilinearDomainBoundaries *rdb =
-    new avtRectilinearDomainBoundaries(true);
-    rdb->SetNumDomains(level_info.patchInfo.size());
-    
-    for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
-    {
-        int low[3],high[3];
-        level_info.patchInfo[i].getBounds(low,high,meshname, use_extracells);
+        std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;   
 
-        int e[6] = { low[0], high[0],
-                   low[1], high[1],
-                   low[2], high[2] };
-        
-        rdb->SetIndicesForAMRPatch(i,0,e);//SetIndicesForRectGrid(i, e);
-    }
-
-    rdb->CalculateBoundaries();
-  
-    this->mesh_boundaries[meshname] = void_ref_ptr(rdb,
-                                   avtStructuredDomainBoundaries::Destruct);
-    cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
-
-    void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-					   timestate, -1);
-    if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
-      fprintf(stderr,"pidx boundary mesh not registered\n");
-    
-
-    
-    int totalPatches = level_info.patchInfo.size();
-    int num_levels = 1;
-    avtStructuredDomainNesting *dn = new avtStructuredDomainNesting(totalPatches, num_levels);
-    
-    dn->SetNumDimensions(3);
-    
-    std::vector< std::vector<int> > childPatches(totalPatches);
-  
-    for (int p1=0; p1<totalPatches ; p1++) {
-      int child_low[3],child_high[3];                                                                     
-      level_info.patchInfo[p1].getBounds(child_low,child_high,meshname,use_extracells);                                            
-      for (int p2=0; p2<totalPatches; p2++) {
-	      if(p1==p2) continue;
-
-        PatchInfo &parentPatchInfo = level_info.patchInfo[p2];                                   
-        int parent_low[3],parent_high[3];                                                                 
-        parentPatchInfo.getBounds(parent_low,parent_high,meshname,use_extracells);                                 
-        int mins[3], maxs[3];                                                                             
-        for (int i=0; i<3; i++) {                                                                        
-          mins[i] = std::max(child_low[i],  parent_low[i]);
-          // *levelInfoChild.refinementRatio[i]);                   maxs[i] = std::min(child_high[i], parent_high[i]);// *levelInfoChild.refinementRatio[i]);     
-        } 
-
-        bool overlap = (mins[0]<maxs[0] &&
-                        mins[1]<maxs[1] &&
-                        mins[2]<maxs[2]);
-        
-        if (overlap) {
-          int child_gpatch = p1;
-          int parent_gpatch = p2;
-          childPatches[parent_gpatch].push_back(child_gpatch);                                            
-	      }
-      }
-    }
-
-    for (int p=0; p<totalPatches ; p++) {
-      int my_level =0;
-      int local_patch = p;
-
-      PatchInfo &patchInfo = level_info.patchInfo[local_patch];
-      int low[3],high[3];
-      patchInfo.getBounds(low,high,meshname,use_extracells);
-
-      std::vector<int> e(6);
-      for (int i=0; i<3; i++) {
-        e[i+0] = low[i];
-        e[i+3] = high[i]-1;
-      }
-      
-      dn->SetNestingForDomain(p, my_level, childPatches[p], e);
-    }
-
-    this->mesh_domains[meshname]=void_ref_ptr(dn, avtStructuredDomainNesting::Destruct);
-    vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-			      AUXILIARY_DATA_DOMAIN_NESTING_INFORMATION,
-			      timestate, -1);
-    if (*vrTmp == NULL || *vrTmp != *this->mesh_domains[meshname])
-      fprintf(stderr,"pidx domain mesh not registered");
-
-   }
+    computeDomainBoundaries(meshname,timestate);
 
     Box slice_box;
     
@@ -1334,7 +1361,6 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     vtkFloatArray *coordsY;
     vtkFloatArray *coordsZ;
 
-    //get global bounds
     int glow[3], ghigh[3];
     level_info.getBounds(glow,ghigh,meshname,use_extracells);
 
@@ -1364,7 +1390,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     	  // Boundary patches are special shifted to preserve global domain.
     	  // Internal patches are always just shifted.
     	  float face_offset= 0;//-1.f;
-    	 
+	 
     	  if (sfc_offset[c]) 
     	  {
     	      if (i==0)
@@ -1384,10 +1410,13 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     	        face_offset += -0.5;
     	   }
     
-	       array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
+	    array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
 	  
-            //printf("c %d: %f\n", c, array[i]);
-	    }
+	    if(i==0)
+	      printf("low %d[%d]: %f\n", domain,c, array[i]);
+	    if(i==my_dims[c]-1)
+	      printf("high %d[%d]: %f\n", domain,c, array[i]);
+	}
 
         switch(c) {
           case 0:
@@ -1451,7 +1480,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     /*
     std::ofstream out;
     char outname[128];
-    sprintf(outname, "out_%d.raw", domain);
+    sprintf(outname, "out_%d_p1_%d_%d_%d_p2_%d_%d_%d.raw", domain,low[0],low[1],low[2],high[0],high[1],high[2]);
     out.open(outname);
 
     uint buffer_size = sizeof(float)*(my_box.p2.x-my_box.p1.x+1)*(my_box.p2.y-my_box.p1.y+1)*(my_box.p2.z-my_box.p1.z+1);
