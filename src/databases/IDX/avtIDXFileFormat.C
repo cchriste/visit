@@ -651,8 +651,10 @@ void avtIDXFileFormat::createBoxes(){
                   logOffset[k] = std::abs(p1phy[k]) / phy2log[k];//phy2log[k];
 		        }*/
 	       
-        	if(nboxes == 1) // single box case
+        	if(nboxes == 1){ // single box case
         	  low[k] = 0;
+		  high[k] = low[k] + resdata[k];
+		}
         	else{ // multibox case (all inside the same domain)
 		  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
 		  
@@ -1236,9 +1238,9 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
   
     this->mesh_boundaries[meshname] = void_ref_ptr(rdb,
                                    avtStructuredDomainBoundaries::Destruct);
-    cache->CacheVoidRef("CC_Mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
+    cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
 
-    void_ref_ptr vrTmp = cache->GetVoidRef("CC_Mesh", // MUST be called any_mesh
+    void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
 					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
 					   timestate, -1);
     if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
@@ -1308,7 +1310,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     }
 
     this->mesh_domains[meshname]=void_ref_ptr(dn, avtStructuredDomainNesting::Destruct);
-    vrTmp = cache->GetVoidRef("CC_Mesh", // MUST be called any_mesh
+    vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
 			      AUXILIARY_DATA_DOMAIN_NESTING_INFORMATION,
 			      timestate, -1);
     if (*vrTmp == NULL || *vrTmp != *this->mesh_domains[meshname])
@@ -1390,7 +1392,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     	  // Boundary patches are special shifted to preserve global domain.
     	  // Internal patches are always just shifted.
     	  float face_offset= 0;//-1.f;
-	 
+
     	  if (sfc_offset[c]) 
     	  {
     	      if (i==0)
@@ -1468,7 +1470,11 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     level_info.patchInfo[domain].getBounds(low,high,"CC_Mesh", use_extracells);
 
     std::cout << "read data " << level_info.patchInfo[domain].toString();
-    for(int k=0; k<3; k++){    
+    for(int k=0; k<3; k++){
+      if(use_extracells){
+	low[k]++;
+	high[k]++;
+      }
         my_box.p1[k] = low[k];
         my_box.p2[k] = high[k];
     }
