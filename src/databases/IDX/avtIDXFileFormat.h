@@ -126,6 +126,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool parallel_boxes;
     int sfc_offset[3];
     std::vector<gidx_info> gidx_datasets;
+    bool uintah_metadata;
 
   private:
 

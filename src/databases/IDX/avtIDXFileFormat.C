@@ -516,7 +516,7 @@ void avtIDXFileFormat::createBoxes(){
     
     upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
     
-    bool uintah_metadata = false;
+    uintah_metadata = false;
 
     parser->SetFileName(upsfilename.c_str());
     if (!parser->Parse())
@@ -1370,8 +1370,12 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     int low[3], high[3];
     level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
 
-    for(int k=0; k<3; k++)
-        my_dims[k] = high[k]-low[k]+1 +1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
+    for(int k=0; k<3; k++){
+      my_dims[k] = high[k]-low[k]+1 +1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
+      
+      if(use_extracells)
+	my_dims[k]--;
+    }
 
     if(debug_format)
         std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
@@ -1471,9 +1475,9 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 
     std::cout << "read data " << level_info.patchInfo[domain].toString();
     for(int k=0; k<3; k++){
-      if(use_extracells){
+      if(uintah_metadata && use_extracells){
 	low[k]++;
-	high[k]++;
+	//high[k]++;
       }
         my_box.p1[k] = low[k];
         my_box.p2[k] = high[k];
