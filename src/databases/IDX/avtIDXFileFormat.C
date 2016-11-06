@@ -574,10 +574,11 @@ void avtIDXFileFormat::createBoxes(){
 
         	if(cellspacing_el == NULL){
         	  if(debug_input)
-        	    std::cout << "cellspacing not found" << std::endl;}
-        	else{
+        	    std::cout << "cellspacing not found" << std::endl;
+		  found_cellspacing = false;
+	        }else{
         	  parseVector(cellspacing_el, level_info.spacing);
-              found_cellspacing = true;
+                  found_cellspacing = true;
 
         	}
     	}
@@ -704,6 +705,21 @@ void avtIDXFileFormat::createBoxes(){
               //std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
             }
 
+       if(!found_cellspacing){
+        printf("Cellspacing not found, calculating\n");
+
+	PatchInfo& box = level_info.patchInfo[0];
+
+        int low[3];
+        int high[3];
+        box.getBounds(low,high,"CC",use_extracells);
+
+        for(int k=0; k<3; k++){
+	  level_info.spacing[k] = (p2phy[k]-p1phy[k])/(high[k]-low[k]+1);;
+	  printf("%f - %f / %d - %d +1\n",p2phy[k],p1phy[k],high[k],low[k]);
+	}
+
+      }
 
 
      //    phyboxes.push_back(Box(p1phy, p2phy));
@@ -715,19 +731,6 @@ void avtIDXFileFormat::createBoxes(){
             
       }
 
-      if(!found_cellspacing){
-        PatchInfo& box = level_info.patchInfo[0];
-
-        double box_min[3]; double box_max[3];
-        level_info.getExtents(box_min, box_max);
-
-        int low[3];
-        int high[3];
-        box.getBounds(low,high,"CC",use_extracells);
-
-        for(int k=0; k<3; k++)
-          level_info.spacing[k]=(box_max[k]-box_min[k])/(high[k]-low[k]+1);
-      }
         
     }
     else{
@@ -1154,7 +1157,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
     mesh->blockTitle = "blocks";
-    mesh->blockPieceName = "p%06d";
+    mesh->blockPieceName = "piece";//%06d";
     mesh->groupPieceName = "global_index";
     
     /*mesh->groupTitle = "levels";
@@ -1453,7 +1456,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     for(int k=0; k<3; k++){
       my_dims[k] = high[k]-low[k]+1 +1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
       
-      if(use_extracells)
+      if(use_extracells && uintah_metadata)
 	my_dims[k]--;
     }
 
