@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2016, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2015, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -40,6 +40,7 @@
 #include <avtIDXFileFormat.h>
 #include <avtMTMDFileFormatInterface.h>
 #include <avtGenericDatabase.h>
+#include <avtIDXOptions.h>
 
 // ****************************************************************************
 //  Method:  IDXCommonPluginInfo::GetDatabaseType
@@ -78,14 +79,31 @@ avtDatabase *
 IDXCommonPluginInfo::SetupDatabase(const char *const *list,
                                    int nList, int nBlock)
 {
+    if (nBlock!=1) 
+      return NULL;
+
     // ignore any nBlocks past 1
     int nTimestepGroups = nList / nBlock;
     avtMTMDFileFormat **ffl = new avtMTMDFileFormat*[nTimestepGroups];
     for (int i = 0 ; i < nTimestepGroups ; i++)
     {
-        ffl[i] = new avtIDXFileFormat(list[i*nBlock]);
+        ffl[i] = new avtIDXFileFormat(list[i*nBlock], readOptions);
     }
     avtMTMDFileFormatInterface *inter 
            = new avtMTMDFileFormatInterface(ffl, nTimestepGroups);
+
     return new avtGenericDatabase(inter);
 }
+
+DBOptionsAttributes *
+IDXCommonPluginInfo::GetReadOptions() const
+{
+    return GetIDXReadOptions();
+}
+
+DBOptionsAttributes *
+IDXCommonPluginInfo::GetWriteOptions() const
+{
+    return GetIDXWriteOptions();
+}
+
