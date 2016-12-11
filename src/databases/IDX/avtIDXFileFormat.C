@@ -660,7 +660,7 @@ void avtIDXFileFormat::createBoxes(){
 		}
         	else{ // multibox case (all inside the same domain)
 		  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
-		  
+		  /*
 		  if(level_info.patchInfo.size() > 0){ 
 
 		    if(k==0){
@@ -671,16 +671,16 @@ void avtIDXFileFormat::createBoxes(){
 		      low[k] = temp_high[k]-1; // force overlap
 		    }
 		 
-		  }
+		    }*/
 
 		  high[k] = low[k] + resdata[k];
-		  
+		  /*
 		  if(level_info.patchInfo.size() == nboxes-1){
 		    if(k==0){
 		      Box log_box = reader->getLogicBox();
 		      high[k] = log_box.p2[k]-1-eCells[k];
 		    }
-		  }
+		    }*/
 		}
 		
     		if(p1log_el != NULL)
