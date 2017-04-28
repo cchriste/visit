@@ -12,8 +12,8 @@
  **                                                **
  ****************************************************/
 
-#ifndef _visus_idx_io_h
-#define _visus_idx_io_h
+#ifndef _pidx_idx_io_h
+#define _pidx_idx_io_h
 
 #include <string>
 #include <vector>
@@ -21,14 +21,19 @@
 #include <PIDX.h>
 #include "visit_idx_io.h"
 #include "visit_idx_io_types.h"
+typedef std::string String;
 
 using namespace VisitIDXIO;
 
-class DatasetImpl;
-class AccessImpl;
+//class DatasetImpl;
+//class AccessImpl;
 
 class PIDXIO : public IDX_IO{
-    
+  PIDX_point global_size, local_offset, local_size;
+  PIDX_file pidx_file;
+  PIDX_access pidx_access;
+  String input_filename;
+
 public:
     
     PIDXIO(){use_raw = false;}
