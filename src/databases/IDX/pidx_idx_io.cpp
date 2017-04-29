@@ -18,15 +18,20 @@
 #include "PIDX.h"
 //#include "data_handle/PIDX_data_types.h"
 
+static PIDX_point global_size, local_offset, local_size;
+static PIDX_file pidx_file;
+static PIDX_access pidx_access;
+static String input_filename;
+
 #if PIDX_HAVE_MPI
-MPI_Comm NEW_COMM_WORLD;
+static MPI_Comm NEW_COMM_WORLD;
 #endif
 
 bool debug = true;
 
-int process_count = 1, rank = 0;
+static int process_count = 1, rank = 0;
 
-void terminate(int out)
+static void terminate(int out)
 {
 #if PIDX_HAVE_MPI
   MPI_Abort(NEW_COMM_WORLD, out);
@@ -35,7 +40,7 @@ void terminate(int out)
 #endif
 }
 
-void terminate_with_error_msg(const char *format, ...)
+static void terminate_with_error_msg(const char *format, ...)
 {
   va_list arg_ptr;
   va_start(arg_ptr, format);

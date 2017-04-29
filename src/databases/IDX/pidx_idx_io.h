@@ -29,10 +29,6 @@ using namespace VisitIDXIO;
 //class AccessImpl;
 
 class PIDXIO : public IDX_IO{
-  PIDX_point global_size, local_offset, local_size;
-  PIDX_file pidx_file;
-  PIDX_access pidx_access;
-  String input_filename;
 
 public:
     
