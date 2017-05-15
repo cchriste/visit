@@ -122,12 +122,13 @@ bool PIDXIO::openDataset(const String filename){
   
   input_filename = filename;
   
-
   ret = PIDX_file_open(filename.c_str(), PIDX_MODE_RDONLY, pidx_access, global_size, &pidx_file);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_file_open");
   
   if(use_raw)
     PIDX_set_io_mode(pidx_file, PIDX_RAW_IO);
+  else
+    PIDX_set_io_mode(pidx_file, PIDX_IDX_IO);
   //PIDX_enable_raw_io(pidx_file);
   
   //ret = PIDX_get_dims(pidx_file, global_size);
@@ -326,6 +327,9 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
     //terminate_with_error_msg("PIDX_set_current_time_step");
     return NULL;
   }
+
+  PIDX_query_box(pidx_file, global_size);
+
 //   PIDX_debug_output(pidx_file);
   PIDX_variable variable;
   
