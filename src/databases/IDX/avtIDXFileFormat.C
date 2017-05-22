@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2015, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -189,16 +189,16 @@ void avtIDXFileFormat::pidx_decomposition(int process_count){
     for (int k = 0; k < dim; k++){
       if(k!=maxdir){
             newbox.p1[k] = 0;
-            newbox.p2[k] = global_size[k]-1;
+	    newbox.p2[k] = global_size[k]-1;
       }
       else {
-        newbox.p1[k] = r*avg_ext;
-        //if(boxes.size()>1)
-        //  newbox.p1[k]--;
-        newbox.p2[k] = newbox.p1[k] + avg_ext +1;
-        if(r == process_count-1){
-           newbox.p2[k] = global_size[k]-1; 
-        }
+	newbox.p1[k] = r*avg_ext;
+	//if(boxes.size()>1)
+	//  newbox.p1[k]--;
+	newbox.p2[k] = newbox.p1[k] + avg_ext +1;
+	if(r == process_count-1){
+	   newbox.p2[k] = global_size[k]-1; 
+	}
       }
     }
 
@@ -272,7 +272,109 @@ void avtIDXFileFormat::loadBalance(){
     }
     
     //std::cout << "max dir " << maxdir << " max extent " << maxextent << " box " << maxbox;
-    
+#if 1
+    std::vector<PatchInfo> newboxes;
+    int n = nprocs;
+    int b = level_info.patchInfo.size();
+    int c = n/b;
+    int d = n%b;
+
+    int h[b];
+
+    if(d == 0){
+      for(int i=0; i<b; i++){
+        PatchInfo& box = level_info.patchInfo[i];
+        int box_low[3];
+        int box_high[3];
+
+        box.getBounds(box_low, box_high, "CC");
+
+        int extent = box_high[maxdir]-box_low[maxdir];
+
+        h[i] = extent/c;
+
+        printf("H[%d] = %d\n", i, h[i]);
+
+      }
+    }
+    else{
+
+      // TODO sort boxes by height
+
+      for(int i=0; i<b; i++){
+        PatchInfo& box = level_info.patchInfo[i];
+        int box_low[3];
+        int box_high[3];
+
+        box.getBounds(box_low, box_high, "CC");
+
+        int extent = box_high[maxdir]-box_low[maxdir];
+
+        if(i <= d){
+          h[i] = extent/c;
+        }
+        else{
+          h[i] = extent/(c+1);
+        }
+
+        printf("H[%d] = %d\n", i, h[i]);
+      }
+
+    }
+
+    for(int i=0; i < b; i++){
+      PatchInfo& box = level_info.patchInfo[i];
+      int box_low[3];
+      int box_high[3];
+
+      int low[3];
+      int high[3];
+      int eCells[6];
+
+      box.getBounds(box_low,box_high,eCells,"CC");
+
+      memcpy(low, box_low, 3*sizeof(int));
+      memcpy(high, box_high, 3*sizeof(int));
+
+      int n_slabs = box_high[maxdir] / h[i];
+      int residual = box_high[maxdir] % h[i];
+
+      int part_p1 = box_low[maxdir];
+      int part_p2 = box_low[maxdir] + h[i];
+
+      int boxes_added = 0;
+      while(part_p2 <= box_high[maxdir] && boxes_added < n_slabs){
+            
+        low[maxdir] = part_p1;
+        high[maxdir] = (part_p2 < box_high[maxdir]) ? part_p2+1 : part_p2;
+           
+        PatchInfo newbox;
+
+        newbox.setBounds(low,high,eCells,"CC");
+        newboxes.push_back(newbox);
+        boxes_added++;
+
+        part_p1 = high[maxdir];
+        part_p2 = part_p1 + h[i] -1;
+
+      }
+
+      if(residual > 0){
+        int lowr[3];
+        int highr[3];
+
+        PatchInfo& last = newboxes.back();
+        last.getBounds(lowr,highr,eCells,"CC");
+
+        highr[maxdir] = box_high[maxdir];//residual;
+
+        last.setBounds(lowr,highr,eCells,"CC");
+
+      }
+
+    }
+
+#else
     int total_extent = 0;
     int avg_ext = 0;
     
@@ -311,12 +413,12 @@ void avtIDXFileFormat::loadBalance(){
         }
 
         if(debug_format && rank==0)
-               std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
+	       std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
         
         int part_p1 = box_low[maxdir];
         int part_p2 = box_low[maxdir] + loc_avg_ext;
         
-        int low[3]; 
+        int low[3];
         int high[3];
         int eCells[6];
         box.getBounds(low,high,eCells,"CC");
@@ -327,7 +429,7 @@ void avtIDXFileFormat::loadBalance(){
         // Point3d log2phy;
    //      Box& phybox = phyboxes.at(i);
    //      if(debug_format && rank==0)
-          // std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl<< std::flush;
+	  // std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl<< std::flush;
       
    //      for (int k = 0; k < dim; k++){
    //        log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
@@ -359,7 +461,7 @@ void avtIDXFileFormat::loadBalance(){
             // newphyboxes.push_back(newphybox);
             
             if(debug_format && rank ==0)
-                   std::cout << "New box: " << newbox.toString();//p1 << " p2: "<< p2 << <<std:endl;//" phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl << std::flush;
+	           std::cout << "New box: " << newbox.toString();//p1 << " p2: "<< p2 << <<std:endl;//" phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl << std::flush;
           
             part_p1 += loc_avg_ext;
             part_p2 += loc_avg_ext;
@@ -385,6 +487,8 @@ void avtIDXFileFormat::loadBalance(){
 
     }
     
+#endif 
+
     level_info.patchInfo.swap(newboxes);
     // phyboxes.swap(newphyboxes);
   
@@ -394,7 +498,7 @@ void avtIDXFileFormat::loadBalance(){
         for(int i=0; i< level_info.patchInfo.size(); i++){
             std::cout << i << " = "<<level_info.patchInfo[i].toString();
             //boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
-                      //<< phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl<< std::flush;
+		      //<< phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl<< std::flush;
         }
         std::cout << "-------------------------" << std::endl<< std::flush;
     }
@@ -449,7 +553,7 @@ Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncom
 
 void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, double* vec){
   String el_str(el->GetCharacterData());
-          
+	  
   el_str = trim(el_str);
   String el_vals = el_str.substr(1,el_str.length()-2);
   if(debug_input)
@@ -458,7 +562,7 @@ void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, double* vec){
   std::stringstream anch_ss(el_vals);
   for (int k=0; k < dim; k++){
     std::getline(anch_ss, anchs, ',');
-           
+	   
     vec[k] = cfloat(anchs);
   }
   if(debug_input)
@@ -554,34 +658,34 @@ void avtIDXFileFormat::createBoxes(){
 
         if(uintah_metadata){
 
-                vtkXMLDataElement *anchor_el = NULL;
-                anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
+        	vtkXMLDataElement *anchor_el = NULL;
+        	anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
 
-                if(anchor_el == NULL){
-                  if(debug_input)
-                    std::cout << "anchor not found" << std::endl;
-                  level_info.anchor[0]=0;
-                  level_info.anchor[1]=0;
-                  level_info.anchor[2]=0;
-                 }
-                else{
-                  parseVector(anchor_el, level_info.anchor);       
-                }
-                
-                //cellspacing
-                vtkXMLDataElement *cellspacing_el = NULL;
-                cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
+        	if(anchor_el == NULL){
+        	  if(debug_input)
+        	    std::cout << "anchor not found" << std::endl;
+        	  level_info.anchor[0]=0;
+        	  level_info.anchor[1]=0;
+        	  level_info.anchor[2]=0;
+        	 }
+        	else{
+        	  parseVector(anchor_el, level_info.anchor);	   
+        	}
+        	
+        	//cellspacing
+        	vtkXMLDataElement *cellspacing_el = NULL;
+        	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
 
-                if(cellspacing_el == NULL){
-                  if(debug_input)
-                    std::cout << "cellspacing not found" << std::endl;
-                  found_cellspacing = false;
-                }else{
-                  parseVector(cellspacing_el, level_info.spacing);
+        	if(cellspacing_el == NULL){
+        	  if(debug_input)
+        	    std::cout << "cellspacing not found" << std::endl;
+		  found_cellspacing = false;
+	        }else{
+        	  parseVector(cellspacing_el, level_info.spacing);
                   found_cellspacing = true;
 
-                }
-        }
+        	}
+    	}
 
         int nboxes = level->GetNumberOfNestedElements();
         
@@ -594,8 +698,8 @@ void avtIDXFileFormat::createBoxes(){
             String lower(xmlbox->FindNestedElementWithName("lower")->GetCharacterData());
             String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
             
-            vtkXMLDataElement* p1log_el = xmlbox->FindNestedElementWithName("p1log");
-            vtkXMLDataElement* p2log_el = xmlbox->FindNestedElementWithName("p2log");
+    	    vtkXMLDataElement* p1log_el = xmlbox->FindNestedElementWithName("p1log");
+    	    vtkXMLDataElement* p2log_el = xmlbox->FindNestedElementWithName("p2log");
 
             String extra_cells = "[0 0 0]";
 
@@ -649,45 +753,45 @@ void avtIDXFileFormat::createBoxes(){
               
                 phy2log[k] = (p2phy[k]-p1phy[k])/(resdata[k]);
                 //p2phy[k] += phy2log[k];
-                
+		
                 /*if(boxes.size() == 0){
                   logOffset[k] = std::abs(p1phy[k]) / phy2log[k];//phy2log[k];
-                        }*/
-               
-                if(nboxes == 1){ // single box case
-                  low[k] = 0;
-                  high[k] = low[k] + resdata[k];
-                }
-                else{ // multibox case (all inside the same domain)
-                  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
-                  /*
-                  if(level_info.patchInfo.size() > 0){ 
+		        }*/
+	       
+        	if(nboxes == 1){ // single box case
+        	  low[k] = 0;
+		  high[k] = low[k] + resdata[k];
+		}
+        	else{ // multibox case (all inside the same domain)
+		  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
+		  /*
+		  if(level_info.patchInfo.size() > 0){ 
 
-                    if(k==0){
-                      int temp_low[3];
-                      int temp_high[3];
-                      level_info.patchInfo.back().getBounds(temp_low,temp_high,"CC");
-                      
-                      low[k] = temp_high[k]-1; // force overlap
-                    }
-                 
-                    }*/
+		    if(k==0){
+		      int temp_low[3];
+		      int temp_high[3];
+		      level_info.patchInfo.back().getBounds(temp_low,temp_high,"CC");
+		      
+		      low[k] = temp_high[k]-1; // force overlap
+		    }
+		 
+		    }*/
 
-                  high[k] = low[k] + resdata[k];
-                  /*
-                  if(level_info.patchInfo.size() == nboxes-1){
-                    if(k==0){
-                      Box log_box = reader->getLogicBox();
-                      high[k] = log_box.p2[k]-1-eCells[k];
-                    }
-                    }*/
-                }
-                
-                if(p1log_el != NULL)
-                  parseVector(p1log_el, low);
-                if(p2log_el != NULL)
-                  parseVector(p2log_el, high);   
-                
+		  high[k] = low[k] + resdata[k];
+		  /*
+		  if(level_info.patchInfo.size() == nboxes-1){
+		    if(k==0){
+		      Box log_box = reader->getLogicBox();
+		      high[k] = log_box.p2[k]-1-eCells[k];
+		    }
+		    }*/
+		}
+		
+    		if(p1log_el != NULL)
+       		  parseVector(p1log_el, low);
+       		if(p2log_el != NULL)
+       		  parseVector(p2log_el, high);   
+		
             }
             
             PatchInfo box;
@@ -708,25 +812,25 @@ void avtIDXFileFormat::createBoxes(){
        if(!found_cellspacing){
         printf("Cellspacing not found, calculating\n");
 
-        PatchInfo& box = level_info.patchInfo[0];
+	PatchInfo& box = level_info.patchInfo[0];
 
         int low[3];
         int high[3];
         box.getBounds(low,high,"CC",use_extracells);
 
         for(int k=0; k<3; k++){
-          level_info.spacing[k] = (p2phy[k]-p1phy[k])/(high[k]-low[k]+1);;
-          printf("%f - %f / %d - %d +1\n",p2phy[k],p1phy[k],high[k],low[k]);
-        }
+	  level_info.spacing[k] = (p2phy[k]-p1phy[k])/(high[k]-low[k]+1);;
+	  printf("%f - %f / %d - %d +1\n",p2phy[k],p1phy[k],high[k],low[k]);
+	}
 
       }
 
 
      //    phyboxes.push_back(Box(p1phy, p2phy));
      //    if(phyboxes.size()==1)
-            //   physicalBox = phyboxes[0];
-            // else
-            //   physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
+	    //   physicalBox = phyboxes[0];
+	    // else
+	    //   physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
      //      boxes.push_back(Box(p1log,p2log));
             
       }
@@ -922,7 +1026,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
       const char* sfc_v = dataset_filename.substr(folder_point+4,1).c_str();
       std::cout << "Use SFC "<< sfc_v << std::endl;
       if(*sfc_v == 'X')
-            sfc_offset[0] = 1;
+	    sfc_offset[0] = 1;
       else if(*sfc_v == 'Y')
         sfc_offset[1] = 1;
       else if(*sfc_v == 'Z')
@@ -1000,7 +1104,6 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
        loadBalance();
     // else
     //    pidx_decomposition(nprocs);
-    fprintf(stderr,"NO PARALLEL YET\n");
 #endif
 
     if(level_info.patchInfo.size()>old_size)
@@ -1286,12 +1389,12 @@ avtIDXFileFormat::SetUpDomainConnectivity(const char* meshname)
     void_ref_ptr vr =
       void_ref_ptr(rdb, avtStructuredDomainBoundaries::Destruct);
     cache->CacheVoidRef("any_mesh",
-                        AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
+			AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
 
         void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-                                           AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-                                           -1, -1);
-        if (*vrTmp == NULL )//|| *vrTmp != *this->mesh_boundaries[meshname])
+					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+					   -1, -1);
+	if (*vrTmp == NULL )//|| *vrTmp != *this->mesh_boundaries[meshname])
       fprintf(stderr,"pidx boundary mesh not registered\n");
 
 
@@ -1325,8 +1428,8 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
 
     void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-                                           AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-                                           timestate, -1);
+					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+					   timestate, -1);
     if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
       fprintf(stderr,"pidx boundary mesh not registered\n");
     
@@ -1346,7 +1449,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
       int child_low[3],child_high[3];                                                                     
       level_info.patchInfo[p1].getBounds(child_low,child_high,meshname,use_extracells);                                            
       for (int p2=0; p2<totalPatches; p2++) {
-              if(p1==p2) continue;
+	      if(p1==p2) continue;
 
         PatchInfo &parentPatchInfo = level_info.patchInfo[p2];                                   
         int parent_low[3],parent_high[3];                                                                 
@@ -1363,11 +1466,11 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
                         mins[2]<maxs[2]);
         
         if (overlap) {
-          printf("overlap %d %d \n", p1,p2); 
+	  printf("overlap %d %d \n", p1,p2); 
           int child_gpatch = p1;
           int parent_gpatch = p2;
           childPatches[parent_gpatch].push_back(child_gpatch);                                            
-        }
+	}
       }
     }
     */
@@ -1396,8 +1499,8 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
     this->mesh_domains[meshname]=void_ref_ptr(dn, avtStructuredDomainNesting::Destruct);
     vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-                              AUXILIARY_DATA_DOMAIN_NESTING_INFORMATION,
-                              timestate, -1);
+			      AUXILIARY_DATA_DOMAIN_NESTING_INFORMATION,
+			      timestate, -1);
     if (*vrTmp == NULL || *vrTmp != *this->mesh_domains[meshname])
       fprintf(stderr,"pidx domain mesh not registered");
 */
@@ -1457,7 +1560,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       my_dims[k] = high[k]-low[k]+1 +1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
       
       if(use_extracells && uintah_metadata)
-        my_dims[k]--;
+	my_dims[k]--;
     }
 
     if(debug_format)
@@ -1474,38 +1577,38 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       float *array = (float *)coords->GetVoidPointer(0); 
           
         for (int i=0; i<my_dims[c]; i++)
-        {
-          // Face centered data gets shifted towards -inf by half a cell.
-          // Boundary patches are special shifted to preserve global domain.
-          // Internal patches are always just shifted.
-          float face_offset= 0;//-1.f;
+    	{
+    	  // Face centered data gets shifted towards -inf by half a cell.
+    	  // Boundary patches are special shifted to preserve global domain.
+    	  // Internal patches are always just shifted.
+    	  float face_offset= 0;//-1.f;
 
-          if (sfc_offset[c]) 
-          {
-              if (i==0)
-                if (low[c]==glow[c]) // patch is on low boundary
-                  face_offset += 0.0;
-                else
-                  face_offset += -0.5;       // patch boundary is internal to the domain
-              else if (i==my_dims[c]-1)
-                if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
-                  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
-                  //  face_offset += 0.0;
-                  //else
-                  face_offset += -1;
-                else                        // patch boundary is internal to the domain
-                  face_offset += -0.5;
-              else
-                face_offset += -0.5;
-           }
+    	  if (sfc_offset[c]) 
+    	  {
+    	      if (i==0)
+    		if (low[c]==glow[c]) // patch is on low boundary
+    		  face_offset += 0.0;
+    		else
+    		  face_offset += -0.5;       // patch boundary is internal to the domain
+    	      else if (i==my_dims[c]-1)
+    		if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
+    		  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
+    		  //  face_offset += 0.0;
+    	          //else
+    	          face_offset += -1;
+    		else                        // patch boundary is internal to the domain
+    		  face_offset += -0.5;
+    	      else
+    	        face_offset += -0.5;
+    	   }
     
-            array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
-          
-            if(i==0)
-              printf("low %d[%d]: %f\n", domain,c, array[i]);
-            if(i==my_dims[c]-1)
-              printf("high %d[%d]: %f\n", domain,c, array[i]);
-        }
+	    array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
+	  
+	    if(i==0)
+	      printf("low %d[%d]: %f\n", domain,c, array[i]);
+	    if(i==my_dims[c]-1)
+	      printf("high %d[%d]: %f\n", domain,c, array[i]);
+	}
 
         switch(c) {
           case 0:
@@ -1559,8 +1662,8 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     std::cout << "read data " << level_info.patchInfo[domain].toString();
     for(int k=0; k<3; k++){
       if(uintah_metadata && use_extracells){
-        low[k]++;
-        //high[k]++;
+	low[k]++;
+	//high[k]++;
       }
         my_box.p1[k] = low[k];
         my_box.p2[k] = high[k];
@@ -1815,7 +1918,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
             }
             printf("range %f , %f\n", min_value, max_value);
             
-            }
+	    }
         return rv;
     }
     else if(type == VisitIDXIO::IDX_FLOAT64){
