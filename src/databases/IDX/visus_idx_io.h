@@ -21,7 +21,10 @@
 #include "visit_idx_io.h"
 #include "visit_idx_io_types.h"
 
+using namespace VisitIDXIO;
+
 class DatasetImpl;
+class AccessImpl;
 
 // TODO generalize end extend
 // Query at full resolution only
