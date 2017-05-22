@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2015, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -113,9 +113,6 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     static vtkDataArray * datatoreturn;
     static const char *curr_varname;
   protected:
-
-    virtual bool     HasInvariantMetaData(void) const { return false; };
-    virtual bool     HasInvariantSIL(void) const { return false; };
 
     std::string                   dataset_filename;
     std::string                   metadata_filename;
