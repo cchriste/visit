@@ -86,6 +86,8 @@
 #include <InvalidVariableException.h>
 #include <dirent.h>
 
+#include "uintah_utils.h"
+
 #ifdef PARALLEL
 #include <avtParallel.h>
 #endif
@@ -98,153 +100,6 @@ bool debug_format = true;
 bool debug_input = true;
 
 using namespace VisitIDXIO;
-
-int        cint   (String s) {int    value;std::istringstream iss(s);iss>>value;return value;}
-float      cfloat (String s) {float  value;std::istringstream iss(s);iss>>value;return value;}
-double     cdouble(String s) {double value;std::istringstream iss(s);iss>>value;return value;}
-// trim from start
-static inline std::string &ltrim(std::string &s) {
-  s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-  return s;
-}
-
-// trim from end
-static inline std::string &rtrim(std::string &s) {
-  s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-  return s;
-}
-
-// trim from both ends
-static inline std::string &trim(std::string &s) {
-  return ltrim(rtrim(s));
-}
-
-void avtIDXFileFormat::pidx_decomposition(int process_count){
-#if 0  
-  if (process_count == 1) return;
-  
-    int maxdir = 0; // largest extent axis
-    int maxextent = 0;
-    int maxbox = 0;
-
-    for(int i=0; i < boxes.size(); i++){
-        Box& box = boxes.at(i);
-        
-        for(int j=0; j < 3; j++){
-            int extent = box.p2[j]-box.p1[j];
-            if(extent > maxextent){
-                maxdir = j;
-                maxextent = extent;
-                maxbox = i;
-            }
-        }
-    }
-
-    int total_extent = 0;
-    int avg_ext = 0;
-    
-    for(int i=0; i < boxes.size(); i++){
-        Box& box = boxes.at(i);
-        
-        total_extent += box.p2[maxdir]-box.p1[maxdir];
-    }
-
-    if(debug_format)
-      printf("total_extent %d\n", total_extent);
-   
-    avg_ext = (total_extent+1) / nprocs;
-    int res_ext = (total_extent+1) % nprocs;
-
-    Box box = boxes[0];
-    int global_size[3] = {box.p2.x-box.p1.x+1,box.p2.y-box.p1.y+1,box.p2.z-box.p1.z+1};
-    if(debug_format)
-      printf("global box size %d %d %d avg_ext %d res_ext %d max_dir %d\n", global_size[0],global_size[1],global_size[2], avg_ext, res_ext, maxdir);
-
-
-  boxes.clear();
-  phyboxes.clear();
-  
-  Point3d log2phy;
-     
-  for (int k = 0; k < dim; k++){
-    log2phy[k] = (physicalBox.p2[k] - physicalBox.p1[k])/(global_size[k]-1);
-  }
-    
-  for(int r=0; r < process_count; r++){
-    
-    int local_size[3];
-    /*
-    for(int d=0; d < dim; d++){
-        if(d == maxdir){
-            local_size[d] = avg_ext;
-            if(r == process_count-1)
-                local_size[d] += res_ext;
-        }else
-            local_size[d] = global_size[d];
-    }
-
-    int local_offset[3];*/
-
-    Box newbox;
-    for (int k = 0; k < dim; k++){
-      if(k!=maxdir){
-            newbox.p1[k] = 0;
-	    newbox.p2[k] = global_size[k]-1;
-      }
-      else {
-	newbox.p1[k] = r*avg_ext;
-	//if(boxes.size()>1)
-	//  newbox.p1[k]--;
-	newbox.p2[k] = newbox.p1[k] + avg_ext +1;
-	if(r == process_count-1){
-	   newbox.p2[k] = global_size[k]-1; 
-	}
-      }
-    }
-
-    /*
-    newbox.p1[0] = local_offset[0];
-    newbox.p1[1] = local_offset[1];
-    newbox.p1[2] = local_offset[2];
-    newbox.p2[0] = local_offset[0]+local_size[0];//-1;
-    newbox.p2[1] = local_offset[1]+local_size[1];//-1;
-    newbox.p2[2] = local_offset[2]+local_size[2];//-1;
-    */
-    if(debug_format)
-      printf("%d: created p1 %f %f %f p2 %f %f %f\n", r, newbox.p1[0],newbox.p1[1],newbox.p1[2], newbox.p2[0],newbox.p2[1],newbox.p2[2]);
-    
-    boxes.push_back(newbox);
-         
-    Point3d phyOffset = physicalBox.p1;
-//      std::cout << "log2phy " <<log2phy << std::endl;
-                
-    Box newphybox;
-    
-    for (int k = 0; k < dim; k++){
-      newphybox.p1[k] = newbox.p1[k] * log2phy[k] + phyOffset[k];
-
-      if(k != maxdir)
-        newphybox.p2[k] = physicalBox.p2[k];//newbox.p2[k] * log2phy[k] + phyOffset[k] + log2phy[k];
-      else{
-        newphybox.p2[k] = newbox.p2[k] * log2phy[k] + phyOffset[k];//newphybox.p1[k] + (avg_ext)*log2phy[k];// +log2phy[k];
-        if(r == process_count-1)
-           newphybox.p2[k] = physicalBox.p2[k];
-      }
-    }       
-
-    if(debug_format)
-      printf("New phy box p1: %f %f %f p2: %f %f %f\n", newphybox.p1.x,newphybox.p1.y,newphybox.p1.z ,newphybox.p2.x,newphybox.p2.y,newphybox.p2.z);
-
-    phyboxes.push_back(newphybox);
-    //physicalBox = physicalBox.getUnion((const Box)phyboxes.at(r));
-    
-  }
-
-  /*if(process_count == 1)
-    physicalBox = reader->getLogicBox();
-  */
-#endif
-}
 
 void avtIDXFileFormat::loadBalance(){
 
@@ -272,7 +127,6 @@ void avtIDXFileFormat::loadBalance(){
     }
     
     //std::cout << "max dir " << maxdir << " max extent " << maxextent << " box " << maxbox;
-#if 1
     std::vector<PatchInfo> newboxes;
     int n = nprocs;
     int b = level_info.patchInfo.size();
@@ -374,121 +228,6 @@ void avtIDXFileFormat::loadBalance(){
 
     }
 
-#else
-    int total_extent = 0;
-    int avg_ext = 0;
-    
-    for(int i=0; i < level_info.patchInfo.size(); i++){
-        PatchInfo& box = level_info.patchInfo[i];
-        int box_low[3];
-        int box_high[3];
-
-        box.getBounds(box_low,box_high,"CC");
-        
-        total_extent += box_high[maxdir] - box_low[maxdir];
-    }
-    //total_extent++; // DIM
-    avg_ext = total_extent / nprocs;
-    int res_ext = (total_extent % nprocs);
-    
-    if(debug_format && rank==0)
-      std::cout << "tot ext " << total_extent << " avg ext " << avg_ext << " res ext " << res_ext << " n boxes " << level_info.patchInfo.size() <<std::endl;
-    
-    std::vector<PatchInfo> newboxes;
-    // std::vector<Box> newphyboxes;
-    
-    for(int i=0; i < level_info.patchInfo.size(); i++){
-        PatchInfo& box = level_info.patchInfo[i];
-        int box_low[3];
-        int box_high[3];
-
-        box.getBounds(box_low,box_high,"CC");
-
-        int loc_avg_ext = box_high[maxdir] - box_low[maxdir];
-        int loc_res = 0;
-        
-        if(loc_avg_ext > avg_ext){
-            loc_res = loc_avg_ext % avg_ext;
-            loc_avg_ext = avg_ext;
-        }
-
-        if(debug_format && rank==0)
-	       std::cout << "local avg ext " << loc_avg_ext << " local res " << loc_res;
-        
-        int part_p1 = box_low[maxdir];
-        int part_p2 = box_low[maxdir] + loc_avg_ext;
-        
-        int low[3];
-        int high[3];
-        int eCells[6];
-        box.getBounds(low,high,eCells,"CC");
-
-        // Point3d p1(box.p1);
-        // Point3d p2(box.p2);
-
-        // Point3d log2phy;
-   //      Box& phybox = phyboxes.at(i);
-   //      if(debug_format && rank==0)
-	  // std::cout << "Old box p1: " << p1 << " p2: "<< p2 << " phy " << phybox.p1 << " p2 " << phybox.p2<< std::endl<< std::flush;
-      
-   //      for (int k = 0; k < dim; k++){
-   //        log2phy[k] = (phybox.p2[k] - phybox.p1[k])/(box.p2[k] - box.p1[k] + 1);
-   //     }
-      
-        //Point3d phyOffset = phybox.p1;
-//      std::cout << "log2phy " <<log2phy << std::endl;
-      
-        while(part_p2 <= box_high[maxdir]){
-            
-            low[maxdir] = part_p1;
-            high[maxdir] = (part_p2 < box_high[maxdir]) ? part_p2+1 : part_p2;
-           
-            PatchInfo newbox;
-
-            newbox.setBounds(low,high,eCells,"CC");
-            newboxes.push_back(newbox);
-
-            // // Box newbox(p1,p2);
-            // // newboxes.push_back(newbox);
-          
-            // Box newphybox;
-          
-            // for (int k = 0; k < dim; k++){
-            //   newphybox.p1[k] = newbox.p1[k] * log2phy[k];// + phyOffset[k];
-            //   newphybox.p2[k] = newbox.p2[k] * log2phy[k];// + phyOffset[k];;
-            // }
-          
-            // newphyboxes.push_back(newphybox);
-            
-            if(debug_format && rank ==0)
-	           std::cout << "New box: " << newbox.toString();//p1 << " p2: "<< p2 << <<std:endl;//" phy " << newphybox.p1 << " p2 " << newphybox.p2<< std::endl << std::flush;
-          
-            part_p1 += loc_avg_ext;
-            part_p2 += loc_avg_ext;
-           
-        }
-        
-        if(loc_res > 0){
-            PatchInfo& boxres = newboxes[newboxes.size()-1];
-            int boxres_low[3];
-            int boxres_high[3];
-            int ecellres[6];
-
-            boxres.getBounds(boxres_low,boxres_high,ecellres,"CC");
-            boxres_high[maxdir] += loc_res-1;
-            boxres.setBounds(boxres_low,boxres_high,ecellres,"CC");
-          
-            // Box& phyboxres = newphyboxes.at(newphyboxes.size()-1);
-            // phyboxres.p2[maxdir] += loc_res*log2phy[maxdir];
-            
-            if(debug_format && rank ==0)       
-              std::cout << "Residual " << loc_res-1 <<" added to box "<< newboxes.size()-1 << boxres.toString();
-        }
-
-    }
-    
-#endif 
-
     level_info.patchInfo.swap(newboxes);
     // phyboxes.swap(newphyboxes);
   
@@ -551,317 +290,80 @@ Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncom
     
 // }
 
-void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, double* vec){
-  String el_str(el->GetCharacterData());
-	  
-  el_str = trim(el_str);
-  String el_vals = el_str.substr(1,el_str.length()-2);
-  if(debug_input)
-    std::cout << "Found vec " << el_vals << std::endl;
-  std::string anchs;
-  std::stringstream anch_ss(el_vals);
-  for (int k=0; k < dim; k++){
-    std::getline(anch_ss, anchs, ',');
-	   
-    vec[k] = cfloat(anchs);
-  }
-  if(debug_input)
-    std::cout << "read " << vec[0] << " "<< vec[1] << " " << vec[2] << std::endl;
-}
-
-void avtIDXFileFormat::parseVector(vtkXMLDataElement *el, int* vec){
-  String el_str(el->GetCharacterData());
-      
-  el_str = trim(el_str);
-  String el_vals = el_str.substr(1,el_str.length()-2);
-  if(debug_input)
-    std::cout << "Found vec " << el_vals << std::endl;
-  std::string anchs;
-  std::stringstream anch_ss(el_vals);
-  for (int k=0; k < dim; k++){
-    std::getline(anch_ss, anchs, ',');
-       
-    vec[k] = cint(anchs);
-  }
-  if(debug_input)
-    std::cout << "read " << vec[0] << " "<< vec[1] << " " << vec[2] << std::endl;
-}
-
-
 void avtIDXFileFormat::createBoxes(){
     
-    size_t found = dataset_filename.find_last_of("/\\");
-    String folder = dataset_filename.substr(0,found);
-    
-    bool found_cellspacing = false;
+  size_t found = dataset_filename.find_last_of("/\\");
+  String folder = dataset_filename.substr(0,found);
 
-    bool use_boxes = false;
-
-    String upsfilename = "noupsfile.ups";
-    DIR *dir;
-    struct dirent *ent;
-    if ((dir = opendir (folder.c_str())) != NULL) {
-        /* print all the files and directories within directory */
-        while ((ent = readdir (dir)) != NULL) {
-            String name(ent->d_name);
-            if(name.substr(name.find_last_of(".") + 1) == "ups"){
-                upsfilename = name;
-                if(debug_input)
-                    std::cout<< ".ups file found " << upsfilename << std::endl;
-                upsfilename = folder + "/" +upsfilename;
-                break;
-            }
-        }
-        closedir (dir);
-    } else {
-        if(debug_input)
-            std::cout<< "No .ups file found" << std::endl;
-    }
-    
-    vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
-    
-    upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
-    
-    uintah_metadata = false;
-
-    parser->SetFileName(upsfilename.c_str());
-    if (!parser->Parse())
-    {
-        if(debug_input)
-            std::cout<< "No .ups file found (Uintah only)" << std::endl;
-
-        parser->SetFileName(metadata_filename.c_str());
-        //std::cout << "trying metadata " << idxmetadata << std::endl;
-        if (!parser->Parse()){        
-            use_boxes = false;
-            if(debug_input)
-             std::cout << "Single-box mode" << std::endl;
-        }else{
-            use_boxes = true;
-        }       
-        
-    }else{
-        uintah_metadata = true;
-        use_boxes = true;
-        if(debug_input)
-            std::cout << "Multi-box mode" << std::endl;
-    }
-    
-    if(use_boxes){
-        vtkXMLDataElement *root = parser->GetRootElement();
-        vtkXMLDataElement *level = NULL;
-
-        if(uintah_metadata)
-            level = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("Level");
-        else 
-            level = root->FindNestedElementWithName("level");
-
-        if(uintah_metadata){
-
-        	vtkXMLDataElement *anchor_el = NULL;
-        	anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
-
-        	if(anchor_el == NULL){
-        	  if(debug_input)
-        	    std::cout << "anchor not found" << std::endl;
-        	  level_info.anchor[0]=0;
-        	  level_info.anchor[1]=0;
-        	  level_info.anchor[2]=0;
-        	 }
-        	else{
-        	  parseVector(anchor_el, level_info.anchor);	   
-        	}
-        	
-        	//cellspacing
-        	vtkXMLDataElement *cellspacing_el = NULL;
-        	cellspacing_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("cellspacing");
-
-        	if(cellspacing_el == NULL){
-        	  if(debug_input)
-        	    std::cout << "cellspacing not found" << std::endl;
-		  found_cellspacing = false;
-	        }else{
-        	  parseVector(cellspacing_el, level_info.spacing);
-                  found_cellspacing = true;
-
-        	}
-    	}
-
-        int nboxes = level->GetNumberOfNestedElements();
-        
-        if(debug_input)
-            std::cout << "Found " << nboxes << " boxes" << std::endl;
-        int last_log = 0;
-        for(int i=0; i < nboxes; i++){
-
-            vtkXMLDataElement *xmlbox = level->GetNestedElement(i);
-            String lower(xmlbox->FindNestedElementWithName("lower")->GetCharacterData());
-            String upper(xmlbox->FindNestedElementWithName("upper")->GetCharacterData());
-            
-    	    vtkXMLDataElement* p1log_el = xmlbox->FindNestedElementWithName("p1log");
-    	    vtkXMLDataElement* p2log_el = xmlbox->FindNestedElementWithName("p2log");
-
-            String extra_cells = "[0 0 0]";
-
-            if(uintah_metadata)
-                extra_cells = String(xmlbox->FindNestedElementWithName("extraCells")->GetCharacterData());
-            
-            String resolution(xmlbox->FindNestedElementWithName("resolution")->GetCharacterData());
-            lower = trim(lower);
-            upper = trim(upper);
-            
-            resolution = trim(resolution);
-          
-            lower = lower.substr(1,lower.length()-2);
-            upper = upper.substr(1,upper.length()-2);
-            
-            // TODO Do we still need extra cells managements as a flag?
-            extra_cells = extra_cells.substr(1,extra_cells.length()-2);
-            resolution = resolution.substr(1,resolution.length()-2);
-            
-            if(debug_input)
-                std::cout<< "lower " << lower << " upper " << upper << " resolution " << resolution << std::endl;
-          
-            // Point3d p1phy(0,0,0), p1log(0,0,0);
-            // Point3d p2phy(0,0,0), p2log(0,0,0), logOffset(0,0,0);
-
-            Point3d p1phy(0,0,0), p2phy(0,0,0);
-
-            int low[3];
-            int high[3];
-          
-            int eCells[6];
-            int resdata[3];
-            double phy2log[3];
-            
-            std::stringstream ress(resolution);
-            std::stringstream ss1(lower);
-            std::stringstream ss2(upper);
-            std::stringstream ssSpace(extra_cells);
-            std::string p1s, p2s, espace, res;
-            for (int k=0; k < dim; k++){
-                std::getline(ss1, p1s, ',');
-                std::getline(ss2, p2s, ',');
-                std::getline(ssSpace, espace, ',');
-                std::getline(ress, res, ',');
-                
-                eCells[k] = cint(espace);
-                resdata[k] = cint(res);
-                
-                p1phy[k] = cfloat(p1s);
-                p2phy[k] = cfloat(p2s);
-              
-                phy2log[k] = (p2phy[k]-p1phy[k])/(resdata[k]);
-                //p2phy[k] += phy2log[k];
-		
-                /*if(boxes.size() == 0){
-                  logOffset[k] = std::abs(p1phy[k]) / phy2log[k];//phy2log[k];
-		        }*/
-	       
-        	if(nboxes == 1){ // single box case
-        	  low[k] = 0;
-		  high[k] = low[k] + resdata[k];
-		}
-        	else{ // multibox case (all inside the same domain)
-		  low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
-		  /*
-		  if(level_info.patchInfo.size() > 0){ 
-
-		    if(k==0){
-		      int temp_low[3];
-		      int temp_high[3];
-		      level_info.patchInfo.back().getBounds(temp_low,temp_high,"CC");
-		      
-		      low[k] = temp_high[k]-1; // force overlap
-		    }
-		 
-		    }*/
-
-		  high[k] = low[k] + resdata[k];
-		  /*
-		  if(level_info.patchInfo.size() == nboxes-1){
-		    if(k==0){
-		      Box log_box = reader->getLogicBox();
-		      high[k] = log_box.p2[k]-1-eCells[k];
-		    }
-		    }*/
-		}
-		
-    		if(p1log_el != NULL)
-       		  parseVector(p1log_el, low);
-       		if(p2log_el != NULL)
-       		  parseVector(p2log_el, high);   
-		
-            }
-            
-            PatchInfo box;
-            // Simmetric extracells !!!! Not true
-            eCells[3] = eCells[0];
-            eCells[4] = eCells[1];
-            eCells[5] = eCells[2];
-            box.setBounds(low,high,eCells,"CC");
-
-            level_info.patchInfo.push_back(box);
-
-            if(debug_input){
-              std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
-              std::cout << level_info.patchInfo.back().toString();
-              //std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
-            }
-
-       if(!found_cellspacing){
-        printf("Cellspacing not found, calculating\n");
-
-	PatchInfo& box = level_info.patchInfo[0];
-
-        int low[3];
-        int high[3];
-        box.getBounds(low,high,"CC",use_extracells);
-
-        for(int k=0; k<3; k++){
-	  level_info.spacing[k] = (p2phy[k]-p1phy[k])/(high[k]-low[k]+1);;
-	  printf("%f - %f / %d - %d +1\n",p2phy[k],p1phy[k],high[k],low[k]);
-	}
-
+  String upsfilename = "noupsfile.ups";
+  DIR *dir;
+  struct dirent *ent;
+  if ((dir = opendir (folder.c_str())) != NULL) {
+      /* print all the files and directories within directory */
+      while ((ent = readdir (dir)) != NULL) {
+          String name(ent->d_name);
+          if(name.substr(name.find_last_of(".") + 1) == "ups"){
+              upsfilename = name;
+              if(debug_input)
+                  std::cout<< ".ups file found " << upsfilename << std::endl;
+              upsfilename = folder + "/" +upsfilename;
+              break;
+          }
       }
+      closedir (dir);
+  } else {
+      if(debug_input)
+          std::cout<< "No .ups file found" << std::endl;
+  }
+  
+  vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
+  
+  upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
+  
+  uintah_metadata = false;
 
+  parser->SetFileName(upsfilename.c_str());
 
-     //    phyboxes.push_back(Box(p1phy, p2phy));
-     //    if(phyboxes.size()==1)
-	    //   physicalBox = phyboxes[0];
-	    // else
-	    //   physicalBox = physicalBox.getUnion((const Box)phyboxes.at(i));
-     //      boxes.push_back(Box(p1log,p2log));
-            
-      }
+  if (!parser->Parse()){
+    if(debug_input)  std::cout<< "No .ups file found (Uintah only)" << std::endl;
 
-        
+    parser->SetFileName(metadata_filename.c_str());
+    
+    if (!parser->Parse()){
+      if(debug_input)  std::cout << "Single-box mode" << std::endl;
     }
-    else{
+  }else{
+    uintah_metadata = true;
+    if(debug_input)  std::cout << "Multi-box mode" << std::endl;
+  }
+  
+  if(uintah_metadata){
+    parse_ups(parser, level_info, dim, use_extracells);
+  }
+  else{
+    Box log_box = reader->getLogicBox();
+    int low[3];
+    int high[3];
+    int eCells[6] = {0,0,0,0,0,0};
 
-        Box log_box = reader->getLogicBox();
-        int low[3];
-        int high[3];
-        int eCells[6] = {0,0,0,0,0,0};
+    low[0] = log_box.p1[0];
+    low[1] = log_box.p1[1];
+    low[2] = log_box.p1[2];
+    high[0] = log_box.p2[0]-1;
+    high[1] = log_box.p2[1]-1;
+    high[2] = log_box.p2[2]-1;
 
-        low[0] = log_box.p1[0];
-        low[1] = log_box.p1[1];
-        low[2] = log_box.p1[2];
-        high[0] = log_box.p2[0]-1;
-        high[1] = log_box.p2[1]-1;
-        high[2] = log_box.p2[2]-1;
+    PatchInfo box;
+    box.setBounds(low,high,eCells,"CC");
+    level_info.patchInfo.push_back(box);
 
-        PatchInfo box;
-        box.setBounds(low,high,eCells,"CC");
-        level_info.patchInfo.push_back(box);
-
-        for(int k=0; k<3; k++){
-          level_info.spacing[k]= 1.f;
-          level_info.anchor[k] = 0.f;
-        }
-        std::cout << "Single Box: ";
-        std::cout << level_info.patchInfo.back().toString();
+    for(int k=0; k<3; k++){
+      level_info.spacing[k]= 1.f;
+      level_info.anchor[k] = 0.f;
     }
+    std::cout << "Single Box: ";
+    std::cout << level_info.patchInfo.back().toString();
+  }
 
 }
 
@@ -1034,43 +536,42 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     }
     
     if(is_gidx){
-        std::cout << "Using GIDX file" << std::endl;
+      std::cout << "Using GIDX file" << std::endl;
 
-        vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
-    
-        parser->SetFileName(dataset_filename.c_str());
-        if (parser->Parse()){
-            vtkXMLDataElement *root = parser->GetRootElement();
+      vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
+  
+      parser->SetFileName(dataset_filename.c_str());
+      if (parser->Parse()){
+        vtkXMLDataElement *root = parser->GetRootElement();
 
-            int ntimesteps = root->GetNumberOfNestedElements();
-    
-            if(debug_format)
-                std::cout << "Found " << ntimesteps << " timesteps in GIDX file" << std::endl;
-    
-            for(int i=0; i < ntimesteps; i++){
-        
-                vtkXMLDataElement *xmltime = root->GetNestedElement(i);
-                String urlstr(xmltime->GetAttribute("url"));
-                String timestr(xmltime->GetAttribute("log_time"));
+        int ntimesteps = root->GetNumberOfNestedElements();
 
-                gidx_info ginfo;
-                ginfo.url = urlstr.substr(7);
-                ginfo.log_time = cint(timestr.c_str());
-                gidx_datasets.push_back(ginfo);
+        if(debug_format)
+          std::cout << "Found " << ntimesteps << " timesteps in GIDX file" << std::endl;
 
-                if(debug_input)
-                    std::cout << "added dataset " << ginfo.url << " time " << ginfo.log_time << std::endl;
+        for(int i=0; i < ntimesteps; i++){
+          vtkXMLDataElement *xmltime = root->GetNestedElement(i);
+          String urlstr(xmltime->GetAttribute("url"));
+          String timestr(xmltime->GetAttribute("log_time"));
 
-                logTimeIndex.push_back(ginfo.log_time);
-                timeIndex.push_back(ginfo.log_time);
-             }
+          gidx_info ginfo;
+          ginfo.url = urlstr.substr(7);
+          ginfo.log_time = cint(timestr.c_str());
+          gidx_datasets.push_back(ginfo);
 
-             if(ntimesteps > 0)
-                if (!reader->openDataset(gidx_datasets[0].url)) // open first dataset 
-                {
-                    std::cout <<"could not load "<<filename << std::endl;
-                    return;
-                }
+          if(debug_input)
+              std::cout << "added dataset " << ginfo.url << " time " << ginfo.log_time << std::endl;
+
+          logTimeIndex.push_back(ginfo.log_time);
+          timeIndex.push_back(ginfo.log_time);
+         }
+
+         if(ntimesteps > 0)
+            if (!reader->openDataset(gidx_datasets[0].url)) // open first dataset 
+            {
+              std::cerr <<"Cannot load "<< filename << std::endl;
+              return;
+            }
 
         }else{
             std::cerr << "Cannot parse GIDX file " << dataset_filename << std::endl;
@@ -1100,21 +601,9 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 
     int old_size = level_info.patchInfo.size();
 #ifdef PARALLEL
-    //if(boxes.size()>1)
-       loadBalance();
-    // else
-    //    pidx_decomposition(nprocs);
+    loadBalance();
 #endif
 
-    if(level_info.patchInfo.size()>old_size)
-      parallel_boxes = true;
-    else
-      parallel_boxes = false;
-
-// #ifdef USE_VISUS
-//     loadBalance();
-// #endif
-  
    // calculateBoundsAndExtents();
 }
 
@@ -1432,80 +921,6 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 					   timestate, -1);
     if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
       fprintf(stderr,"pidx boundary mesh not registered\n");
-    
-
-    /*
-    int totalPatches = level_info.patchInfo.size();
-    int num_levels = 1;
-    avtStructuredDomainNesting *dn = new avtStructuredDomainNesting(totalPatches, num_levels);
-    
-    dn->SetNumDimensions(3);
-    
-    std::vector< std::vector<int> > childPatches(totalPatches);
-    */
-
-    /* //OLD
-    for (int p1=0; p1<totalPatches ; p1++) {
-      int child_low[3],child_high[3];                                                                     
-      level_info.patchInfo[p1].getBounds(child_low,child_high,meshname,use_extracells);                                            
-      for (int p2=0; p2<totalPatches; p2++) {
-	      if(p1==p2) continue;
-
-        PatchInfo &parentPatchInfo = level_info.patchInfo[p2];                                   
-        int parent_low[3],parent_high[3];                                                                 
-        parentPatchInfo.getBounds(parent_low,parent_high,meshname,use_extracells);                                 
-        int mins[3], maxs[3];                                                                             
-        for (int i=0; i<3; i++) {                                                                        
-          mins[i] = std::max(child_low[i],  parent_low[i]);
-          // *levelInfoChild.refinementRatio[i]);
-          maxs[i] = std::min(child_high[i], parent_high[i]);// *levelInfoChild.refinementRatio[i]);     
-        } 
-
-        bool overlap = (mins[0]<maxs[0] &&
-                        mins[1]<maxs[1] &&
-                        mins[2]<maxs[2]);
-        
-        if (overlap) {
-	  printf("overlap %d %d \n", p1,p2); 
-          int child_gpatch = p1;
-          int parent_gpatch = p2;
-          childPatches[parent_gpatch].push_back(child_gpatch);                                            
-	}
-      }
-    }
-    */
-    /* 
-    for (int p=0; p<totalPatches ; p++) {
-      int my_level =0;
-      int local_patch = p;
-
-      PatchInfo &patchInfo = level_info.patchInfo[local_patch];
-      int low[3],high[3];
-      patchInfo.getBounds(low,high,meshname,use_extracells);
-      
-      std::vector<int> e(6);
-      for (int i=0; i<3; i++) {
-        e[i+0] = low[i];
-        e[i+3] = high[i]-1;
-      }
-      
-      childPatches[p].push_back(p);
-
-      dn->SetNestingForDomain(p, my_level, childPatches[p], e);
-
-
-      
-    }
-
-    this->mesh_domains[meshname]=void_ref_ptr(dn, avtStructuredDomainNesting::Destruct);
-    vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-			      AUXILIARY_DATA_DOMAIN_NESTING_INFORMATION,
-			      timestate, -1);
-    if (*vrTmp == NULL || *vrTmp != *this->mesh_domains[meshname])
-      fprintf(stderr,"pidx domain mesh not registered");
-*/
-    //}
-
 
 }
 

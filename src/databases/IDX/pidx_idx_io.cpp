@@ -125,14 +125,10 @@ bool PIDXIO::openDataset(const String filename){
   ret = PIDX_file_open(filename.c_str(), PIDX_MODE_RDONLY, pidx_access, global_size, &pidx_file);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_file_open");
   
-  if(use_raw)
-    PIDX_set_io_mode(pidx_file, PIDX_RAW_IO);
-  else
-    PIDX_set_io_mode(pidx_file, PIDX_IDX_IO);
-  //PIDX_enable_raw_io(pidx_file);
-  
-  //ret = PIDX_get_dims(pidx_file, global_size);
-  //if (ret != PIDX_success)  terminate_with_error_msg("PIDX_set_dims");
+  // if(use_raw)
+  //   PIDX_set_io_mode(pidx_file, PIDX_RAW_IO);
+  // else
+  //   PIDX_set_io_mode(pidx_file, PIDX_IDX_IO);
   
   (global_size[2] > 1) ? dims = 3 : dims = 2;
   
@@ -317,9 +313,8 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   if (variable_index >= variable_count) terminate_with_error_msg("Variable index more than variable count\n");
   
   // set RAW for now
-  if(use_raw)
-    PIDX_set_io_mode(pidx_file, PIDX_RAW_IO);
-  //PIDX_enable_raw_io(pidx_file);
+  // if(use_raw)
+  //   PIDX_set_io_mode(pidx_file, PIDX_RAW_IO);
 
   ret = PIDX_set_current_time_step(pidx_file, timestate);
   if (ret != PIDX_success) {
@@ -328,7 +323,7 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
     return NULL;
   }
 
-  PIDX_query_box(pidx_file, global_size);
+  //PIDX_query_box(pidx_file, global_size);
 
 //   PIDX_debug_output(pidx_file);
   PIDX_variable variable;

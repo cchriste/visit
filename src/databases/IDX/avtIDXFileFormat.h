@@ -123,7 +123,6 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     bool use_extracells;
     bool use_raw;
     bool is_gidx;
-    bool parallel_boxes;
     int sfc_offset[3];
     std::vector<gidx_info> gidx_datasets;
     bool uintah_metadata;
@@ -145,10 +144,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     void SetUpDomainConnectivity(const char* meshname);
     
     void loadBalance();
-    void pidx_decomposition(int nprocs);
-    void parseVector(vtkXMLDataElement *el, double* vec);
-    void parseVector(vtkXMLDataElement *el, int* vec);
-       
+
     std::vector<double> timeIndex;
     std::vector<int> logTimeIndex;
     
