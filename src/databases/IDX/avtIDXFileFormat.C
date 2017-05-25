@@ -87,6 +87,7 @@
 #include <dirent.h>
 
 #include "uintah_utils.h"
+#include "visit_idx_utils.h"
 
 #ifdef PARALLEL
 #include <avtParallel.h>
@@ -244,52 +245,6 @@ void avtIDXFileFormat::loadBalance(){
 
 }
 
-
-template <typename Type>
-Type* avtIDXFileFormat::convertComponents(const unsigned char* src, int src_ncomponents, int dst_ncomponents, long long totsamples){
-    int n=src_ncomponents;
-    int m=dst_ncomponents;
-    int ncomponents=std::min(m,n);
-    
-    Type* dst = (Type*)calloc(totsamples*m, sizeof(Type));
-    
-    //for each component...
-    for (int C=0;C<ncomponents;C++)
-    {
-        Type* src_p=((Type*)src)+C;
-        Type* dst_p=((Type*)dst)+C;
-        for (long long I=0; I<totsamples; I++,src_p+=n,dst_p+=m)
-        {
-            *dst_p=*src_p;
-            
-            //std::cout << "c " << C << " I " <<I << std::endl;
-        }
-        
-    }
-    
-    //std::cout << "data converted " << std::endl;
-    
-    return dst;
-}
-
-// TODO consider the physical box
-// void avtIDXFileFormat::calculateBoundsAndExtents(){
-    
-//     // TODO deallocate this stuff
-//     for(int i=0; i< boxes.size(); i++){
-//         Box& box = boxes.at(i);
-//         int* my_bounds = new int[3];
-            
-//         my_bounds[0] = box.p2.x-box.p1.x+1;
-//         my_bounds[1] = box.p2.y-box.p1.y+1;
-//         my_bounds[2] = box.p2.z-box.p1.z+1;
-        
-//         boxes_bounds.push_back(my_bounds);
-        
-//     }
-    
-// }
-
 void avtIDXFileFormat::createBoxes(){
     
   size_t found = dataset_filename.find_last_of("/\\");
@@ -361,8 +316,11 @@ void avtIDXFileFormat::createBoxes(){
       level_info.spacing[k]= 1.f;
       level_info.anchor[k] = 0.f;
     }
-    std::cout << "Single Box: ";
-    std::cout << level_info.patchInfo.back().toString();
+
+    if(debug_input){
+      std::cout << "Single Box: ";
+      std::cout << level_info.patchInfo.back().toString();
+    }
   }
 
 }
@@ -464,7 +422,6 @@ void avtIDXFileFormat::createTimeIndex(){
 //  Creation:   Mon Dec 10 15:06:44 PST 2012
 //
 // ****************************************************************************
-bool avtIDXFileFormat::data_query = false;
 
 avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* attrs)
 : avtMTMDFileFormat(filename)
@@ -604,7 +561,6 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     loadBalance();
 #endif
 
-   // calculateBoundsAndExtents();
 }
 
 
@@ -1140,7 +1096,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(isVector && dim < 3){
             
-            unsigned char* newdata = convertComponents<unsigned char>(data, field.ncomponents, 3, ntuples);
+            unsigned char* newdata = convertTo3Components<unsigned char>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((unsigned char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1156,7 +1112,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(isVector && dim < 3){
             
-            unsigned short* newdata = convertComponents<unsigned short>(data, field.ncomponents, 3, ntuples);
+            unsigned short* newdata = convertTo3Components<unsigned short>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((unsigned short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1182,7 +1138,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(isVector && dim < 3){
             
-            unsigned int* newdata = convertComponents<unsigned int>(data, field.ncomponents, 3, ntuples);
+            unsigned int* newdata = convertTo3Components<unsigned int>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((unsigned int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1208,7 +1164,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(isVector && dim < 3){
             
-            char* newdata = convertComponents<char>(data, field.ncomponents, 3, ntuples);
+            char* newdata = convertTo3Components<char>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1224,7 +1180,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(isVector && dim < 3){
             
-            short* newdata = convertComponents<short>(data, field.ncomponents, 3, ntuples);
+            short* newdata = convertTo3Components<short>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1250,7 +1206,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(isVector && dim < 3){
             
-            int* newdata = convertComponents<int>(data, field.ncomponents, 3, ntuples);
+            int* newdata = convertTo3Components<int>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1277,7 +1233,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         // ?? is it correct to use long here ??
         if(isVector && dim < 3){
             
-            long* newdata = convertComponents<long>(data, field.ncomponents, 3, ntuples);
+            long* newdata = convertTo3Components<long>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((long*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1303,7 +1259,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            float* newdata = convertComponents<float>(data, field.ncomponents, 3, ntuples);
+            float* newdata = convertTo3Components<float>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((float*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1344,7 +1300,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
         
         if(isVector && dim < 3){
             
-            double* newdata = convertComponents<double>(data, field.ncomponents, 3, ntuples);
+            double* newdata = convertTo3Components<double>(data, field.ncomponents, 3, ntuples);
             rv->SetArray((double*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
             
             delete data;
@@ -1395,10 +1351,6 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 //  Creation:   Mon Dec 10 15:06:44 PST 2012
 //
 // ****************************************************************************
-
-//vtkDataArray * avtIDXFileFormat::datatoreturn = NULL;
-//const char *avtIDXFileFormat::curr_varname = NULL;
-//int avtIDXFileFormat::activations = 0;
 
 vtkDataArray *
 avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
