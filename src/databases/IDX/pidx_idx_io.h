@@ -32,6 +32,7 @@ class PIDXIO : public IDX_IO{
 
 public:
     
+    //TODO: remove use_raw
     PIDXIO(){use_raw = false;}
 
     PIDXIO(bool _use_raw){ use_raw = _use_raw; };
