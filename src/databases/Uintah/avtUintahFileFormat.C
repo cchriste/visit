@@ -858,7 +858,7 @@ avtUintahFileFormat::ReadMetaData(avtDatabaseMetaData *md, int timeState)
             AddScalarVarToMetaData(md, newVarname, mesh_for_this_var, cent);
         }
       }
-    }   
+    }
   }
   
   md->AddGroupInformation(numLevels, totalPatches, groupIds);
@@ -1043,6 +1043,7 @@ avtUintahFileFormat::CalculateDomainNesting(int timestate, const std::string &me
       int e[6] = { low[0], high[0],
                    low[1], high[1],
                    low[2], high[2] };
+      std::cout <<patch<<","<<my_level<<", <"<<e[0]<<","<<e[2]<<","<<e[4]<<"> to <"<<e[1]<<","<<e[3]<<","<<e[5]<< std::endl;
       //debug5<<"\trdb->SetIndicesForAMRPatch("<<patch<<","<<my_level<<", <"<<e[0]<<","<<e[2]<<","<<e[4]<<"> to <"<<e[1]<<","<<e[3]<<","<<e[5]<<">)\n";
       rdb->SetIndicesForAMRPatch(patch, my_level, e);
     }

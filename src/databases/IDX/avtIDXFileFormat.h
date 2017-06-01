@@ -108,6 +108,9 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual void           FreeUpResources(void);
     virtual void           ActivateTimestep(int ts);
 
+    virtual bool     HasInvariantMetaData(void) const { return false; };
+    virtual bool     HasInvariantSIL(void) const { return false; };
+
   protected:
 
     std::string                   dataset_filename;

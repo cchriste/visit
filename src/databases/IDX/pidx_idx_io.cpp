@@ -281,16 +281,19 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   local_offset[0] = (slice % sub_div[0]) * local_size[0];
   
 #else*/
-  for(int i=0; i< dims; i++){
-      local_size[i] = box.p2[i] - box.p1[i] + 1;
-      local_offset[i] = box.p1[i];
-  }
+  // for(int i=0; i< dims; i++){
+  //     local_size[i] = (unsigned long long)(box.p2[i] - box.p1[i] + 1);
+  //     local_offset[i] = (unsigned long long)(box.p1[i]);
+  // }
 //#endif
+  
+  PIDX_set_point(local_offset, box.p1[0], box.p1[1], box.p1[2]);
+  PIDX_set_point(local_size, (box.p2[0]-box.p1[0]+1), (box.p2[1]-box.p1[1]+1),(box.p2[2]-box.p1[2]+1));
 
-  local_size[3] = 1;
-  local_size[4] = 1;
-  local_offset[3] = 0;
-  local_offset[4] = 0;
+  // local_size[3] = 1;
+  // local_size[4] = 1;
+  // local_offset[3] = 0;
+  // local_offset[4] = 0;
   
   if(debug)
     printf("local box %lld %lld %lld size %lld %lld %lld time %d\n", local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2], timestate);
@@ -323,7 +326,7 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
     return NULL;
   }
 
-  //PIDX_query_box(pidx_file, global_size);
+  PIDX_query_box(pidx_file, global_size);
 
 //   PIDX_debug_output(pidx_file);
   PIDX_variable variable;

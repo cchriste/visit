@@ -51,6 +51,7 @@
 #include <vtkCharArray.h>
 #include <vtkShortArray.h>
 #include <vtkIntArray.h>
+#include <vtkPointData.h>
 #include <vtkCellType.h>
 #include <vtkCellData.h>
 #include <vtkLongArray.h>
@@ -65,6 +66,7 @@
 #include <vtkMatrix4x4.h>
 #include <vtkXMLDataElement.h>
 #include <vtkXMLDataParser.h>
+#include <vtkStreamingDemandDrivenPipeline.h>
 
 #include <vtkRectilinearGrid.h>
 #include <vtkStructuredGrid.h>
@@ -95,12 +97,13 @@
 
 typedef std::string String;
 
-#define USE_AMR 0
+#define USE_AMR 1
 
 bool debug_format = true;
-bool debug_input = true;
+bool debug_input = false;
 
 using namespace VisitIDXIO;
+using namespace std;
 
 void avtIDXFileFormat::loadBalance(){
 
@@ -128,6 +131,7 @@ void avtIDXFileFormat::loadBalance(){
     }
     
     //std::cout << "max dir " << maxdir << " max extent " << maxextent << " box " << maxbox;
+    printf("NUM PROCS %d\n", nprocs);
     std::vector<PatchInfo> newboxes;
     int n = nprocs;
     int b = level_info.patchInfo.size();
@@ -148,7 +152,7 @@ void avtIDXFileFormat::loadBalance(){
 
         h[i] = extent/c;
 
-        printf("H[%d] = %d\n", i, h[i]);
+        //printf("H[%d] = %d\n", i, h[i]);
 
       }
     }
@@ -172,7 +176,7 @@ void avtIDXFileFormat::loadBalance(){
           h[i] = extent/(c+1);
         }
 
-        printf("H[%d] = %d\n", i, h[i]);
+        //printf("H[%d] = %d\n", i, h[i]);
       }
 
     }
@@ -200,7 +204,7 @@ void avtIDXFileFormat::loadBalance(){
       int boxes_added = 0;
       while(part_p2 <= box_high[maxdir] && boxes_added < n_slabs){
             
-        low[maxdir] = part_p1;
+        low[maxdir] = part_p1 > 0 ? part_p1-1 : part_p1;
         high[maxdir] = (part_p2 < box_high[maxdir]) ? part_p2+1 : part_p2;
            
         PatchInfo newbox;
@@ -464,6 +468,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     nprocs = 1;
 #endif
     
+    //nprocs = 4;
     //std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
   
 #ifdef USE_VISUS
@@ -557,10 +562,12 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     createTimeIndex();
 
     int old_size = level_info.patchInfo.size();
-#ifdef PARALLEL
-    loadBalance();
-#endif
 
+    printf("%d bef: FILE OPEN N PATCHES %d\n", rank, old_size);
+//#ifdef PARALLEL
+    loadBalance();
+//#endif
+    printf("%d aft: FILE OPEN N PATCHES %d\n", rank, level_info.patchInfo.size());
 }
 
 
@@ -656,6 +663,8 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     if(debug_format)
         std::cout << rank << ": Meta data" << std::endl;
 
+    ActivateTimestep(timestate);
+
     md->ClearMeshes();
     md->ClearScalars(); 
     md->ClearVectors();
@@ -666,34 +675,43 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
 
 #if USE_AMR    
     mesh->meshType = AVT_AMR_MESH;
-    int totalPatches = level_info.patchInfo.size();
-    mesh->numBlocks = totalPatches;
-    mesh->blockOrigin = 0;
-    //mesh->LODs = reader->getMaxResolution();
-    mesh->spatialDimension = dim;
     mesh->topologicalDimension = dim;
+    mesh->spatialDimension = dim;
+
+    int totalPatches = level_info.patchInfo.size();
+    printf("TOTAL PATCHES %d\n", totalPatches);
+    mesh->numBlocks = totalPatches;
+    
+    //mesh->blockOrigin = 0;
+    //mesh->LODs = reader->getMaxResolution();
+
     mesh->blockTitle = "patches";
     mesh->blockPieceName = "patch";
-    
+
+    int numLevels = 1; // only 1 AMR level for now
+    mesh->numGroups = numLevels;
+    mesh->groupTitle = "levels";
+    mesh->groupPieceName = "level";
+
     std::vector<int> groupIds(totalPatches);
     std::vector<std::string> pieceNames(totalPatches);
     
-    int numLevels = 1;
     for (int i = 0; i < mesh->numBlocks; i++) {
       char tmpName[64];
       int level = 0; // only 1 level
       int local_patch = i;
       sprintf(tmpName,"level%d, patch%d", level, local_patch);
 
+      //printf("Setting id %d = %d name %s\n", i, level, tmpName);
       groupIds[i] = level;
       pieceNames[i] = tmpName;
     }
-    mesh->groupTitle = "levels";
-    mesh->groupPieceName = "level";
-    mesh->numGroups = numLevels; // n AMR levels
-    mesh->containsExteriorBoundaryGhosts = false;
-    mesh->blockNames = pieceNames;
 
+    mesh->blockNames = pieceNames;
+    mesh->groupIds = groupIds;
+
+    mesh->containsExteriorBoundaryGhosts = false;
+    
     md->AddGroupInformation(numLevels, totalPatches, groupIds);
 #else
     mesh->meshType = AVT_RECTILINEAR_MESH;
@@ -772,8 +790,9 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->logicalBounds[2] = logical[2];
 
     md->Add(mesh);
-   
-    //md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
+  
+    md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
+    md->SetCyclesAreAccurate(true);
     
 #ifdef PARALLEL // only PIDX
    // md->SetFormatCanDoDomainDecomposition(true);
@@ -799,16 +818,11 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
             AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
             //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
     }
-    
+
     if(debug_format)
       printf("%d: end meta\n", rank);
 
-#if USE_AMR
-    computeDomainBoundaries(mesh->name.c_str(), timestate);
-#else
-    SetUpDomainConnectivity(mesh->name.c_str());
-#endif
-    return;
+    printf("%d: DONE metadata\n", rank);
 }
 
 void
@@ -845,6 +859,8 @@ avtIDXFileFormat::SetUpDomainConnectivity(const char* meshname)
 
 }
 
+bool overlap(const int& a,const int& b,const int& p,const int& q)
+  {return ((a)<=(q) && (b)>=(p));}
 
 void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timestate){
   //if (!avtDatabase::OnlyServeUpMetaData() && level_info.patchInfo.size()>0 ){
@@ -853,21 +869,54 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     new avtRectilinearDomainBoundaries(true);
     rdb->SetNumDomains(level_info.patchInfo.size());
     printf("Setting number of domains %d for mesh %s\n", level_info.patchInfo.size(), meshname);
-    for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
-    {
-        int low[3],high[3];
-        level_info.patchInfo[i].getBounds(low,high,meshname, use_extracells);
+    // for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
+    // {
+    //     int low[3],high[3];
 
-        int e[6] = { low[0], high[0],
+    //     level_info.patchInfo[i].getBounds(low,high,meshname, use_extracells);
+
+    //     int e[6] = { low[0], high[0],
+    //                low[1], high[1],
+    //                low[2], high[2] };
+        
+    //     rdb->SetIndicesForAMRPatch(i,0,e);//SetIndicesForRectGrid(i, e);
+    // }
+
+    for(int domain=0; domain < level_info.patchInfo.size(); domain++){
+      int low[3], high[3];
+      level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
+
+      int e[6] = { low[0], high[0],
                    low[1], high[1],
                    low[2], high[2] };
-        
-        rdb->SetIndicesForAMRPatch(i,0,e);//SetIndicesForRectGrid(i, e);
 
+      //rdb->SetExtents(domain, e);
+      rdb->SetIndicesForAMRPatch(domain,0,e);//SetIndicesForRectGrid(i, e);
+
+    // for(int b=0; b < level_info.patchInfo.size(); b++){
+    //   int tlow[3], thigh[3];
+    //   level_info.patchInfo[b].getBounds(tlow,thigh,meshname,use_extracells);
+
+    //   if (b == domain) continue;
+      
+    //   if(overlap(low[0],high[0],tlow[0],thigh[0])&&
+    //      overlap(low[1],high[1],tlow[1],thigh[1])&&
+    //      overlap(low[2],high[2],tlow[2],thigh[2]))
+    //   {
+    //     int neig_low[3] = {max(low[0],tlow[0]),max(low[1],tlow[1]),max(low[2],tlow[2])};
+    //     int neig_high[3] = {min(high[0],thigh[0]),min(high[1],thigh[1]),min(high[2],thigh[2])};
+
+    //     rdb->AddNeighbor(domain, domain, b,
+    //                              neig_low, neig_high);
+
+    //     //printf("%d add neighbour %d [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
+
+    //   }
+    // }
     }
-
-    rdb->CalculateBoundaries();
   
+    rdb->CalculateBoundaries();
+
     this->mesh_boundaries[meshname] = void_ref_ptr(rdb,
                                    avtStructuredDomainBoundaries::Destruct);
     cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
@@ -877,6 +926,10 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 					   timestate, -1);
     if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
       fprintf(stderr,"pidx boundary mesh not registered\n");
+
+    //canDoStreaming = false;
+
+    printf("%d: DONE compute domain boundary\n", rank);
 
 }
 
@@ -910,7 +963,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
         std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;   
 
     Box slice_box;
-    
+
     vtkRectilinearGrid *rgrid = vtkRectilinearGrid::New();
     int my_dims[3];
     float *arrayX;
@@ -928,19 +981,28 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
 
     for(int k=0; k<3; k++){
-      my_dims[k] = high[k]-low[k]+1 +1; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
-      
-      if(use_extracells && uintah_metadata)
-	my_dims[k]--;
+      int offset = 2; // always one for non-node-centered
+      // if (high[k] == ghigh[k]) 
+      //   offset = 0;
+      // if(k==0){
+      //   offset = 2;
+      //   // if(high[k] == ghigh[k]) 
+      //   //   offset = 0;
+      // }
+
+      my_dims[k] = high[k]-low[k]+offset; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
+
+      // if(use_extracells && uintah_metadata)
+      //   my_dims[k]--;
     }
 
-    if(debug_format)
-        std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
+    //if(debug_format)
+      std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
 
-    rgrid->SetDimensions(my_dims[0], my_dims[1], my_dims[2]);
+    rgrid->SetDimensions(my_dims);
      
-    printf("global %d %d %d - %d %d %d local %d %d %d - %d %d %d\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
-    printf("cellspacing %f %f %f\n", level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
+    // printf("global %d %d %d - %d %d %d local %d %d %d - %d %d %d\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
+    // printf("cellspacing %f %f %f\n", level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
 
     for (int c=0; c<3; c++) {
       vtkFloatArray *coords = vtkFloatArray::New(); 
@@ -952,34 +1014,42 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
     	  // Face centered data gets shifted towards -inf by half a cell.
     	  // Boundary patches are special shifted to preserve global domain.
     	  // Internal patches are always just shifted.
-    	  float face_offset= 0;//-1.f;
-
+    	  float face_offset= 0;
+#if 1
     	  if (sfc_offset[c]) 
     	  {
-    	      if (i==0)
-    		if (low[c]==glow[c]) // patch is on low boundary
-    		  face_offset += 0.0;
-    		else
-    		  face_offset += -0.5;       // patch boundary is internal to the domain
-    	      else if (i==my_dims[c]-1)
-    		if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
-    		  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
-    		  //  face_offset += 0.0;
-    	          //else
-    	          face_offset += -1;
-    		else                        // patch boundary is internal to the domain
-    		  face_offset += -0.5;
-    	      else
-    	        face_offset += -0.5;
+    	    if (i==0)
+      		  if (low[c]==glow[c]) // patch is on low boundary
+      		    face_offset += 0.0;
+      		  else
+      		    face_offset += -0.5;       // patch boundary is internal to the domain
+      	  else if (i==my_dims[c]-1)
+      		  if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
+      		  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
+      		  //  face_offset += 0.0;
+      	          //else
+      	          face_offset += -1;
+        		else                        // patch boundary is internal to the domain
+        		  face_offset += -0.5;
+      	  else
+      	    face_offset += -0.5;
     	   }
-    
-	    array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
+#endif    
+      // if(c == 0){
+        
+      //   // if (high[c]==ghigh[c])
+      //   //   face_offset += 0.0;
+      //   // else
+      //     face_offset += -1.0;
+      // }
+
+	       array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
 	  
-	    if(i==0)
-	      printf("low %d[%d]: %f\n", domain,c, array[i]);
-	    if(i==my_dims[c]-1)
-	      printf("high %d[%d]: %f\n", domain,c, array[i]);
-	}
+	     // if(i==0)
+	     //   printf("low %d[%d]: %f\n", domain,c, array[i]);
+	     // if(i==my_dims[c]-1)
+	     //   printf("high %d[%d]: %f\n", domain,c, array[i]);
+	     }
 
         switch(c) {
           case 0:
@@ -992,6 +1062,176 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 
       coords->Delete();
     }
+
+#if 1
+    int nCells = rgrid->GetNumberOfCells();
+    int *blanks = new int[nCells];
+    memset(blanks, 0, nCells*sizeof(int));
+
+    // int nNodes = rgrid->GetNumberOfPoints();
+    // int *blanksN = new int[nNodes];
+    // memset(blanksN, 0, nNodes*sizeof(int));
+
+    unsigned char realVal = 0, ghost = 0;//, ghostN = 0, noghostN = 0;
+
+    avtGhostData::AddGhostZoneType(ghost, DUPLICATED_ZONE_INTERNAL_TO_PROBLEM);
+    vtkUnsignedCharArray *ghostCells = vtkUnsignedCharArray::New();
+    ghostCells->SetName("avtGhostZones");
+    ghostCells->Allocate(nCells);
+
+    // avtGhostData::AddGhostNodeType(ghostN,
+    //                                     DUPLICATED_NODE);
+    // avtGhostData::RemoveGhostNodeType(noghostN,
+    //                                     DUPLICATED_NODE);//NODE_NOT_APPLICABLE_TO_PROBLEM);
+    // vtkUnsignedCharArray *ghostNodes = vtkUnsignedCharArray::New();
+    // ghostNodes->SetName("avtGhostNodes");
+    // ghostNodes->Allocate(nNodes);
+
+    int dim_block[3] = {my_dims[0]-1,my_dims[1]-1,my_dims[2]-1};
+
+    printf("NCELLS %d dims %d %d %d\n", nCells, dim_block[0],dim_block[1],dim_block[2]);
+
+    for(int b=0; b < level_info.patchInfo.size(); b++){
+      if (b == domain) continue;
+
+      int tlow[3], thigh[3];
+      level_info.patchInfo[b].getBounds(tlow,thigh,meshname,use_extracells);
+
+      int count_ghost = 0;
+
+      bool over[3] = {overlap(low[0],high[0],tlow[0],thigh[0]),
+                      overlap(low[1],high[1],tlow[1],thigh[1]),
+                      overlap(low[2],high[2],tlow[2],thigh[2])};
+
+      if(over[0] && over[1] && over[2])
+      {
+        int neig_low[3];
+        int neig_high[3];
+
+        for(int d=0; d < 3; d++){
+          int maxv = max(low[d],tlow[d]);
+          int minv = min(high[d],thigh[d]);
+          // if(!over[d]){
+          //   neig_low[d] = maxv;
+          //   neig_high[d] = minv;
+          // }
+          // else{
+            if(low[d] < tlow[d]){
+              neig_low[d] = maxv+1;
+              neig_high[d] = minv;
+            }
+            else{
+              neig_low[d] = maxv;
+              neig_high[d] = minv-1;
+            }
+
+            if(minv == ghigh[d])
+              neig_high[d] = minv;
+          // }
+        }
+
+      // int neig_low[3];
+      // int neig_high[3];
+
+      // for(int d=0; d < 3; d++){
+      //   if(overlap(low[d],high[d],tlow[d],thigh[d]))
+      //   {
+      //     int maxv = max(low[d],tlow[d]);
+      //     int minv = min(high[d],thigh[d]);
+
+      //     if(low[d] < tlow[d]){
+      //       neig_low[d] = maxv+1;
+      //       neig_high[d] = minv;
+      //     }
+      //     else{
+      //       neig_low[d] = maxv;
+      //       neig_high[d] = minv-1;
+      //     }
+      //   }
+      //   else{
+      //     neig_low[d] = low[d];
+      //     neig_high[d] = high[d];
+      //   }
+
+      // }
+        // int neig_low[3] = {max(low[0],tlow[0]+1),max(low[1],tlow[1]+1),max(low[2],tlow[2]+1)};
+        // int neig_high[3] = {min(high[0],thigh[0]),min(high[1],thigh[1]),min(high[2],thigh[2])};
+
+        printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
+        for(int k=neig_low[2]; k <= neig_high[2]; k++)
+          for(int j=neig_low[1]; j <= neig_high[1]; j++)
+            for(int i=neig_low[0]; i <= neig_high[0]; i++){
+              
+              int ii = i - low[0];
+              int jj = j - low[1];
+              int kk = k - low[2];
+              
+              blanks[(ii) + dim_block[0] * ((jj) + dim_block[1] * (kk))] = 1;
+              //blanksN[ii + (dim_block[0]+1) * (jj + (dim_block[1]+1) * kk)] = 1;
+              count_ghost++;
+            }
+      }
+
+
+
+
+      
+      // for(int k=low[2]; k < high[2]; k++)
+      //   for(int j=low[1]; j < high[1]; j++)
+      //     for(int i=low[0]; i < high[0]; i++){
+      //       if(i >= tlow[0] && i <= thigh[0] &&
+      //          j >= tlow[1] && j <= thigh[1] &&
+      //          k >= tlow[1] && k <= thigh[2]){
+      //         int ii = i - low[0];
+      //         int jj = j - low[1];
+      //         int kk = k - low[2];
+              
+      //         blanks[(ii) + d[0] * ((jj) + d[1] * (kk))] = 1;
+      //         blanksN[ii + (d[0]+1) * (jj + (d[1]+1) * kk)] = 1;
+      //         count_ghost++;
+      //       }
+      //       // else 
+      //       //   blanks[i + d[0] * (j + d[1] * k)] = 0;
+      //     }
+
+
+      //printf("%d found %d ghosts %d\n", domain, count_ghost, ghost);
+    }
+
+    for (int i = 0; i < nCells; i++) {
+      if (!blanks[i]){
+          ghostCells->InsertNextValue(realVal);
+          
+      }
+      else{
+          ghostCells->InsertNextValue(ghost);
+          
+      }
+        
+      // if(!blanksN[i]){
+      //   ghostNodes->InsertNextValue(noghostN);
+      // }
+      // else
+      //   ghostNodes->InsertNextValue(ghostN);
+        
+    }
+
+    rgrid->GetCellData()->AddArray(ghostCells);
+    //rgrid->GetPointData()->AddArray(ghostNodes);
+
+    vtkStreamingDemandDrivenPipeline::SetUpdateGhostLevel(
+        rgrid->GetInformation(), 0);
+    ghostCells->Delete();
+    // ghostNodes->Delete();
+
+    delete [] blanks;
+#endif
+
+#if USE_AMR
+    computeDomainBoundaries(meshname, timestate);
+#else
+    SetUpDomainConnectivity(meshname);
+#endif
 
     if(debug_format)
       printf("end mesh\n");
@@ -1032,10 +1272,10 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 
     std::cout << "read data " << level_info.patchInfo[domain].toString();
     for(int k=0; k<3; k++){
-      if(uintah_metadata && use_extracells){
-	low[k]++;
-	//high[k]++;
-      }
+ //      if(uintah_metadata && use_extracells){
+	// low[k]++;
+	// //high[k]++;
+ //      }
         my_box.p1[k] = low[k];
         my_box.p2[k] = high[k];
     }
@@ -1379,7 +1619,6 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 
 void avtIDXFileFormat::ActivateTimestep(int ts){
     //printf("Activate timestep\n");
-
 }
 
 // ****************************************************************************
