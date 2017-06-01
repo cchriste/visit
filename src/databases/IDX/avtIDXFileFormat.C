@@ -1012,7 +1012,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       //   my_dims[k]--;
     }
 
-    //if(debug_format)
+    if(debug_format)
       std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
 
     rgrid->SetDimensions(my_dims);
@@ -1025,13 +1025,13 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       coords->SetNumberOfTuples(my_dims[c]); 
       float *array = (float *)coords->GetVoidPointer(0); 
           
-        for (int i=0; i<my_dims[c]; i++)
+        for (int i=0; i < my_dims[c]; i++)
     	{
     	  // Face centered data gets shifted towards -inf by half a cell.
     	  // Boundary patches are special shifted to preserve global domain.
     	  // Internal patches are always just shifted.
     	  float face_offset= 0;
-#if 1
+
     	  if (sfc_offset[c]) 
     	  {
     	    if (i==0)
@@ -1050,22 +1050,20 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       	  else
       	    face_offset += -0.5;
     	   }
-#endif    
-      // if(c == 0){
-        
-      //   // if (high[c]==ghigh[c])
-      //   //   face_offset += 0.0;
-      //   // else
-      //     face_offset += -1.0;
-      // }
+         else{
+
+           if (i==my_dims[c]-1)
+              if (high[c]==ghigh[c])
+                face_offset += -1.0;
+         }
 
 	       array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
 	  
-	     // if(i==0)
-	     //   printf("low %d[%d]: %f\n", domain,c, array[i]);
-	     // if(i==my_dims[c]-1)
-	     //   printf("high %d[%d]: %f\n", domain,c, array[i]);
-	     }
+  	     // if(i==0)
+  	     //   printf("low %d[%d]: %f\n", domain,c, array[i]);
+  	     // if(i==my_dims[c]-1)
+  	     //   printf("high %d[%d]: %f\n", domain,c, array[i]);
+  	     // }
 
         switch(c) {
           case 0:
@@ -1143,6 +1141,9 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 
             if(minv == ghigh[d])
               neig_high[d] = minv;
+
+            if(maxv == glow[d])
+              neig_low[d] = maxv;
           // }
         }
 
@@ -1183,6 +1184,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
               int kk = k - low[2];
               
               blanks[(ii) + dim_block[0] * ((jj) + dim_block[1] * (kk))] = 1;
+
               //blanksN[ii + (dim_block[0]+1) * (jj + (dim_block[1]+1) * kk)] = 1;
               count_ghost++;
             }
@@ -1244,7 +1246,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 #endif
 
 #if USE_AMR
-    computeDomainBoundaries(meshname, timestate);
+    //computeDomainBoundaries(meshname, timestate);
 #else
     SetUpDomainConnectivity(meshname);
 #endif
