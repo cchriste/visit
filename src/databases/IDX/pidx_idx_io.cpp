@@ -347,8 +347,10 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   int v_per_sample = 0;
   PIDX_values_per_datatype(variable->type_name, &v_per_sample, &bits_per_sample);
 
-  void *data = malloc((bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * v_per_sample);//variable->values_per_sample);
-  memset(data, 0, (bits_per_sample/8) * local_size[0] * local_size[1] * local_size[2]  * v_per_sample);//variable->values_per_sample);
+  int this_size = (int)(local_size[0] * local_size[1] * local_size[2]);
+
+  void *data = malloc((bits_per_sample/8) * this_size * v_per_sample);//variable->values_per_sample);
+  memset(data, 0, (bits_per_sample/8) * this_size * v_per_sample);//variable->values_per_sample);
 
   ret = PIDX_variable_read_data_layout(variable, local_offset, local_size, data, PIDX_row_major);
   if (ret != PIDX_success)  terminate_with_error_msg("PIDX_variable_read_data_layout");

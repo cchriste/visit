@@ -131,14 +131,18 @@ void avtIDXFileFormat::loadBalance(){
     }
     
     //std::cout << "max dir " << maxdir << " max extent " << maxextent << " box " << maxbox;
-    printf("NUM PROCS %d\n", nprocs);
+    //printf("NUM PROCS %d patches %d\n", nprocs, level_info.patchInfo.size());
     std::vector<PatchInfo> newboxes;
     int n = nprocs;
     int b = level_info.patchInfo.size();
-    int c = n/b;
-    int d = n%b;
+    int c = b > n ? b/n : n/b; // how many patches per core
+    int d = b > n ? b%n : n%b;
+
+    printf("Trying to use %d patches per core, res %d\n", c, d);
 
     int h[b];
+    int res[b];
+    int slabs[b];
 
     if(d == 0){
       for(int i=0; i<b; i++){
@@ -148,11 +152,13 @@ void avtIDXFileFormat::loadBalance(){
 
         box.getBounds(box_low, box_high, "CC");
 
-        int extent = box_high[maxdir]-box_low[maxdir];
+        int extent = box_high[maxdir]-box_low[maxdir]+1;
 
         h[i] = extent/c;
+        slabs[i] = extent/h[i];
+        res[i] = extent%h[i];
 
-        //printf("H[%d] = %d\n", i, h[i]);
+        printf("Even H[%d] = %d res %d\n", i, h[i], res[i]);
 
       }
     }
@@ -171,12 +177,16 @@ void avtIDXFileFormat::loadBalance(){
 
         if(i <= d){
           h[i] = extent/c;
+          slabs[i] = extent/h[i];
+          res[i] = extent%h[i];
         }
         else{
-          h[i] = extent/(c+1);
+          h[i] = ceil((float)extent/(c+1));
+          slabs[i] = extent/h[i];
+          res[i] = extent%h[i];
         }
 
-        //printf("H[%d] = %d\n", i, h[i]);
+        printf("Uneven H[%d] = %d res %d\n", i, h[i], res[i]);
       }
 
     }
@@ -195,14 +205,16 @@ void avtIDXFileFormat::loadBalance(){
       memcpy(low, box_low, 3*sizeof(int));
       memcpy(high, box_high, 3*sizeof(int));
 
-      int n_slabs = box_high[maxdir] / h[i];
-      int residual = box_high[maxdir] % h[i];
+      int n_slabs = slabs[i];//floor((float)(box_high[maxdir]-box_low[maxdir]) / h[i]);
+
+      int residual = res[i];
+
+      printf("n_slabs %d residual %d\n", n_slabs, res[i]);
 
       int part_p1 = box_low[maxdir];
       int part_p2 = box_low[maxdir] + h[i];
-
-      int boxes_added = 0;
-      while(part_p2 <= box_high[maxdir] && boxes_added < n_slabs){
+      int added_boxes = 0;
+      while(/*part_p2 <= box_high[maxdir]+1 && */added_boxes < n_slabs){
             
         low[maxdir] = part_p1 > 0 ? part_p1-1 : part_p1;
         high[maxdir] = (part_p2 < box_high[maxdir]) ? part_p2+1 : part_p2;
@@ -211,7 +223,7 @@ void avtIDXFileFormat::loadBalance(){
 
         newbox.setBounds(low,high,eCells,"CC");
         newboxes.push_back(newbox);
-        boxes_added++;
+        added_boxes++;
 
         part_p1 = high[maxdir];
         part_p2 = part_p1 + h[i] -1;
@@ -247,6 +259,10 @@ void avtIDXFileFormat::loadBalance(){
         std::cout << "-------------------------" << std::endl<< std::flush;
     }
 
+    if(level_info.patchInfo.size() % nprocs != 0){
+      fprintf(stderr,"ERROR: wrong domain decomposition\n");
+      assert(false);
+    }
 }
 
 void avtIDXFileFormat::createBoxes(){
@@ -460,13 +476,13 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         std::cout << "Using Little Endian" << std::endl;
     std::cout << "--------------------------" << std::endl;
 
-#ifdef PARALLEL
+// #ifdef PARALLEL
     rank = PAR_Rank();
     nprocs = PAR_Size();
-#else
-    rank = 0;
-    nprocs = 1;
-#endif
+// #else
+//     rank = 0;
+//     nprocs = 1;
+// #endif
     
     //nprocs = 4;
     //std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
@@ -929,7 +945,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
     //canDoStreaming = false;
 
-    printf("%d: DONE compute domain boundary\n", rank);
+    //printf("%d: DONE compute domain boundary\n", rank);
 
 }
 
@@ -1089,7 +1105,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 
     int dim_block[3] = {my_dims[0]-1,my_dims[1]-1,my_dims[2]-1};
 
-    printf("NCELLS %d dims %d %d %d\n", nCells, dim_block[0],dim_block[1],dim_block[2]);
+    //printf("NCELLS %d dims %d %d %d\n", nCells, dim_block[0],dim_block[1],dim_block[2]);
 
     for(int b=0; b < level_info.patchInfo.size(); b++){
       if (b == domain) continue;
@@ -1157,7 +1173,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
         // int neig_low[3] = {max(low[0],tlow[0]+1),max(low[1],tlow[1]+1),max(low[2],tlow[2]+1)};
         // int neig_high[3] = {min(high[0],thigh[0]),min(high[1],thigh[1]),min(high[2],thigh[2])};
 
-        printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
+        //printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
         for(int k=neig_low[2]; k <= neig_high[2]; k++)
           for(int j=neig_low[1]; j <= neig_high[1]; j++)
             for(int i=neig_low[0]; i <= neig_high[0]; i++){
