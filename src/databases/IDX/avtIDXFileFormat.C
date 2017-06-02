@@ -1063,7 +1063,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
   	     //   printf("low %d[%d]: %f\n", domain,c, array[i]);
   	     // if(i==my_dims[c]-1)
   	     //   printf("high %d[%d]: %f\n", domain,c, array[i]);
-  	     // }
+  	    }
 
         switch(c) {
           case 0:
@@ -1076,7 +1076,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 
       coords->Delete();
     }
-  }
+  
 
 #if 1
     int nCells = rgrid->GetNumberOfCells();
