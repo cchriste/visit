@@ -138,7 +138,7 @@ void avtIDXFileFormat::loadBalance(){
     int c = b > n ? b/n : n/b; // how many patches per core
     int d = b > n ? b%n : n%b;
 
-    printf("Trying to use %d patches per core, res %d\n", c, d);
+    //printf("Trying to use %d patches per core, res %d\n", c, d);
 
     int h[b];
     int res[b];
@@ -158,7 +158,7 @@ void avtIDXFileFormat::loadBalance(){
         slabs[i] = extent/h[i];
         res[i] = extent%h[i];
 
-        printf("Even H[%d] = %d res %d\n", i, h[i], res[i]);
+        //printf("Even H[%d] = %d res %d\n", i, h[i], res[i]);
 
       }
     }
@@ -186,7 +186,7 @@ void avtIDXFileFormat::loadBalance(){
           res[i] = extent%h[i];
         }
 
-        printf("Uneven H[%d] = %d res %d\n", i, h[i], res[i]);
+        //printf("Uneven H[%d] = %d res %d\n", i, h[i], res[i]);
       }
 
     }
@@ -209,12 +209,13 @@ void avtIDXFileFormat::loadBalance(){
 
       int residual = res[i];
 
-      printf("n_slabs %d residual %d\n", n_slabs, res[i]);
+      //printf("n_slabs %d residual %d\n", n_slabs, res[i]);
 
       int part_p1 = box_low[maxdir];
-      int part_p2 = box_low[maxdir] + h[i];
+      int part_p2 = box_low[maxdir] + h[i] -1;
+
       int added_boxes = 0;
-      while(/*part_p2 <= box_high[maxdir]+1 && */added_boxes < n_slabs){
+      while(added_boxes < n_slabs){
             
         low[maxdir] = part_p1 > 0 ? part_p1-1 : part_p1;
         high[maxdir] = (part_p2 < box_high[maxdir]) ? part_p2+1 : part_p2;
