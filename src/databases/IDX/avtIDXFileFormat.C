@@ -1025,7 +1025,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       coords->SetNumberOfTuples(my_dims[c]); 
       float *array = (float *)coords->GetVoidPointer(0); 
           
-        for (int i=0; i < my_dims[c]; i++)
+      for (int i=0; i < my_dims[c]; i++)
     	{
     	  // Face centered data gets shifted towards -inf by half a cell.
     	  // Boundary patches are special shifted to preserve global domain.
@@ -1076,6 +1076,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
 
       coords->Delete();
     }
+  }
 
 #if 1
     int nCells = rgrid->GetNumberOfCells();
@@ -1189,29 +1190,6 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
               count_ghost++;
             }
       }
-
-
-
-
-      
-      // for(int k=low[2]; k < high[2]; k++)
-      //   for(int j=low[1]; j < high[1]; j++)
-      //     for(int i=low[0]; i < high[0]; i++){
-      //       if(i >= tlow[0] && i <= thigh[0] &&
-      //          j >= tlow[1] && j <= thigh[1] &&
-      //          k >= tlow[1] && k <= thigh[2]){
-      //         int ii = i - low[0];
-      //         int jj = j - low[1];
-      //         int kk = k - low[2];
-              
-      //         blanks[(ii) + d[0] * ((jj) + d[1] * (kk))] = 1;
-      //         blanksN[ii + (d[0]+1) * (jj + (d[1]+1) * kk)] = 1;
-      //         count_ghost++;
-      //       }
-      //       // else 
-      //       //   blanks[i + d[0] * (j + d[1] * k)] = 0;
-      //     }
-
 
       //printf("%d found %d ghosts %d\n", domain, count_ghost, ghost);
     }
