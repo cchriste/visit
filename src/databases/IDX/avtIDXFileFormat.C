@@ -60,6 +60,7 @@
 #include <vtkUnsignedIntArray.h>
 #include <vtkUnsignedLongArray.h>
 #include <vtkSmartPointer.h>
+#include <DebugStream.h>
 #include <vtkHexahedron.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkRenderWindow.h>
@@ -99,35 +100,30 @@ typedef std::string String;
 
 #define USE_AMR 1
 
-bool debug_format = true;
-bool debug_input = false;
-
 using namespace VisitIDXIO;
 using namespace std;
 
 void avtIDXFileFormat::loadBalance(){
 
-  //std::cout << "Load balancing";
-    
     int maxdir = 0; // largest extent axis
     int maxextent = 0;
     int maxbox = 0;
     
     for(int i=0; i < level_info.patchInfo.size(); i++){
-        PatchInfo& box = level_info.patchInfo[i];
-        int box_low[3];
-        int box_high[3];
+      PatchInfo& box = level_info.patchInfo[i];
+      int box_low[3];
+      int box_high[3];
 
-        box.getBounds(box_low,box_high,"CC");
-        
-        for(int j=0; j < 3; j++){
-            int extent = box_high[j]-box_low[j];
-            if(extent > maxextent){
-                maxdir = j;
-                maxextent = extent;
-                maxbox = i;
-            }
+      box.getBounds(box_low,box_high,"CC");
+
+      for(int j=0; j < 3; j++){
+        int extent = box_high[j]-box_low[j];
+        if(extent > maxextent){
+          maxdir = j;
+          maxextent = extent;
+          maxbox = i;
         }
+      }
     }
     
     //std::cout << "max dir " << maxdir << " max extent " << maxextent << " box " << maxbox;
@@ -216,10 +212,10 @@ void avtIDXFileFormat::loadBalance(){
 
       int added_boxes = 0;
       while(added_boxes < n_slabs){
-            
+
         low[maxdir] = part_p1 > 0 ? part_p1-1 : part_p1;
         high[maxdir] = (part_p2 < box_high[maxdir]) ? part_p2+1 : part_p2;
-           
+
         PatchInfo newbox;
 
         newbox.setBounds(low,high,eCells,"CC");
@@ -248,105 +244,102 @@ void avtIDXFileFormat::loadBalance(){
 
     level_info.patchInfo.swap(newboxes);
     // phyboxes.swap(newphyboxes);
-  
-    if(debug_format && rank == 0){
-      std::cout << "Total number of boxes/domains: " << level_info.patchInfo.size() << std::endl<< std::flush;
-      std::cout << "----------Boxes----------" << std::endl<< std::flush;
-        for(int i=0; i< level_info.patchInfo.size(); i++){
-            std::cout << i << " = "<<level_info.patchInfo[i].toString();
+
+    if(rank == 0){
+      debug4 << "Total number of boxes/domains: " << level_info.patchInfo.size() << std::endl<< std::flush;
+      debug4 << "----------Boxes----------" << std::endl<< std::flush;
+      for(int i=0; i< level_info.patchInfo.size(); i++){
+        debug4 << i << " = "<<level_info.patchInfo[i].toString();
             //boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
 		      //<< phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl<< std::flush;
-        }
-        std::cout << "-------------------------" << std::endl<< std::flush;
+      }
+      debug4 << "-------------------------" << std::endl<< std::flush;
     }
 
     if(level_info.patchInfo.size() % nprocs != 0){
       fprintf(stderr,"ERROR: wrong domain decomposition\n");
       assert(false);
     }
-}
+  }
 
-void avtIDXFileFormat::createBoxes(){
-    
-  size_t found = dataset_filename.find_last_of("/\\");
-  String folder = dataset_filename.substr(0,found);
+  void avtIDXFileFormat::createBoxes(){
 
-  String upsfilename = "noupsfile.ups";
-  DIR *dir;
-  struct dirent *ent;
-  if ((dir = opendir (folder.c_str())) != NULL) {
+    size_t found = dataset_filename.find_last_of("/\\");
+    String folder = dataset_filename.substr(0,found);
+
+    String upsfilename = "noupsfile.ups";
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir (folder.c_str())) != NULL) {
       /* print all the files and directories within directory */
       while ((ent = readdir (dir)) != NULL) {
-          String name(ent->d_name);
-          if(name.substr(name.find_last_of(".") + 1) == "ups"){
-              upsfilename = name;
-              if(debug_input)
-                  std::cout<< ".ups file found " << upsfilename << std::endl;
-              upsfilename = folder + "/" +upsfilename;
-              break;
-          }
+        String name(ent->d_name);
+        if(name.substr(name.find_last_of(".") + 1) == "ups"){
+          upsfilename = name;
+          debug4 << ".ups file found " << upsfilename << std::endl;
+          upsfilename = folder + "/" +upsfilename;
+          break;
+        }
       }
       closedir (dir);
-  } else {
-      if(debug_input)
-          std::cout<< "No .ups file found" << std::endl;
-  }
-  
-  vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
-  
-  upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
-  
-  uintah_metadata = false;
+    } else {
+      debug4 << "No .ups file found" << std::endl;
+    }
 
-  parser->SetFileName(upsfilename.c_str());
+    vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
 
-  if (!parser->Parse()){
-    if(debug_input)  std::cout<< "No .ups file found (Uintah only)" << std::endl;
+    upsfilename.replace(upsfilename.end()-3, upsfilename.end(),"ups");
 
-    parser->SetFileName(metadata_filename.c_str());
-    
+    uintah_metadata = false;
+
+    parser->SetFileName(upsfilename.c_str());
+
     if (!parser->Parse()){
-      if(debug_input)  std::cout << "Single-box mode" << std::endl;
-    }
-  }else{
-    uintah_metadata = true;
-    if(debug_input)  std::cout << "Multi-box mode" << std::endl;
-  }
-  
-  if(uintah_metadata){
-    parse_ups(parser, level_info, dim, use_extracells);
-  }
-  else{
-    Box log_box = reader->getLogicBox();
-    int low[3];
-    int high[3];
-    int eCells[6] = {0,0,0,0,0,0};
+      debug4 << "No .ups file found (Uintah only)" << std::endl;
 
-    low[0] = log_box.p1[0];
-    low[1] = log_box.p1[1];
-    low[2] = log_box.p1[2];
-    high[0] = log_box.p2[0]-1;
-    high[1] = log_box.p2[1]-1;
-    high[2] = log_box.p2[2]-1;
+      parser->SetFileName(metadata_filename.c_str());
 
-    PatchInfo box;
-    box.setBounds(low,high,eCells,"CC");
-    level_info.patchInfo.push_back(box);
-
-    for(int k=0; k<3; k++){
-      level_info.spacing[k]= 1.f;
-      level_info.anchor[k] = 0.f;
+      if (!parser->Parse()){
+        debug4 << "Single-box mode" << std::endl;
+      }
+    }else{
+      uintah_metadata = true;
+      debug4 << "Multi-box mode" << std::endl;
     }
 
-    if(debug_input){
-      std::cout << "Single Box: ";
-      std::cout << level_info.patchInfo.back().toString();
+    if(uintah_metadata){
+      parse_ups(parser, level_info, dim, use_extracells);
     }
+    else{
+      Box log_box = reader->getLogicBox();
+      int low[3];
+      int high[3];
+      int eCells[6] = {0,0,0,0,0,0};
+
+      low[0] = log_box.p1[0];
+      low[1] = log_box.p1[1];
+      low[2] = log_box.p1[2];
+      high[0] = log_box.p2[0]-1;
+      high[1] = log_box.p2[1]-1;
+      high[2] = log_box.p2[2]-1;
+
+      PatchInfo box;
+      box.setBounds(low,high,eCells,"CC");
+      level_info.patchInfo.push_back(box);
+
+      for(int k=0; k<3; k++){
+        level_info.spacing[k]= 1.f;
+        level_info.anchor[k] = 0.f;
+      }
+
+      debug4 << "Single Box: ";
+      debug4 << level_info.patchInfo.back().toString();
+
+    }
+
   }
 
-}
-
-void avtIDXFileFormat::createTimeIndex(){
+  void avtIDXFileFormat::createTimeIndex(){
     timeIndex.clear();
     logTimeIndex.clear();
 
@@ -356,84 +349,78 @@ void avtIDXFileFormat::createTimeIndex(){
     
     String udafilename = folder + "/index.xml";
 
-    //std::cout << "trying metadata " << udafilename << std::endl;
     parser->SetFileName(udafilename.c_str());
     if (!parser->Parse()){
-        parser->SetFileName(metadata_filename.c_str());
-        //std::cout << "trying metadata " << idxmetadata << std::endl;
-        if (!parser->Parse()){
-            std::cout<< "No metadata XML file found " << udafilename << std::endl;
-            
-            std::vector<double> times = reader->getTimes();
-            
-            for(int i=0; i< times.size(); i++){
-                timeIndex.push_back(times.at(i));
-                logTimeIndex.push_back(times.at(i));
-            }
-            
-            return;
+      parser->SetFileName(metadata_filename.c_str());
+      if (!parser->Parse()){
+        debug5 << "No metadata XML file found " << udafilename << std::endl;
+
+        std::vector<double> times = reader->getTimes();
+
+        for(int i=0; i< times.size(); i++){
+          timeIndex.push_back(times.at(i));
+          logTimeIndex.push_back(times.at(i));
         }
+
+        return;
+      }
     }
 
-    if(debug_input)
-      std::cout << "Found metadata file" << std::endl;
+    debug4 << "Found metadata file" << std::endl;
 
     vtkXMLDataElement *root = parser->GetRootElement();
     vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
     if(level != NULL){
-    int ntimesteps = level->GetNumberOfNestedElements();
-    
-    if(debug_format)
-        std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
-    
-    for(int i=0; i < ntimesteps; i++){
-        
+      int ntimesteps = level->GetNumberOfNestedElements();
+
+      debug4 << "Found " << ntimesteps << " timesteps" << std::endl;
+
+      for(int i=0; i < ntimesteps; i++){
+
         vtkXMLDataElement *xmltime = level->GetNestedElement(i);
         String timestr(xmltime->GetAttribute("time"));
         String logtimestr(xmltime->GetCharacterData());
 
-        if(debug_input)
-            std::cout << "time " << timestr << " index " << logtimestr << std::endl;
+        debug4 << "time " << timestr << " index " << logtimestr << std::endl;
         
         double time = cdouble(timestr);
         int logtime = cint(logtimestr);
 
         logTimeIndex.push_back(logtime);
-      
+
         timeIndex.push_back(time);
-    }
+      }
     }
     else{
       fprintf(stderr, "No timesteps field found in index.xml, no physical time available\n");
-    
+
       if(is_gidx)
       {
         for(int i=0; i< gidx_datasets.size(); i++){
          timeIndex.push_back(gidx_datasets[i].log_time);
          logTimeIndex.push_back(gidx_datasets[i].log_time);            
-        } 
+       } 
 
-      }else
-      {
-          std::vector<double> times = reader->getTimes();
-                
-          for(int i=0; i< times.size(); i++){
-            timeIndex.push_back(times.at(i));
-            logTimeIndex.push_back(times.at(i));            
-          }
+     }else
+     {
+      std::vector<double> times = reader->getTimes();
+
+      for(int i=0; i< times.size(); i++){
+        timeIndex.push_back(times.at(i));
+        logTimeIndex.push_back(times.at(i));            
       }
-           
     }
+
+  }
   
-    if(debug_input){
-        std::cout << "loaded " << timeIndex.size() << " timesteps"<< std::endl;
-        std::cout << reader->getNTimesteps() << " in the timesteps range of the IDX file" << std::endl;
-    }
+  debug4 << "loaded " << timeIndex.size() << " timesteps"<< std::endl;
+  debug4 << reader->getNTimesteps() << " in the timesteps range of the IDX file" << std::endl;
+
     //if(timeIndex.size() != reader->getNTimesteps())
     //  std::cout << "ERROR: the timesteps in the IDX file and in the index.xml are not consistent!\n You will not be able to use the physical time"<< std::endl;
 
-    return;
-    
+  return;
+
 }
 
 // ****************************************************************************
@@ -448,45 +435,42 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 : avtMTMDFileFormat(filename)
 {
 
-    for (int i=0; attrs!=0 && i<attrs->GetNumberOfOptions(); ++i) {
+  for (int i=0; attrs!=0 && i<attrs->GetNumberOfOptions(); ++i) {
        // printf("reading option %d %s\n",i, attrs->GetName(i).c_str() );
-        if (attrs->GetName(i) == "Big Endian") {
-            reverse_endian = attrs->GetBool("Big Endian");
-        }
-        else if (attrs->GetName(i) == "Use extra cells") {
-            use_extracells = attrs->GetBool("Use extra cells");
-        }else if (attrs->GetName(i) == "Use RAW format") {
-            use_raw = attrs->GetBool("Use RAW format");
-        }
+    if (attrs->GetName(i) == "Big Endian") {
+      reverse_endian = attrs->GetBool("Big Endian");
     }
-    
-    std::cout << "--------------------------" << std::endl;
-    if(use_extracells)
-        std::cout << "Using extra cells" << std::endl;
-    else
-        std::cout << "Not using extra cells" << std::endl;
-    
-    if(use_raw)
-        std::cout << "Using RAW format" << std::endl;
-    else
-        std::cout << "Not using RAW format" << std::endl;
+    else if (attrs->GetName(i) == "Use extra cells") {
+      use_extracells = attrs->GetBool("Use extra cells");
+    }else if (attrs->GetName(i) == "Use RAW format") {
+      use_raw = attrs->GetBool("Use RAW format");
+    }
+  }
 
-    if(reverse_endian)
-        std::cout << "Using Big Endian" << std::endl;
-    else
-        std::cout << "Using Little Endian" << std::endl;
-    std::cout << "--------------------------" << std::endl;
+  debug4 << "--------------------------" << std::endl;
+  if(use_extracells)
+    debug4 << "Using extra cells" << std::endl;
+  else
+    debug4 << "Not using extra cells" << std::endl;
+
+  if(use_raw)
+    debug4 << "Using RAW format" << std::endl;
+  else
+    debug4 << "Not using RAW format" << std::endl;
+
+  if(reverse_endian)
+    debug4 << "Using Big Endian" << std::endl;
+  else
+    debug4 << "Using Little Endian" << std::endl;
+  debug4 << "--------------------------" << std::endl;
 
 // #ifdef PARALLEL
-    rank = PAR_Rank();
-    nprocs = PAR_Size();
+  rank = PAR_Rank();
+  nprocs = PAR_Size();
 // #else
 //     rank = 0;
 //     nprocs = 1;
 // #endif
-    
-    //nprocs = 4;
-    //std::cout << "~~~PROC " << rank << " / " << nprocs << std::endl;
   
 #ifdef USE_VISUS
     reader = new VisusIDXIO(); // USE VISUS
@@ -507,85 +491,81 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
       const char* sfc_v = dataset_filename.substr(folder_point+4,1).c_str();
       std::cout << "Use SFC "<< sfc_v << std::endl;
       if(*sfc_v == 'X')
-	    sfc_offset[0] = 1;
-      else if(*sfc_v == 'Y')
-        sfc_offset[1] = 1;
-      else if(*sfc_v == 'Z')
-        sfc_offset[2] = 1;
-    }
-    
-    if(is_gidx){
-      std::cout << "Using GIDX file" << std::endl;
+       sfc_offset[0] = 1;
+     else if(*sfc_v == 'Y')
+      sfc_offset[1] = 1;
+    else if(*sfc_v == 'Z')
+      sfc_offset[2] = 1;
+  }
 
-      vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
-  
-      parser->SetFileName(dataset_filename.c_str());
-      if (parser->Parse()){
-        vtkXMLDataElement *root = parser->GetRootElement();
+  if(is_gidx){
+    debug4 << "Using GIDX file" << std::endl;
 
-        int ntimesteps = root->GetNumberOfNestedElements();
+    vtkSmartPointer<vtkXMLDataParser> parser = vtkSmartPointer<vtkXMLDataParser>::New();
 
-        if(debug_format)
-          std::cout << "Found " << ntimesteps << " timesteps in GIDX file" << std::endl;
+    parser->SetFileName(dataset_filename.c_str());
+    if (parser->Parse()){
+      vtkXMLDataElement *root = parser->GetRootElement();
 
-        for(int i=0; i < ntimesteps; i++){
-          vtkXMLDataElement *xmltime = root->GetNestedElement(i);
-          String urlstr(xmltime->GetAttribute("url"));
-          String timestr(xmltime->GetAttribute("log_time"));
+      int ntimesteps = root->GetNumberOfNestedElements();
 
-          gidx_info ginfo;
-          ginfo.url = urlstr.substr(7);
-          ginfo.log_time = cint(timestr.c_str());
-          gidx_datasets.push_back(ginfo);
+      debug4 << "Found " << ntimesteps << " timesteps in GIDX file" << std::endl;
 
-          if(debug_input)
-              std::cout << "added dataset " << ginfo.url << " time " << ginfo.log_time << std::endl;
+      for(int i=0; i < ntimesteps; i++){
+        vtkXMLDataElement *xmltime = root->GetNestedElement(i);
+        String urlstr(xmltime->GetAttribute("url"));
+        String timestr(xmltime->GetAttribute("log_time"));
 
-          logTimeIndex.push_back(ginfo.log_time);
-          timeIndex.push_back(ginfo.log_time);
-         }
+        gidx_info ginfo;
+        ginfo.url = urlstr.substr(7);
+        ginfo.log_time = cint(timestr.c_str());
+        gidx_datasets.push_back(ginfo);
 
-         if(ntimesteps > 0)
+        debug5 << "added dataset " << ginfo.url << " time " << ginfo.log_time << std::endl;
+
+        logTimeIndex.push_back(ginfo.log_time);
+        timeIndex.push_back(ginfo.log_time);
+      }
+
+      if(ntimesteps > 0)
             if (!reader->openDataset(gidx_datasets[0].url)) // open first dataset 
             {
-              std::cerr <<"Cannot load "<< filename << std::endl;
+              std::cerr << "Cannot load "<< filename << std::endl;
               return;
             }
 
-        }else{
+          }else{
             std::cerr << "Cannot parse GIDX file " << dataset_filename << std::endl;
+          }
+
         }
-
-    }
-    else
-    {
-        String folder = dataset_filename.substr(0,folder_point);
-        String dataset_name = dataset_filename.substr(folder_point,ext_point-folder_point);
-        
-        // "Standard" IDX metadata file (not yet standardized)
-        metadata_filename = folder + dataset_name+"/"+dataset_name+".xml";
-
-        if (!reader->openDataset(filename))
+        else
         {
-            std::cout <<"could not load "<<filename << std::endl;
+          String folder = dataset_filename.substr(0,folder_point);
+          String dataset_name = dataset_filename.substr(folder_point,ext_point-folder_point);
+
+        // "Standard" IDX metadata file (not yet standardized)
+          metadata_filename = folder + dataset_name+"/"+dataset_name+".xml";
+
+          if (!reader->openDataset(filename))
+          {
+            std::cerr <<"Could not load "<<filename << std::endl;
             return;
+          }
         }
-    }
-//    std::cout <<"dataset loaded";
+
     dim = reader->getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
-  
+
     createBoxes();
 
     createTimeIndex();
 
     int old_size = level_info.patchInfo.size();
 
-    printf("%d bef: FILE OPEN N PATCHES %d\n", rank, old_size);
 //#ifdef PARALLEL
     loadBalance();
 //#endif
-    printf("%d aft: FILE OPEN N PATCHES %d\n", rank, level_info.patchInfo.size());
-}
+  }
 
 
 // ****************************************************************************
@@ -596,19 +576,18 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 //
 // ****************************************************************************
 
-avtIDXFileFormat::~avtIDXFileFormat()
-{
-    if(debug_format)
-        std::cout<<"(avtIDXFileFormat destructor)" << std::endl;
+  avtIDXFileFormat::~avtIDXFileFormat()
+  {
+    debug5 <<"(avtIDXFileFormat destructor)" << std::endl;
 
     // for(int i=0; i < boxes_bounds.size(); i++)
     //     if(boxes_bounds.at(i) != NULL)
     //         delete [] boxes_bounds.at(i);
-  
+
     if(reader != NULL)
       delete reader;
-  
-}
+
+  }
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetNTimesteps
@@ -621,15 +600,15 @@ avtIDXFileFormat::~avtIDXFileFormat()
 //
 // ****************************************************************************
 
-int
-avtIDXFileFormat::GetNTimesteps(void)
-{
+  int
+  avtIDXFileFormat::GetNTimesteps(void)
+  {
     if(timeIndex.size() == 0)
-        createTimeIndex();
+      createTimeIndex();
 
     //printf("Ntimesteps %d \n", timeIndex.size());
     return timeIndex.size();// reader->getNTimesteps();
-}
+  }
 
 
 // ****************************************************************************
@@ -646,13 +625,12 @@ avtIDXFileFormat::GetNTimesteps(void)
 //
 // ****************************************************************************
 
-void
-avtIDXFileFormat::FreeUpResources(void)
-{
-    if(debug_format)
-        std::cout<<"avtIDXFileFormat::FreeUpResources..." << std::endl;
+  void
+  avtIDXFileFormat::FreeUpResources(void)
+  {
+    debug5 <<"avtIDXFileFormat::FreeUpResources..." << std::endl;
     //<ctc> todo... something (is destructor also called?)
-}
+  }
 
 
 //bool avtIDXFileFormat::CanCacheVariable(const char *var)
@@ -673,12 +651,11 @@ avtIDXFileFormat::FreeUpResources(void)
 //
 // ****************************************************************************
 
-void
-avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
+  void
+  avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     int timestate) 
-{
-    if(debug_format)
-        std::cout << rank << ": Meta data" << std::endl;
+  {
+    debug5 << rank << ": Meta data" << std::endl;
 
     ActivateTimestep(timestate);
 
@@ -696,7 +673,7 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
     mesh->spatialDimension = dim;
 
     int totalPatches = level_info.patchInfo.size();
-    printf("TOTAL PATCHES %d\n", totalPatches);
+    
     mesh->numBlocks = totalPatches;
     
     //mesh->blockOrigin = 0;
@@ -776,116 +753,117 @@ avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
 
     //this can be done once for everything because the spatial range is the same for all meshes
     double box_min[3] = { level_info.anchor[0] + low[0] * level_info.spacing[0],
-                            level_info.anchor[1] + low[1] * level_info.spacing[1],
-                            level_info.anchor[2] + low[2] * level_info.spacing[2] };
-    double box_max[3] = { level_info.anchor[0] + high[0] * level_info.spacing[0],
-                        level_info.anchor[1] + high[1] * level_info.spacing[1],
-                        level_info.anchor[2] + high[2] * level_info.spacing[2] };
+      level_info.anchor[1] + low[1] * level_info.spacing[1],
+      level_info.anchor[2] + low[2] * level_info.spacing[2] };
+      double box_max[3] = { level_info.anchor[0] + high[0] * level_info.spacing[0],
+        level_info.anchor[1] + high[1] * level_info.spacing[1],
+        level_info.anchor[2] + high[2] * level_info.spacing[2] };
+        {
+          debug5 << "Dimensions " << dim <<std::endl;
+          char* debug_str = new char[1024];
+          sprintf(debug_str, "anchor %f %f %f spacing %f %f %f\n",level_info.anchor[0],level_info.anchor[1],level_info.anchor[2], level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
+          debug5 << debug_str;
+          sprintf(debug_str, "global log %d %d %d - %d %d %d\n", low[0],low[1],low[2],high[0],high[1],high[2]);
+          debug5 << debug_str;
+          sprintf(debug_str, "global phy %f %f %f - %f %f %f\n", box_min[0],box_min[1],box_min[2],box_max[0],box_max[1],box_max[2]);
+          debug5 << debug_str;
 
-    if(debug_format){
-        printf("Dimensions %d\n", dim);
-        printf("anchor %f %f %f spacing %f %f %f\n",level_info.anchor[0],level_info.anchor[1],level_info.anchor[2], level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
-        printf("global log %d %d %d - %d %d %d\n", low[0],low[1],low[2],high[0],high[1],high[2]);
-        printf("global phy %f %f %f - %f %f %f\n", box_min[0],box_min[1],box_min[2],box_max[0],box_max[1],box_max[2]);
-    }
+          delete [] debug_str;
+        }
 
-    int logical[3];
-    for (int i=0; i<3; i++)
-        logical[i] = high[i]-low[i];
+        int logical[3];
+        for (int i=0; i<3; i++)
+          logical[i] = high[i]-low[i];
 
-    mesh->hasSpatialExtents = true; 
-    mesh->minSpatialExtents[0] = box_min[0];
-    mesh->maxSpatialExtents[0] = box_max[0];
-    mesh->minSpatialExtents[1] = box_min[1];
-    mesh->maxSpatialExtents[1] = box_max[1];
-    mesh->minSpatialExtents[2] = box_min[2];
-    mesh->maxSpatialExtents[2] = box_max[2];
+        mesh->hasSpatialExtents = true; 
+        mesh->minSpatialExtents[0] = box_min[0];
+        mesh->maxSpatialExtents[0] = box_max[0];
+        mesh->minSpatialExtents[1] = box_min[1];
+        mesh->maxSpatialExtents[1] = box_max[1];
+        mesh->minSpatialExtents[2] = box_min[2];
+        mesh->maxSpatialExtents[2] = box_max[2];
 
-    mesh->hasLogicalBounds = true;
-    mesh->logicalBounds[0] = logical[0];
-    mesh->logicalBounds[1] = logical[1];
-    mesh->logicalBounds[2] = logical[2];
+        mesh->hasLogicalBounds = true;
+        mesh->logicalBounds[0] = logical[0];
+        mesh->logicalBounds[1] = logical[1];
+        mesh->logicalBounds[2] = logical[2];
 
-    md->Add(mesh);
-  
-    md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
-    md->SetCyclesAreAccurate(true);
-    
+        md->Add(mesh);
+
+        md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
+        md->SetCyclesAreAccurate(true);
+
 #ifdef PARALLEL // only PIDX
    // md->SetFormatCanDoDomainDecomposition(true);
 #endif
-   
+
     //if(timestate == 0){
-    const std::vector<Field>& fields = reader->getFields();
-    if(debug_format)
-        std::cout << "adding " << fields.size() << "fields" << std::endl;
-    int ndtype;
+        const std::vector<Field>& fields = reader->getFields();
+        debug5 << "adding " << fields.size() << "fields" << std::endl;
+        int ndtype;
     // char testvar[128];
     // sprintf(testvar, "AA_var_%d",timestate);
     // AddScalarVarToMetaData(md, testvar, mesh->name, AVT_ZONECENT);
-    for (int i = 0; i < (int) fields.size(); i++)
-    {
-        const Field& field = fields[i];
+        for (int i = 0; i < (int) fields.size(); i++)
+        {
+          const Field& field = fields[i];
         // printf("adding field %s\n", field.name.c_str());
-        if (!field.isVector){
+          if (!field.isVector){
             AddScalarVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT);
             //md->Add(new avtScalarMetaData(field.name,mesh->name,AVT_ZONECENT));
-        }
-        else
+          }
+          else
             AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
             //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
-    }
+        }
 
-    if(debug_format)
-      printf("%d: end meta\n", rank);
+        debug5 << rank << ": end meta" <<std::endl;
+      }
 
-    printf("%d: DONE metadata\n", rank);
-}
+      void
+      avtIDXFileFormat::SetUpDomainConnectivity(const char* meshname)
+      {
+        avtRectilinearDomainBoundaries *rdb =
+        new avtRectilinearDomainBoundaries(true);
+        int ndomains =level_info.patchInfo.size();
+        rdb->SetNumDomains(ndomains);
+        printf("Rect: Setting number of domains %d for mesh %s\n", ndomains, meshname);
 
-void
-avtIDXFileFormat::SetUpDomainConnectivity(const char* meshname)
-{
-    avtRectilinearDomainBoundaries *rdb =
-      new avtRectilinearDomainBoundaries(true);
-    int ndomains =level_info.patchInfo.size();
-    rdb->SetNumDomains(ndomains);
-    printf("Rect: Setting number of domains %d for mesh %s\n", ndomains, meshname);
+        for(int n=0; n < ndomains; n++) {
+          int low[3],high[3];
+          level_info.patchInfo[n].getBounds(low,high,meshname, use_extracells);
 
-    for(int n=0; n < ndomains; n++) {
-        int low[3],high[3];
-        level_info.patchInfo[n].getBounds(low,high,meshname, use_extracells);
+          int e[6] = { low[0], high[0],
+           low[1], high[1],
+           low[2], high[2] };
 
-        int e[6] = { low[0], high[0],
-                   low[1], high[1],
-                   low[2], high[2] };
-        
-      rdb->SetIndicesForRectGrid(n, e);
-    }
-    rdb->CalculateBoundaries();
-    void_ref_ptr vr =
-      void_ref_ptr(rdb, avtStructuredDomainBoundaries::Destruct);
-    cache->CacheVoidRef("any_mesh",
-			AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
+           rdb->SetIndicesForRectGrid(n, e);
+         }
+         rdb->CalculateBoundaries();
+         void_ref_ptr vr =
+         void_ref_ptr(rdb, avtStructuredDomainBoundaries::Destruct);
+         cache->CacheVoidRef("any_mesh",
+           AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
 
         void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-					   -1, -1);
+          AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+          -1, -1);
 	if (*vrTmp == NULL )//|| *vrTmp != *this->mesh_boundaries[meshname])
-      fprintf(stderr,"pidx boundary mesh not registered\n");
+    fprintf(stderr,"pidx boundary mesh not registered\n");
 
 
 }
 
 bool overlap(const int& a,const int& b,const int& p,const int& q)
-  {return ((a)<=(q) && (b)>=(p));}
+{return ((a)<=(q) && (b)>=(p));}
 
 void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timestate){
   //if (!avtDatabase::OnlyServeUpMetaData() && level_info.patchInfo.size()>0 ){
 
-    avtRectilinearDomainBoundaries *rdb =
-    new avtRectilinearDomainBoundaries(true);
-    rdb->SetNumDomains(level_info.patchInfo.size());
-    printf("Setting number of domains %d for mesh %s\n", level_info.patchInfo.size(), meshname);
+  avtRectilinearDomainBoundaries *rdb =
+  new avtRectilinearDomainBoundaries(true);
+  rdb->SetNumDomains(level_info.patchInfo.size());
+  //printf("Setting number of domains %d for mesh %s\n", level_info.patchInfo.size(), meshname);
     // for (long long i = 0 ; i < level_info.patchInfo.size() ; i++)
     // {
     //     int low[3],high[3];
@@ -895,17 +873,17 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     //     int e[6] = { low[0], high[0],
     //                low[1], high[1],
     //                low[2], high[2] };
-        
+
     //     rdb->SetIndicesForAMRPatch(i,0,e);//SetIndicesForRectGrid(i, e);
     // }
 
-    for(int domain=0; domain < level_info.patchInfo.size(); domain++){
-      int low[3], high[3];
-      level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
+  for(int domain=0; domain < level_info.patchInfo.size(); domain++){
+    int low[3], high[3];
+    level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
 
-      int e[6] = { low[0], high[0],
-                   low[1], high[1],
-                   low[2], high[2] };
+    int e[6] = { low[0], high[0],
+     low[1], high[1],
+     low[2], high[2] };
 
       //rdb->SetExtents(domain, e);
       rdb->SetIndicesForAMRPatch(domain,0,e);//SetIndicesForRectGrid(i, e);
@@ -931,16 +909,16 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     //   }
     // }
     }
-  
+
     rdb->CalculateBoundaries();
 
     this->mesh_boundaries[meshname] = void_ref_ptr(rdb,
-                                   avtStructuredDomainBoundaries::Destruct);
+     avtStructuredDomainBoundaries::Destruct);
     cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
 
     void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-					   AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-					   timestate, -1);
+      AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+      timestate, -1);
     if (*vrTmp == NULL || *vrTmp != *this->mesh_boundaries[meshname])
       fprintf(stderr,"pidx boundary mesh not registered\n");
 
@@ -948,7 +926,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
     //printf("%d: DONE compute domain boundary\n", rank);
 
-}
+  }
 
 
 // ****************************************************************************
@@ -973,11 +951,10 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 //
 // ****************************************************************************
 
-vtkDataSet *
-avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
-{
-    if(debug_format)
-        std::cout<< rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;   
+  vtkDataSet *
+  avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
+  {
+    debug5 << rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;   
 
     Box slice_box;
 
@@ -1013,11 +990,10 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       //   my_dims[k]--;
     }
 
-    if(debug_format)
-      std::cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
+    debug5 << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
 
     rgrid->SetDimensions(my_dims);
-     
+
     // printf("global %d %d %d - %d %d %d local %d %d %d - %d %d %d\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
     // printf("cellspacing %f %f %f\n", level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
 
@@ -1025,64 +1001,64 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       vtkFloatArray *coords = vtkFloatArray::New(); 
       coords->SetNumberOfTuples(my_dims[c]); 
       float *array = (float *)coords->GetVoidPointer(0); 
-          
+
       for (int i=0; i < my_dims[c]; i++)
-    	{
+      {
     	  // Face centered data gets shifted towards -inf by half a cell.
     	  // Boundary patches are special shifted to preserve global domain.
     	  // Internal patches are always just shifted.
-    	  float face_offset= 0;
+       float face_offset= 0;
 
-    	  if (sfc_offset[c]) 
-    	  {
-    	    if (i==0)
+       if (sfc_offset[c]) 
+       {
+         if (i==0)
       		  if (low[c]==glow[c]) // patch is on low boundary
-      		    face_offset += 0.0;
-      		  else
+              face_offset += 0.0;
+            else
       		    face_offset += -0.5;       // patch boundary is internal to the domain
-      	  else if (i==my_dims[c]-1)
+           else if (i==my_dims[c]-1)
       		  if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
       		  //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
       		  //  face_offset += 0.0;
       	          //else
-      	          face_offset += -1;
+             face_offset += -1;
         		else                        // patch boundary is internal to the domain
-        		  face_offset += -0.5;
-      	  else
-      	    face_offset += -0.5;
-    	   }
+              face_offset += -0.5;
+            else
+             face_offset += -0.5;
+         }
          else{
 
            if (i==my_dims[c]-1)
-              if (high[c]==ghigh[c])
-                face_offset += -1.0;
-         }
+            if (high[c]==ghigh[c])
+              face_offset += -1.0;
+          }
 
-	       array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
-	  
+          array[i] = level_info.anchor[c] + (i + low[c] + face_offset) * level_info.spacing[c];
+
   	     // if(i==0)
   	     //   printf("low %d[%d]: %f\n", domain,c, array[i]);
   	     // if(i==my_dims[c]-1)
   	     //   printf("high %d[%d]: %f\n", domain,c, array[i]);
-  	    }
+        }
 
         switch(c) {
           case 0:
-            rgrid->SetXCoordinates(coords); break;
+          rgrid->SetXCoordinates(coords); break;
           case 1:
-            rgrid->SetYCoordinates(coords); break;
+          rgrid->SetYCoordinates(coords); break;
           case 2:
-            rgrid->SetZCoordinates(coords); break;
+          rgrid->SetZCoordinates(coords); break;
         }
 
-      coords->Delete();
-    }
-  
+        coords->Delete();
+      }
+
 
 #if 1
-    int nCells = rgrid->GetNumberOfCells();
-    int *blanks = new int[nCells];
-    memset(blanks, 0, nCells*sizeof(int));
+      int nCells = rgrid->GetNumberOfCells();
+      int *blanks = new int[nCells];
+      memset(blanks, 0, nCells*sizeof(int));
 
     // int nNodes = rgrid->GetNumberOfPoints();
     // int *blanksN = new int[nNodes];
@@ -1116,17 +1092,17 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
       int count_ghost = 0;
 
       bool over[3] = {overlap(low[0],high[0],tlow[0],thigh[0]),
-                      overlap(low[1],high[1],tlow[1],thigh[1]),
-                      overlap(low[2],high[2],tlow[2],thigh[2])};
+        overlap(low[1],high[1],tlow[1],thigh[1]),
+        overlap(low[2],high[2],tlow[2],thigh[2])};
 
-      if(over[0] && over[1] && over[2])
-      {
-        int neig_low[3];
-        int neig_high[3];
+        if(over[0] && over[1] && over[2])
+        {
+          int neig_low[3];
+          int neig_high[3];
 
-        for(int d=0; d < 3; d++){
-          int maxv = max(low[d],tlow[d]);
-          int minv = min(high[d],thigh[d]);
+          for(int d=0; d < 3; d++){
+            int maxv = max(low[d],tlow[d]);
+            int minv = min(high[d],thigh[d]);
           // if(!over[d]){
           //   neig_low[d] = maxv;
           //   neig_high[d] = minv;
@@ -1147,7 +1123,7 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
             if(maxv == glow[d])
               neig_low[d] = maxv;
           // }
-        }
+          }
 
       // int neig_low[3];
       // int neig_high[3];
@@ -1177,110 +1153,98 @@ avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
         // int neig_high[3] = {min(high[0],thigh[0]),min(high[1],thigh[1]),min(high[2],thigh[2])};
 
         //printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
-        for(int k=neig_low[2]; k <= neig_high[2]; k++)
-          for(int j=neig_low[1]; j <= neig_high[1]; j++)
-            for(int i=neig_low[0]; i <= neig_high[0]; i++){
-              
-              int ii = i - low[0];
-              int jj = j - low[1];
-              int kk = k - low[2];
-              
-              blanks[(ii) + dim_block[0] * ((jj) + dim_block[1] * (kk))] = 1;
+          for(int k=neig_low[2]; k <= neig_high[2]; k++)
+            for(int j=neig_low[1]; j <= neig_high[1]; j++)
+              for(int i=neig_low[0]; i <= neig_high[0]; i++){
+
+                int ii = i - low[0];
+                int jj = j - low[1];
+                int kk = k - low[2];
+
+                blanks[(ii) + dim_block[0] * ((jj) + dim_block[1] * (kk))] = 1;
 
               //blanksN[ii + (dim_block[0]+1) * (jj + (dim_block[1]+1) * kk)] = 1;
-              count_ghost++;
+                count_ghost++;
+              }
             }
-      }
 
       //printf("%d found %d ghosts %d\n", domain, count_ghost, ghost);
-    }
+          }
 
-    for (int i = 0; i < nCells; i++) {
-      if (!blanks[i]){
-          ghostCells->InsertNextValue(realVal);
-          
-      }
-      else{
-          ghostCells->InsertNextValue(ghost);
-          
-      }
-        
+          for (int i = 0; i < nCells; i++) {
+            if (!blanks[i]){
+              ghostCells->InsertNextValue(realVal);
+
+            }
+            else{
+              ghostCells->InsertNextValue(ghost);
+
+            }
+
       // if(!blanksN[i]){
       //   ghostNodes->InsertNextValue(noghostN);
       // }
       // else
       //   ghostNodes->InsertNextValue(ghostN);
-        
-    }
 
-    rgrid->GetCellData()->AddArray(ghostCells);
+          }
+
+          rgrid->GetCellData()->AddArray(ghostCells);
     //rgrid->GetPointData()->AddArray(ghostNodes);
 
-    vtkStreamingDemandDrivenPipeline::SetUpdateGhostLevel(
-        rgrid->GetInformation(), 0);
-    ghostCells->Delete();
+          vtkStreamingDemandDrivenPipeline::SetUpdateGhostLevel(
+            rgrid->GetInformation(), 0);
+          ghostCells->Delete();
     // ghostNodes->Delete();
 
-    delete [] blanks;
+          delete [] blanks;
 #endif
 
 #if USE_AMR
     //computeDomainBoundaries(meshname, timestate);
 #else
-    SetUpDomainConnectivity(meshname);
+          SetUpDomainConnectivity(meshname);
 #endif
 
-    if(debug_format)
-      printf("end mesh\n");
-    return rgrid;
-    
-}
+          debug5 << rank << ": end mesh" << std::endl;
+          return rgrid;
 
-void
-avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
-{
-  // if(debug_format)
-  //   printf("%d: entering getcycles\n", rank);
-  for(int i = 0; i < reader->getNTimesteps(); ++i)
-      cycles.push_back(i);
+        }
 
-  // if(debug_format)
-  //   printf("%d: exiting getcycles\n", rank);
-}
+        void
+        avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
+        {
 
-void
-avtIDXFileFormat::GetTimes(std::vector<double> &times)
-{
-  // if(debug_format)
-  //   printf("%d: entering gettimes\n", rank);
-  times.swap(timeIndex);
+          for(int i = 0; i < reader->getNTimesteps(); ++i)
+            cycles.push_back(i);
+        }
 
-  // if(debug_format)
-  //   printf("%d: exiting gettimes\n", rank);
+        void
+        avtIDXFileFormat::GetTimes(std::vector<double> &times)
+        {
+          times.swap(timeIndex);
+        }
 
-}
+        vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
 
-vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char *varname){
-    
-    Box my_box;
-    int low[3];
-    int high[3];
-    level_info.patchInfo[domain].getBounds(low,high,"CC_Mesh", use_extracells);
+          Box my_box;
+          int low[3];
+          int high[3];
+          level_info.patchInfo[domain].getBounds(low,high,"CC_Mesh", use_extracells);
 
-    std::cout << "read data " << level_info.patchInfo[domain].toString();
-    for(int k=0; k<3; k++){
+          debug5 << "read data " << level_info.patchInfo[domain].toString();
+          for(int k=0; k<3; k++){
  //      if(uintah_metadata && use_extracells){
 	// low[k]++;
 	// //high[k]++;
  //      }
-        my_box.p1[k] = low[k];
-        my_box.p2[k] = high[k];
-    }
-    
-    unsigned char* data = reader->getData(my_box, timestate, varname);
+            my_box.p1[k] = low[k];
+            my_box.p2[k] = high[k];
+          }
 
-    if(debug_format)
-      printf("read data done\n");
+          unsigned char* data = reader->getData(my_box, timestate, varname);
+
+          debug5 << rank << ": read data done" << std::endl;
     /*
     std::ofstream out;
     char outname[128];
@@ -1298,275 +1262,274 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
     out.write((const char*)data, buffer_size);
     out.close();
     */
-    if(data == NULL){
-        std::cout << " NO DATA " << std::endl;
-        return NULL;
-    }
-    
-    Field field = reader->getCurrField();
-    DTypes type = field.type;
-    
-    int my_bounds[3];
-    for(int k=0; k<3; k++)
-     my_bounds [k] = high[k]-low[k]+1;
+          if(data == NULL){
+            std::cerr << " NO DATA " << std::endl;
+            return NULL;
+          }
 
-    int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
-    long long ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
+          Field field = reader->getCurrField();
+          DTypes type = field.type;
 
-    int ncomponents = 1;
-    
-    bool isVector = field.isVector;
-    
+          int my_bounds[3];
+          for(int k=0; k<3; k++)
+           my_bounds [k] = high[k]-low[k]+1;
+
+         int ztuples = (dim == 2) ? 1 : (my_bounds[2]);
+         long long ntuples = (my_bounds[0])*(my_bounds[1])*ztuples;
+
+         int ncomponents = 1;
+
+         bool isVector = field.isVector;
+
    // printf("is vector? %d\n", isVector);
 
-    if(isVector)
+         if(isVector)
         ncomponents = 3; // Visit wants 3 components vectors
-    
-    long long ntotal = ntuples * ncomponents;
-  
+
+      long long ntotal = ntuples * ncomponents;
+
     // do not reverse endianess if data is compressed
-    reverse_endian = reverse_endian * !reader->isCompressed();
-  
-    if(type == VisitIDXIO::IDX_UINT8){
+      reverse_endian = reverse_endian * !reader->isCompressed();
+
+      if(type == VisitIDXIO::IDX_UINT8){
         vtkUnsignedCharArray*rv = vtkUnsignedCharArray::New();
         rv->SetNumberOfComponents(ncomponents); //<ctc> eventually handle vector data, since visit can actually render it!
         
         if(isVector && dim < 3){
-            
-            unsigned char* newdata = convertTo3Components<unsigned char>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((unsigned char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          unsigned char* newdata = convertTo3Components<unsigned char>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((unsigned char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else
             rv->SetArray((unsigned char*)data,ncomponents*ntuples,1/*delete when done*/,vtkDataArrayTemplate<unsigned char>::VTK_DATA_ARRAY_FREE);
-        return rv;
-    }
-    else if(type == VisitIDXIO::IDX_UINT16){
-    
+          return rv;
+      }
+      else if(type == VisitIDXIO::IDX_UINT16){
+
         vtkUnsignedShortArray *rv = vtkUnsignedShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            
-            unsigned short* newdata = convertTo3Components<unsigned short>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((unsigned short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          unsigned short* newdata = convertTo3Components<unsigned short>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((unsigned short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else
-            rv->SetArray((unsigned short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((unsigned short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned short>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
-            unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
-            for (long long i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
+          unsigned short *buff = (unsigned short *) rv->GetVoidPointer(0);
+          for (long long i = 0 ; i < ntotal ; i++)
+          {
+            int tmp;
+            int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+            buff[i] = tmp;
+          }
         }
-    
+
         return rv;
-    }
-    else if(type == VisitIDXIO::IDX_UINT32){
+      }
+      else if(type == VisitIDXIO::IDX_UINT32){
         vtkUnsignedIntArray *rv = vtkUnsignedIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            
-            unsigned int* newdata = convertTo3Components<unsigned int>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((unsigned int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          unsigned int* newdata = convertTo3Components<unsigned int>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((unsigned int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else
-            rv->SetArray((unsigned int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((unsigned int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<unsigned int>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
-            unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
-            for (long long i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
+          unsigned int *buff = (unsigned int *) rv->GetVoidPointer(0);
+          for (long long i = 0 ; i < ntotal ; i++)
+          {
+            int tmp;
+            int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+            buff[i] = tmp;
+          }
         }
         
         return rv;
-    }
-    else if(type == VisitIDXIO::IDX_INT8){
+      }
+      else if(type == VisitIDXIO::IDX_INT8){
         vtkCharArray*rv = vtkCharArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            
-            char* newdata = convertTo3Components<char>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          char* newdata = convertTo3Components<char>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((char*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else
-            rv->SetArray((char*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((char*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<char>::VTK_DATA_ARRAY_FREE);
         
         return rv;
-    }
-    else if(type == VisitIDXIO::IDX_INT16){
+      }
+      else if(type == VisitIDXIO::IDX_INT16){
         vtkShortArray *rv = vtkShortArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            
-            short* newdata = convertTo3Components<short>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          short* newdata = convertTo3Components<short>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((short*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else
-            rv->SetArray((short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((short*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<short>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
-            short *buff = (short *) rv->GetVoidPointer(0);
-            for (long long i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
+          short *buff = (short *) rv->GetVoidPointer(0);
+          for (long long i = 0 ; i < ntotal ; i++)
+          {
+            int tmp;
+            int16_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+            buff[i] = tmp;
+          }
         }
         
         return rv;
-    }
-    else if(type == VisitIDXIO::IDX_INT32){
+      }
+      else if(type == VisitIDXIO::IDX_INT32){
         vtkIntArray *rv = vtkIntArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            
-            int* newdata = convertTo3Components<int>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          int* newdata = convertTo3Components<int>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((int*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else
-            rv->SetArray((int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((int*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
-            int *buff = (int *) rv->GetVoidPointer(0);
-            for (long long i = 0 ; i < ntotal ; i++)
-            {
-                int tmp;
-                int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
+          int *buff = (int *) rv->GetVoidPointer(0);
+          for (long long i = 0 ; i < ntotal ; i++)
+          {
+            int tmp;
+            int32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+            buff[i] = tmp;
+          }
         }
         
         return rv;
-    }
-    else if(type == VisitIDXIO::IDX_INT64){
+      }
+      else if(type == VisitIDXIO::IDX_INT64){
         vtkLongArray *rv = vtkLongArray::New();
         rv->SetNumberOfComponents(ncomponents);
-    
+
         // ?? is it correct to use long here ??
         if(isVector && dim < 3){
-            
-            long* newdata = convertTo3Components<long>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((long*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          long* newdata = convertTo3Components<long>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((long*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else
-            rv->SetArray((long*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((long*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<long>::VTK_DATA_ARRAY_FREE);
         
         if(reverse_endian){
-            long *buff = (long *) rv->GetVoidPointer(0);
-            for (long long i = 0 ; i < ntotal ; i++)
-            {
-                long tmp;
-                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
+          long *buff = (long *) rv->GetVoidPointer(0);
+          for (long long i = 0 ; i < ntotal ; i++)
+          {
+            long tmp;
+            double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+            buff[i] = tmp;
+          }
         }
         
         return rv;
-    }
-    else if(type == VisitIDXIO::IDX_FLOAT32){
+      }
+      else if(type == VisitIDXIO::IDX_FLOAT32){
       //  printf("FLOAT32 creating array ncomp %d tuples %d \n", ncomponents, ntuples);
         vtkFloatArray *rv = vtkFloatArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            float* newdata = convertTo3Components<float>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((float*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+          float* newdata = convertTo3Components<float>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((float*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else{
-            rv->SetArray((float*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((float*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<int>::VTK_DATA_ARRAY_FREE);
         }
         
         if(reverse_endian){
-            float *buff = (float *) rv->GetVoidPointer(0);
+          float *buff = (float *) rv->GetVoidPointer(0);
 
-            float min_value = 99999999999999.f;
-            float max_value = -99999999999999.f;
+          float min_value = 99999999999999.f;
+          float max_value = -99999999999999.f;
 
-            for (long long i = 0 ; i < ntotal ; i++)
-            {
-                float tmp;
-                float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
+          for (long long i = 0 ; i < ntotal ; i++)
+          {
+            float tmp;
+            float32_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+            buff[i] = tmp;
 
-                float value = buff[i];
-                if(value < min_value)
-                  min_value = value;
+            float value = buff[i];
+            if(value < min_value)
+              min_value = value;
 
-                if(value > max_value)
-                  max_value = value;
-            }
-            printf("range %f , %f\n", min_value, max_value);
-            
-	    }
+            if(value > max_value)
+              max_value = value;
+          }
+          printf("range %f , %f\n", min_value, max_value);
+
+        }
         return rv;
-    }
-    else if(type == VisitIDXIO::IDX_FLOAT64){
-        
+      }
+      else if(type == VisitIDXIO::IDX_FLOAT64){
+
       //printf("DOUBLE creating array ncomp %d \n", ncomponents);
         vtkDoubleArray *rv = vtkDoubleArray::New();
         rv->SetNumberOfComponents(ncomponents);
         
         if(isVector && dim < 3){
-            
-            double* newdata = convertTo3Components<double>(data, field.ncomponents, 3, ntuples);
-            rv->SetArray((double*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
-            
-            delete data;
+
+          double* newdata = convertTo3Components<double>(data, field.ncomponents, 3, ntuples);
+          rv->SetArray((double*)newdata,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
+
+          delete data;
         }
         else{
          // printf("DOUBLE converting %d \n", ncomponents*ntuples);
-            rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
+          rv->SetArray((double*)data,ncomponents*ntuples,1,vtkDataArrayTemplate<double>::VTK_DATA_ARRAY_FREE);
         }
-      
+
         if(reverse_endian){
-            double *buff = (double *) rv->GetVoidPointer(0);
-            for (unsigned long long i = 0 ; i < ntotal ; i++)
-            {
-                double tmp;
-                double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
-                buff[i] = tmp;
-            }
+          double *buff = (double *) rv->GetVoidPointer(0);
+          for (unsigned long long i = 0 ; i < ntotal ; i++)
+          {
+            double tmp;
+            double64_Reverse_Endian(buff[i], (unsigned char *) &tmp);
+            buff[i] = tmp;
+          }
         }
-       
+
         return rv;
-    }else{
+      }else{
 
         fprintf(stderr, "Type %d not found\n", type);
+      }
+
+      debug5 << rank << ": done data loading" << std::endl;
+      return NULL;
     }
-  
-    if(debug_format)
-      printf("done data loading\n");
-  return NULL;
-}
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetVar
@@ -1589,34 +1552,24 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 //
 // ****************************************************************************
 
-vtkDataArray *
-avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
-{
-    //std::cout<< rank << ": start getvar " << varname << " domain "<< domain;
-  
+    vtkDataArray *
+    avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
+    {
   // get correspondig logic time
-  if(debug_format)
-   printf("Requested index time %d using logical time (IDX) %d\n", timestate, logTimeIndex[timestate]);
+      debug5 << "Requested index time " << timestate << " using logical time (IDX) " << logTimeIndex[timestate] << std::endl;
 
-  if(is_gidx){
-//     delete reader;
+      if(is_gidx){
+        reader->openDataset(gidx_datasets[timestate].url);
+      }
 
-// #ifdef USE_VISUS
-//     reader = new VisusIDXIO(); // USE VISUS
-// #else
-//     reader = new PIDXIO(use_raw);     // USE PIDX
-// #endif
-    reader->openDataset(gidx_datasets[timestate].url);
-  }
+      timestate = logTimeIndex[timestate];
+      return queryToVtk(timestate, domain, varname);
 
-  timestate = logTimeIndex[timestate];
-  return queryToVtk(timestate, domain, varname);
-    
-}
+    }
 
-void avtIDXFileFormat::ActivateTimestep(int ts){
+    void avtIDXFileFormat::ActivateTimestep(int ts){
     //printf("Activate timestep\n");
-}
+    }
 
 // ****************************************************************************
 //  Method: avtIDXFileFormat::GetVectorVar
@@ -1639,12 +1592,10 @@ void avtIDXFileFormat::ActivateTimestep(int ts){
 //
 // ****************************************************************************
 
-vtkDataArray *
-avtIDXFileFormat::GetVectorVar(int timestate, int domain, const char *varname)
-{
+    vtkDataArray *
+    avtIDXFileFormat::GetVectorVar(int timestate, int domain, const char *varname)
+    {
+      timestate = logTimeIndex[timestate];
+      return queryToVtk(timestate, domain, varname);
 
-  std::cout<< rank << ": start getVectorVar " << varname << " domain "<< domain;
-    timestate = logTimeIndex[timestate];
-    return queryToVtk(timestate, domain, varname);
-    
-}
+    }
