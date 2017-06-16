@@ -131,16 +131,17 @@ void avtIDXFileFormat::loadBalance(){
     std::vector<PatchInfo> newboxes;
     int n = nprocs;
     int b = level_info.patchInfo.size();
-    int c = b > n ? b/n : n/b; // how many patches per core
+    int c = b > n ? b/n : n/b; // how many patches per box
     int d = b > n ? b%n : n%b;
 
     //printf("Trying to use %d patches per core, res %d\n", c, d);
 
-    int h[b];
+    float h[b];
     int res[b];
     int slabs[b];
+    //  fprintf(stderr,"n %d b %d c %d d %d\n",n,b,c,d);
 
-    if(d == 0){
+//    if(d == 0){
       for(int i=0; i<b; i++){
         PatchInfo& box = level_info.patchInfo[i];
         int box_low[3];
@@ -149,17 +150,32 @@ void avtIDXFileFormat::loadBalance(){
         box.getBounds(box_low, box_high, "CC");
 
         int extent = box_high[maxdir]-box_low[maxdir]+1;
+    
+#if 0
+        h[i] = ceil((float)extent/c);
+        slabs[i] = ceil((float)extent/h[i]);
 
-        h[i] = extent/c;
-        slabs[i] = extent/h[i];
-        res[i] = extent%h[i];
+	if(c > slabs[i]) {
+            h[i] = floor((float)extent/c);
+            slabs[i] = floor((float)extent/h[i]);
+	}
+	
+	int diff = slabs[i]-c;
+	slabs[i] = c;
+	res[i] = extent%h[i] + diff*h[i];
+#else
+        h[i] = (float)extent/c;
+	slabs[i]=c;
+	res[i]=extent % int(h[i]*c);
+#endif	
+        //res[i] = extent%h[i];
 
-        //printf("Even H[%d] = %d res %d\n", i, h[i], res[i]);
+	//  printf("Even H[%d] = %d xslabs %d res %d\n", i, h[i], slabs[i], res[i]);
 
       }
+#if 0
     }
     else{
-
       // TODO sort boxes by height
 
       for(int i=0; i<b; i++){
@@ -172,7 +188,7 @@ void avtIDXFileFormat::loadBalance(){
         int extent = box_high[maxdir]-box_low[maxdir];
 
         if(i <= d){
-          h[i] = extent/c;
+	  h[i] = ceil((float)extent/c);
           slabs[i] = extent/h[i];
           res[i] = extent%h[i];
         }
@@ -186,6 +202,7 @@ void avtIDXFileFormat::loadBalance(){
       }
 
     }
+#endif
 
     for(int i=0; i < b; i++){
       PatchInfo& box = level_info.patchInfo[i];
@@ -223,7 +240,7 @@ void avtIDXFileFormat::loadBalance(){
         added_boxes++;
 
         part_p1 = high[maxdir];
-        part_p2 = part_p1 + h[i] -1;
+        part_p2 = round(part_p1 + h[i]) -1;
 
       }
 
@@ -257,7 +274,7 @@ void avtIDXFileFormat::loadBalance(){
     }
 
     if(level_info.patchInfo.size() % nprocs != 0){
-      fprintf(stderr,"ERROR: wrong domain decomposition\n");
+	fprintf(stderr,"ERROR: wrong domain decomposition, patches %d procs %d\n", level_info.patchInfo.size(), nprocs);
       assert(false);
     }
   }
