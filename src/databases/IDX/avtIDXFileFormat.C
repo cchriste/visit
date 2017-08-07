@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2015, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -244,7 +244,7 @@ void avtIDXFileFormat::loadBalance(){
 
       }
 
-      if(residual > 0){
+      if(residual > 0 || (high[maxdir] < box_high[maxdir])){
         int lowr[3];
         int highr[3];
 

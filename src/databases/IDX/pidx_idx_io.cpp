@@ -12,6 +12,10 @@
  **                                                **
  ****************************************************/
 
+#include "pidx_idx_io.h"
+#include "PIDX.h"
+
+#include <InvalidFilesException.h>
 #include <DebugStream.h>
 #include <cstdarg>
 #include <string>
@@ -35,7 +39,7 @@ static void terminate(int out)
 #if PIDX_HAVE_MPI
   MPI_Abort(NEW_COMM_WORLD, out);
 #else
-  exit(out);
+  EXCEPTION1(InvalidFilesException, "PIDX terminated.");
 #endif
 }
 

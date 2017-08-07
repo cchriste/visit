@@ -15,13 +15,12 @@
 #ifndef _visus_idx_io_h
 #define _visus_idx_io_h
 
-#include <string>
-#include <vector>
-#include <cassert>
 #include "visit_idx_io.h"
 #include "visit_idx_io_types.h"
 
-using namespace VisitIDXIO;
+#include <string>
+#include <vector>
+#include <cassert>
 
 class DatasetImpl;
 class AccessImpl;
@@ -37,7 +36,7 @@ public:
     
     bool openDataset(const std::string filename);
     
-    unsigned char* getData(const Box box, const int timestate, const char* varname);
+    unsigned char* getData(const VisitIDXIO::Box box, const int timestate, const char* varname);
     
     virtual ~VisusIDXIO();
   
