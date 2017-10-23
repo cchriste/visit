@@ -481,18 +481,20 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     debug4 << "Using Little Endian" << std::endl;
   debug4 << "--------------------------" << std::endl;
 
-// #ifdef PARALLEL
+#ifdef PARALLEL
+  debug4 << "THIS IS PARALLEL AVT"<< std::endl;
   rank = PAR_Rank();
   nprocs = PAR_Size();
-// #else
-//     rank = 0;
-//     nprocs = 1;
-// #endif
+#else
+  debug4 << "THIS IS NOT PARALLEL AVT"<< std::endl;
+  rank = 0;
+  nprocs = 1;
+#endif
   
 #ifdef USE_VISUS
     reader = new VisusIDXIO(); // USE VISUS
 #else
-    reader = new PIDXIO(use_raw);     // USE PIDX
+    reader = new PIDXIO();     // USE PIDX
 #endif
     
     dataset_filename = filename;

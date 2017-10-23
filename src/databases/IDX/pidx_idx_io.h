@@ -26,26 +26,18 @@
 
 typedef std::string String;
 
-//class DatasetImpl;
-//class AccessImpl;
-
 class PIDXIO : public IDX_IO{
 
 public:
     
-    //TODO: remove use_raw
-    PIDXIO(){use_raw = false;}
-
-    PIDXIO(bool _use_raw){ use_raw = _use_raw; };
-    
+    PIDXIO(){}
+  
     bool openDataset(const std::string filename);
     
     unsigned char* getData(const VisitIDXIO::Box box, const int timestate, const char* varname);
     
     virtual ~PIDXIO();
 
-    bool use_raw;
-  
 };
 
 
