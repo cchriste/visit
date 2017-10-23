@@ -103,7 +103,79 @@ typedef std::string String;
 using namespace VisitIDXIO;
 using namespace std;
 
+bool computeDivisor(int x, int &divisor) {
+  int upperBound = std::sqrt(x);
+  for (int i = 2; i <= upperBound; ++i) {
+    if (x % i == 0) {
+      divisor = i;
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<int> computeGrid(int num) {
+  std::vector<int> grid(3);
+  grid[0] = 1;
+  grid[1] = 1;
+  grid[2] = 1;
+  int axis = 0;
+  int divisor = 0;
+  while (computeDivisor(num, divisor)) {
+    grid[axis] *= divisor;
+    num /= divisor;
+    axis = (axis + 1) % 3;
+  }
+  if (num != 1) {
+    grid[axis] *= num;
+  }
+  return grid;
+}
+
 void avtIDXFileFormat::loadBalance(){
+
+  // This works only for single box
+  int n = nprocs;
+  int b = level_info.patchInfo.size();
+  int c = b > n ? b/n : n/b; // how many patches per box
+
+  std::vector<PatchInfo> newboxes;
+
+  // need to consider extra cells?
+
+  for(int i=0; i < level_info.patchInfo.size(); i++){
+    
+    std::vector<int> block_decomp = computeGrid(c);
+
+    //printf("decomposing box %d in [%d %d %d]\n", i, block_decomp[0],block_decomp[1],block_decomp[2]);
+
+    PatchInfo& box = level_info.patchInfo[i];
+    int box_low[3];
+    int box_high[3];
+    int eCells[6];
+  
+    box.getBounds(box_low,box_high,eCells,"CC");
+
+    int box_dim[3] = {box_high[0]-box_low[0],box_high[1]-box_low[1],box_high[2]-box_low[2]};
+    int block_dim[3] = {box_dim[0]/block_decomp[0],box_dim[1]/block_decomp[1],box_dim[2]/block_decomp[2]};
+
+    //printf("block dim [%d %d %d]\n", block_dim[0],block_dim[1],block_dim[2]);
+    for(int nb=0; nb<c; nb++){
+
+      int bid[3] = {nb % block_decomp[0], (nb / block_decomp[0]) % block_decomp[1], nb / (block_decomp[0] * block_decomp[1])};
+      int curr_p1[3] = { bid[0]*block_dim[0],bid[1]*block_dim[1],bid[2]*block_dim[2]};
+      int curr_p2[3] = {curr_p1[0]+block_dim[0], curr_p1[1]+block_dim[1], curr_p1[2]+block_dim[2]};
+
+      PatchInfo newbox;
+      newbox.setBounds(curr_p1,curr_p2,eCells,"CC");
+      newboxes.push_back(newbox);
+ 
+    }
+
+  }
+
+
+#if 0
 
     int maxdir = 0; // largest extent axis
     int maxextent = 0;
@@ -150,59 +222,14 @@ void avtIDXFileFormat::loadBalance(){
         box.getBounds(box_low, box_high, "CC");
 
         int extent = box_high[maxdir]-box_low[maxdir]+1;
-    
-#if 0
-        h[i] = ceil((float)extent/c);
-        slabs[i] = ceil((float)extent/h[i]);
 
-	if(c > slabs[i]) {
-            h[i] = floor((float)extent/c);
-            slabs[i] = floor((float)extent/h[i]);
-	}
-	
-	int diff = slabs[i]-c;
-	slabs[i] = c;
-	res[i] = extent%h[i] + diff*h[i];
-#else
         h[i] = (float)extent/c;
-	slabs[i]=c;
-	res[i]=extent % int(h[i]*c);
-#endif	
-        //res[i] = extent%h[i];
+        slabs[i]=c;
+        res[i]=extent % int(h[i]*c);
 
-	//  printf("Even H[%d] = %d xslabs %d res %d\n", i, h[i], slabs[i], res[i]);
+        //  printf("Even H[%d] = %d xslabs %d res %d\n", i, h[i], slabs[i], res[i]);
 
       }
-#if 0
-    }
-    else{
-      // TODO sort boxes by height
-
-      for(int i=0; i<b; i++){
-        PatchInfo& box = level_info.patchInfo[i];
-        int box_low[3];
-        int box_high[3];
-
-        box.getBounds(box_low, box_high, "CC");
-
-        int extent = box_high[maxdir]-box_low[maxdir];
-
-        if(i <= d){
-	  h[i] = ceil((float)extent/c);
-          slabs[i] = extent/h[i];
-          res[i] = extent%h[i];
-        }
-        else{
-          h[i] = ceil((float)extent/(c+1));
-          slabs[i] = extent/h[i];
-          res[i] = extent%h[i];
-        }
-
-        //printf("Uneven H[%d] = %d res %d\n", i, h[i], res[i]);
-      }
-
-    }
-#endif
 
     for(int i=0; i < b; i++){
       PatchInfo& box = level_info.patchInfo[i];
@@ -258,23 +285,21 @@ void avtIDXFileFormat::loadBalance(){
       }
 
     }
+#endif
 
     level_info.patchInfo.swap(newboxes);
-    // phyboxes.swap(newphyboxes);
 
-    if(rank == 0){
+    if(rank == 0){ 
       debug4 << "Total number of boxes/domains: " << level_info.patchInfo.size() << std::endl<< std::flush;
       debug4 << "----------Boxes----------" << std::endl<< std::flush;
       for(int i=0; i< level_info.patchInfo.size(); i++){
         debug4 << i << " = "<<level_info.patchInfo[i].toString();
-            //boxes.at(i).p1 << " , " << boxes.at(i).p2 << " phy: "
-		      //<< phyboxes.at(i).p1 << " , " << phyboxes.at(i).p2 << std::endl<< std::flush;
       }
       debug4 << "-------------------------" << std::endl<< std::flush;
     }
 
     if(level_info.patchInfo.size() % nprocs != 0){
-	fprintf(stderr,"ERROR: wrong domain decomposition, patches %d procs %d\n", level_info.patchInfo.size(), nprocs);
+      fprintf(stderr,"ERROR: wrong domain decomposition, patches %d procs %d\n", level_info.patchInfo.size(), nprocs);
       assert(false);
     }
   }
