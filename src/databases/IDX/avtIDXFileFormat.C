@@ -166,6 +166,11 @@ void avtIDXFileFormat::loadBalance(){
       int curr_p1[3] = { bid[0]*block_dim[0],bid[1]*block_dim[1],bid[2]*block_dim[2]};
       int curr_p2[3] = {curr_p1[0]+block_dim[0], curr_p1[1]+block_dim[1], curr_p1[2]+block_dim[2]};
 
+      for(int d=0; d <3; d++){
+        //curr_p1[d] = curr_p1[d] > 0 ? curr_p1[d]-1 : curr_p1[d];
+        curr_p2[d] = (curr_p2[d] < box_high[d]) ? curr_p2[d]+1 : curr_p2[d];
+      }
+
       PatchInfo newbox;
       newbox.setBounds(curr_p1,curr_p2,eCells,"CC");
       newboxes.push_back(newbox);
