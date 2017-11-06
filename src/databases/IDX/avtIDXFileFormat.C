@@ -156,7 +156,7 @@ void avtIDXFileFormat::loadBalance(){
   
     box.getBounds(box_low,box_high,eCells,"CC");
 
-    int box_dim[3] = {box_high[0]-box_low[0],box_high[1]-box_low[1],box_high[2]-box_low[2]};
+    int box_dim[3] = {box_high[0]-box_low[0],box_high[1]-box_low[1],box_high[2]-box_low[2]};  // should be +1
     int block_dim[3] = {box_dim[0]/block_decomp[0],box_dim[1]/block_decomp[1],box_dim[2]/block_decomp[2]};
 
     //printf("block dim [%d %d %d]\n", block_dim[0],block_dim[1],block_dim[2]);
@@ -168,7 +168,7 @@ void avtIDXFileFormat::loadBalance(){
 
       for(int d=0; d <3; d++){
         //curr_p1[d] = curr_p1[d] > 0 ? curr_p1[d]-1 : curr_p1[d];
-        curr_p2[d] = (curr_p2[d] < box_high[d]) ? curr_p2[d]+1 : curr_p2[d];
+        curr_p2[d] = (curr_p2[d] < box_high[d]) ? curr_p2[d]+1 : box_high[d];
       }
 
       PatchInfo newbox;
@@ -1105,9 +1105,9 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
 
 #if 1
-      int nCells = rgrid->GetNumberOfCells();
-      int *blanks = new int[nCells];
-      memset(blanks, 0, nCells*sizeof(int));
+      size_t nCells = rgrid->GetNumberOfCells();
+      char *blanks = new char[nCells];
+      memset(blanks, 0, nCells*sizeof(char));
 
     // int nNodes = rgrid->GetNumberOfPoints();
     // int *blanksN = new int[nNodes];
@@ -1210,7 +1210,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
                 int jj = j - low[1];
                 int kk = k - low[2];
 
-                blanks[(ii) + dim_block[0] * ((jj) + dim_block[1] * (kk))] = 1;
+                blanks[(size_t)(ii) + (size_t)dim_block[0] * (size_t)((size_t)(jj) + (size_t)dim_block[1] * (size_t)(kk))] = 1;
 
               //blanksN[ii + (dim_block[0]+1) * (jj + (dim_block[1]+1) * kk)] = 1;
                 count_ghost++;
