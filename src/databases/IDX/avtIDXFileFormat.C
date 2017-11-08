@@ -141,6 +141,7 @@ void avtIDXFileFormat::loadBalance(){
   if(decomposition_n == nprocs)
     return;
 
+  // TODO use another datastruct to store the boxes
   // This works only for single box
   int n = nprocs;
   int b = level_info.patchInfo.size();
@@ -148,7 +149,7 @@ void avtIDXFileFormat::loadBalance(){
   std::vector<int> global_size = reader->getGlobalSize();
 
   if (n < b){
-    b = 1;
+    b = n;
     level_info.patchInfo.clear();
 
     int low[3]={0,0,0};
@@ -159,17 +160,18 @@ void avtIDXFileFormat::loadBalance(){
     level_info.patchInfo.push_back(box);
   }
 
-  int c = b/n; // how many patches per box
+  int c = b > n ? b/n : n/b; // how many patches per box
   std::vector<PatchInfo> newboxes;
 
   // need to consider extra cells?
-  //printf("n %d b %d c %d\n", n,b,c);
+  // printf("n %d b %d c %d\n", n,b,c);
+  // printf("global %d %d %d\n", global_size[0],global_size[1],global_size[2]);
 
   for(int i=0; i < level_info.patchInfo.size(); i++){
     
     std::vector<int> block_decomp = computeGrid(c);
 
-    //printf("decomposing box %d in [%d %d %d]\n", i, block_decomp[0],block_decomp[1],block_decomp[2]);
+    // printf("decomposing box %d in [%d %d %d]\n", i, block_decomp[0],block_decomp[1],block_decomp[2]);
 
     PatchInfo& box = level_info.patchInfo[i];
     int box_low[3];
@@ -321,6 +323,7 @@ void avtIDXFileFormat::loadBalance(){
       debug4 << "----------Boxes----------" << std::endl<< std::flush;
       for(int i=0; i< level_info.patchInfo.size(); i++){
         debug4 << i << " = "<<level_info.patchInfo[i].toString();
+        cout << i << " = "<<level_info.patchInfo[i].toString();
       }
       debug4 << "-------------------------" << std::endl<< std::flush;
     }
@@ -634,7 +637,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     int old_size = level_info.patchInfo.size();
 
 //#ifdef PARALLEL
-    //loadBalance();
+    loadBalance();
 //#endif
   }
 
@@ -1628,8 +1631,6 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     {
   // get correspondig logic time
       debug5 << "Requested index time " << timestate << " using logical time (IDX) " << logTimeIndex[timestate] << std::endl;
-
-      loadBalance();
 
       if(is_gidx){
         reader->openDataset(gidx_datasets[timestate].url);

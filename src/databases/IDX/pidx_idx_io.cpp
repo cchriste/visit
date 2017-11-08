@@ -106,6 +106,9 @@ PIDXIO::~PIDXIO(){
 }
 
 std::vector<int> PIDXIO::getGlobalSize(){
+  
+  int ret = PIDX_serial_file_open(input_filename.c_str(), PIDX_MODE_RDONLY, global_size, &pidx_file);
+
   std::vector<int> size(3);
   for(int i=0;i<3;i++)
     size[i] = (int)global_size[i];
