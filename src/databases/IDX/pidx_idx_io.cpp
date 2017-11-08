@@ -105,6 +105,13 @@ PIDXIO::~PIDXIO(){
  // terminate(0);
 }
 
+std::vector<int> PIDXIO::getGlobalSize(){
+  std::vector<int> size(3);
+  for(int i=0;i<3;i++)
+    size[i] = (int)global_size[i];
+  return size;
+}
+
 bool PIDXIO::openDataset(const String filename){
   
   if (rank == 0)  debug5 << "-----PIDXIO openDataset" << std::endl;

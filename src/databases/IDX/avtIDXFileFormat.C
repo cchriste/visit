@@ -103,6 +103,8 @@ typedef std::string String;
 using namespace VisitIDXIO;
 using namespace std;
 
+static int decomposition_n = 0;
+
 bool computeDivisor(int x, int &divisor) {
   int upperBound = std::sqrt(x);
   for (int i = 2; i <= upperBound; ++i) {
@@ -134,14 +136,34 @@ std::vector<int> computeGrid(int num) {
 
 void avtIDXFileFormat::loadBalance(){
 
+#if 1
+  // check if already done decomposition for current nprocs
+  if(decomposition_n == nprocs)
+    return;
+
   // This works only for single box
   int n = nprocs;
   int b = level_info.patchInfo.size();
-  int c = b > n ? b/n : n/b; // how many patches per box
 
+  std::vector<int> global_size = reader->getGlobalSize();
+
+  if (n < b){
+    b = 1;
+    level_info.patchInfo.clear();
+
+    int low[3]={0,0,0};
+    int high[3]={global_size[0]-1,global_size[1]-1,global_size[2]-1};
+    int eCells[6]={0,0,0,0,0,0};
+    PatchInfo box;
+    box.setBounds(low,high,eCells,"CC");
+    level_info.patchInfo.push_back(box);
+  }
+
+  int c = b/n; // how many patches per box
   std::vector<PatchInfo> newboxes;
 
   // need to consider extra cells?
+  //printf("n %d b %d c %d\n", n,b,c);
 
   for(int i=0; i < level_info.patchInfo.size(); i++){
     
@@ -163,24 +185,24 @@ void avtIDXFileFormat::loadBalance(){
     for(int nb=0; nb<c; nb++){
 
       int bid[3] = {nb % block_decomp[0], (nb / block_decomp[0]) % block_decomp[1], nb / (block_decomp[0] * block_decomp[1])};
-      int curr_p1[3] = { bid[0]*block_dim[0],bid[1]*block_dim[1],bid[2]*block_dim[2]};
+      int curr_p1[3] = { box_low[0]+(bid[0]*block_dim[0]),box_low[1]+(bid[1]*block_dim[1]),box_low[2]+(bid[2]*block_dim[2])};
       int curr_p2[3] = {curr_p1[0]+block_dim[0], curr_p1[1]+block_dim[1], curr_p1[2]+block_dim[2]};
 
       for(int d=0; d <3; d++){
         //curr_p1[d] = curr_p1[d] > 0 ? curr_p1[d]-1 : curr_p1[d];
-        curr_p2[d] = (curr_p2[d] < box_high[d]) ? curr_p2[d]+1 : box_high[d];
+        curr_p2[d] = (curr_p2[d] < global_size[d]-1) ? curr_p2[d]+1 : global_size[d]-1;
       }
 
       PatchInfo newbox;
       newbox.setBounds(curr_p1,curr_p2,eCells,"CC");
       newboxes.push_back(newbox);
- 
     }
 
   }
 
+  decomposition_n = nprocs;
 
-#if 0
+#else
 
     int maxdir = 0; // largest extent axis
     int maxextent = 0;
@@ -612,7 +634,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     int old_size = level_info.patchInfo.size();
 
 //#ifdef PARALLEL
-    loadBalance();
+    //loadBalance();
 //#endif
   }
 
@@ -1606,6 +1628,8 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     {
   // get correspondig logic time
       debug5 << "Requested index time " << timestate << " using logical time (IDX) " << logTimeIndex[timestate] << std::endl;
+
+      loadBalance();
 
       if(is_gidx){
         reader->openDataset(gidx_datasets[timestate].url);

@@ -128,7 +128,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
 
   private:
 
-    IDX_IO* reader;
+    PIDXIO* reader;
     bool reverse_endian;
     std::map<std::string, void_ref_ptr> mesh_boundaries;
     std::map<std::string, void_ref_ptr> mesh_domains;

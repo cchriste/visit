@@ -36,6 +36,8 @@ public:
     
     unsigned char* getData(const VisitIDXIO::Box box, const int timestate, const char* varname);
     
+    std::vector<int> getGlobalSize();
+
     virtual ~PIDXIO();
 
 };
