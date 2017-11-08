@@ -301,6 +301,8 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   sprintf(debug_str,"%d: local box %lld %lld %lld size %lld %lld %lld time %d\n", rank, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2], timestate);
   debug5 << debug_str;
 
+  cout << debug_str;
+
   delete [] debug_str;
   
   PIDX_access pidx_access;

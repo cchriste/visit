@@ -135,6 +135,8 @@ class avtIDXFileFormat : public avtMTMDFileFormat
 
     LevelInfo level_info;
 
+    LevelInfo input_patches;
+
     std::vector<double> timeIndex;
     std::vector<int> logTimeIndex;
 
@@ -145,7 +147,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     void computeDomainBoundaries(const char* meshname, int timestate);
     void SetUpDomainConnectivity(const char* meshname);
 
-    void loadBalance();
+    void domainDecomposition();
 
 
 };
