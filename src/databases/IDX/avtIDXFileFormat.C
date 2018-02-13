@@ -266,7 +266,7 @@ void avtIDXFileFormat::domainDecomposition(){
       memcpy(low, box_low, 3*sizeof(int));
       memcpy(high, box_high, 3*sizeof(int));
 
-      int n_slabs = slabs[i];//floor((float)(box_high[maxdir]-box_low[maxdir]) / h[i]);
+      int n_slabs = slabs[i];//floor((foat)(box_high[maxdir]-box_low[maxdir]) / h[i]);
 
       int residual = res[i];
 
@@ -311,12 +311,12 @@ void avtIDXFileFormat::domainDecomposition(){
   level_info.patchInfo.swap(newboxes);
 
   //if(rank == 0){ 
-    debug4 << "Total number of boxes/domains: " << level_info.patchInfo.size() << std::endl<< std::flush;
-    debug4 << "----------Boxes----------" << std::endl<< std::flush;
+  std::cout<< "Total number of boxes/domains: " << level_info.patchInfo.size() << std::endl<< std::flush;
+  std::cout << "----------Boxes----------" << std::endl<< std::flush;
     for(int i=0; i< level_info.patchInfo.size(); i++){
-      debug4 << i << " = "<<level_info.patchInfo[i].toString();
+      std::cout << i << " = "<<level_info.patchInfo[i].toString();
     }
-    debug4 << "-------------------------" << std::endl<< std::flush;
+    std::cout << "-------------------------" << std::endl<< std::flush;
   //}
 
   if(level_info.patchInfo.size() % nprocs != 0){
@@ -371,7 +371,23 @@ void avtIDXFileFormat::createBoxes(){
   }
 
   if(uintah_metadata){
+    vtkSmartPointer<vtkXMLDataParser> timestep_parser = vtkSmartPointer<vtkXMLDataParser>::New();
+    size_t folder_point = dataset_filename.find_last_of("/\\");                                                                         String folder = dataset_filename.substr(0,folder_point);
+  
+    String timestep_filename = folder + "/timestep.xml";
+    timestep_parser->SetFileName(timestep_filename.c_str());
+    
+    if (!timestep_parser->Parse() ){
+      std::cout << "NOT found timestep .xml" <<std::endl;
+    }
+    else {
+      debug4 << "found timestep.xml in " << timestep_filename.c_str()<<std::endl;
+      parse_timestep(timestep_parser, input_patches, dim, use_extracells);
+    }
+
+    // Note: parse ups after timeste.xml so it will use the anchor
     parse_ups(parser, input_patches, dim, use_extracells);
+   
   }
   else{
     Box log_box = reader->getLogicBox();
@@ -400,6 +416,7 @@ void avtIDXFileFormat::createBoxes(){
 
   }
 
+  std::cout << "anchor point " << input_patches.anchor[0] <<","<< input_patches.anchor[1] <<","<< input_patches.anchor[2] <<std::endl;
 }
 
 void avtIDXFileFormat::createTimeIndex(){
@@ -411,6 +428,7 @@ void avtIDXFileFormat::createTimeIndex(){
   String folder = dataset_filename.substr(0,folder_point);
 
   String udafilename = folder + "/index.xml";
+  std::cout <<"looking for index.xml here " << udafilename.c_str() << std::endl;
 
   parser->SetFileName(udafilename.c_str());
   if (!parser->Parse()){
@@ -430,6 +448,7 @@ void avtIDXFileFormat::createTimeIndex(){
   }
 
   debug4 << "Found metadata file" << std::endl;
+  std::cout <<"Found metadata file" << std::endl;
 
   vtkXMLDataElement *root = parser->GetRootElement();
   vtkXMLDataElement *level = root->FindNestedElementWithName("timesteps");
@@ -437,7 +456,7 @@ void avtIDXFileFormat::createTimeIndex(){
     int ntimesteps = level->GetNumberOfNestedElements();
 
     debug4 << "Found " << ntimesteps << " timesteps" << std::endl;
-
+    std::cout << "Found " << ntimesteps << " timesteps" << std::endl;
     for(int i=0; i < ntimesteps; i++){
 
       vtkXMLDataElement *xmltime = level->GetNestedElement(i);
@@ -445,7 +464,7 @@ void avtIDXFileFormat::createTimeIndex(){
       String logtimestr(xmltime->GetCharacterData());
 
       debug4 << "time " << timestr << " index " << logtimestr << std::endl;
-
+      std::cout << "time " << timestr << " index " << logtimestr << std::endl;
       double time = cdouble(timestr);
       int logtime = cint(logtimestr);
 
@@ -811,6 +830,9 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     
     int low[3],high[3];
     input_patches.getBounds(low,high,"CC_Mesh",use_extracells);
+   
+    std::cout << "low " << low[0] << ","<< low[1]<<","<< low[2] <<std::endl;
+    std::cout << "high " << high[0] << ","<< high[1]<<","<< high[2] <<std::endl;
 
     //this can be done once for everything because the spatial range is the same for all meshes
     double box_min[3] = { input_patches.anchor[0] + low[0] * input_patches.spacing[0],
@@ -828,8 +850,8 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
           debug5 << debug_str;
           sprintf(debug_str, "global phy %f %f %f - %f %f %f\n", box_min[0],box_min[1],box_min[2],box_max[0],box_max[1],box_max[2]);
           debug5 << debug_str;
-
-          delete [] debug_str;
+	  std::cout << debug_str << std::endl; 
+         delete [] debug_str;
         }
 
         int logical[3];
@@ -848,7 +870,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         mesh->logicalBounds[0] = logical[0];
         mesh->logicalBounds[1] = logical[1];
         mesh->logicalBounds[2] = logical[2];
-
+	std::cout << "logical bounds " << logical[0]<<","<< logical[1]<<","<< logical[2]<<std::endl; 
         md->Add(mesh);
 
         md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
@@ -1275,9 +1297,12 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 void
 avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 {
-
-  for(int i = 0; i < reader->getNTimesteps(); ++i)
-    cycles.push_back(i);
+  if(logTimeIndex.size()>0)
+    cycles.swap(logTimeIndex);
+  else{
+    for(int i = 0; i < reader->getNTimesteps(); ++i)
+      cycles.push_back(i);
+  }
 }
 
 void

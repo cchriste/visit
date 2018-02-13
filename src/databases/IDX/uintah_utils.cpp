@@ -4,7 +4,7 @@
 
 using namespace VisitIDXIO;
 
-bool uintah_debug_input = false;
+bool uintah_debug_input = true;
 
 void ups_parse_vector(vtkXMLDataElement *el, double* vec, int dim){
   std::string el_str(el->GetCharacterData());
@@ -42,14 +42,88 @@ void ups_parse_vector(vtkXMLDataElement *el, int* vec, int dim){
     std::cout << "read " << vec[0] << " "<< vec[1] << " " << vec[2] << std::endl;
 }
 
+
+void parse_timestep(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, int dim, bool use_extracells){
+  
+  
+  vtkXMLDataElement *root = parser->GetRootElement();
+  vtkXMLDataElement *level = NULL;
+  //TODO unused variable  
+bool found_cellspacing = false;
+  
+  vtkXMLDataElement *anchor_el = NULL;
+  if(root == NULL)
+    std::cerr << "malformed XML"  << std::endl;
+  else{
+     anchor_el = root->FindNestedElementWithName("Grid");
+  if(anchor_el == NULL)
+    std::cerr << "anchor not found" << std::endl;    
+  else
+    {
+     anchor_el = anchor_el->FindNestedElementWithName("Level");
+     if(anchor_el == NULL)
+       std::cerr << "anchor not found" << std::endl;  
+     else anchor_el = anchor_el->FindNestedElementWithName("anchor");
+    }
+  }
+  if(anchor_el == NULL){
+    if(uintah_debug_input)
+      std::cerr << "anchor not found" << std::endl;
+    level_info.anchor[0]=0;
+    level_info.anchor[1]=0;
+    level_info.anchor[2]=0;
+  }
+  else{
+    std::cout << "setting anchor point"<<std::endl;
+    ups_parse_vector(anchor_el, level_info.anchor, dim);
+  }
+    
+    //cellspacing
+  
+  vtkXMLDataElement *cellspacing_el = NULL;
+  if(root == NULL)
+    std::cerr << "malformed XML"  << std::endl;
+  else{
+    cellspacing_el = root->FindNestedElementWithName("Grid");
+    if(cellspacing_el == NULL){
+      if(uintah_debug_input)
+      std::cerr << "cellspacing not found" << std::endl;
+  }else{
+    
+    cellspacing_el= cellspacing_el->FindNestedElementWithName("Level");
+    if(cellspacing_el == NULL){
+      if(uintah_debug_input)
+        std::cerr << "cellspacing not found" << std::endl;
+    }  
+    else{
+      std::cout << "setting cellspacing"<<std::endl; 
+      cellspacing_el= cellspacing_el->FindNestedElementWithName("cellspacing");
+    }
+  }
+  }
+
+  if(cellspacing_el == NULL){
+    if(uintah_debug_input)
+      std::cout << "cellspacing not found" << std::endl;
+
+    found_cellspacing = false;
+  }
+  else
+    ups_parse_vector(cellspacing_el, level_info.spacing, dim);
+
+}
+
+
 void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, int dim, bool use_extracells){
   
   vtkXMLDataElement *root = parser->GetRootElement();
   vtkXMLDataElement *level = NULL;
-  bool found_cellspacing = false;
+  
+  
 
   level = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("Level");
-
+  /*
+bool found_cellspacing = false;
   vtkXMLDataElement *anchor_el = NULL;
   anchor_el = root->FindNestedElementWithName("Grid")->FindNestedElementWithName("anchor");
 
@@ -74,7 +148,7 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
 
     found_cellspacing = false;
   }
-      
+  */      
 
   int nboxes = level->GetNumberOfNestedElements();
   
@@ -172,7 +246,7 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
       std::cout << level_info.patchInfo.back().toString();
       //std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
     }
-
+    /*
     if(!found_cellspacing){
       if(uintah_debug_input)
         printf("Cellspacing not found, calculating\n");
@@ -190,5 +264,6 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
           printf("%f - %f / %d - %d +1\n",p2phy[k],p1phy[k],high[k],low[k]);
       }
     }
+    */
   }
 }

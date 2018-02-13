@@ -16,5 +16,6 @@ extern void ups_parse_vector(vtkXMLDataElement *el, int* vec, int dim);
 extern void ups_parse_vector(vtkXMLDataElement *el, double* vec, int dim);
 
 extern void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& levelInfo, int dim, bool use_extracells);
+extern void parse_timestep(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& levelInfo, int dim, bool use_extracells);
 
 #endif //UINTAH_IDX_UTILS_H
