@@ -371,7 +371,7 @@ void avtIDXFileFormat::createBoxes(){
   }
 
   if(uintah_metadata){
-    vtkSmartPointer<vtkXMLDataParser> timestep_parser = vtkSmartPointer<vtkXMLDataParser>::New();
+    /* vtkSmartPointer<vtkXMLDataParser> timestep_parser = vtkSmartPointer<vtkXMLDataParser>::New();
     size_t folder_point = dataset_filename.find_last_of("/\\");                                                                         String folder = dataset_filename.substr(0,folder_point);
   
     String timestep_filename = folder + "/timestep.xml";
@@ -386,6 +386,7 @@ void avtIDXFileFormat::createBoxes(){
     }
 
     // Note: parse ups after timeste.xml so it will use the anchor
+    */
     parse_ups(parser, input_patches, dim, use_extracells);
    
   }
