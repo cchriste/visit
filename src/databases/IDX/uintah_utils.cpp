@@ -4,7 +4,7 @@
 
 using namespace VisitIDXIO;
 
-bool uintah_debug_input = true;
+bool uintah_debug_input = false;
 
 void ups_parse_vector(vtkXMLDataElement *el, double* vec, int dim){
   std::string el_str(el->GetCharacterData());
@@ -74,7 +74,6 @@ bool found_cellspacing = false;
     level_info.anchor[2]=0;
   }
   else{
-    std::cout << "setting anchor point"<<std::endl;
     ups_parse_vector(anchor_el, level_info.anchor, dim);
   }
     
@@ -96,7 +95,6 @@ bool found_cellspacing = false;
         std::cerr << "cellspacing not found" << std::endl;
     }  
     else{
-      std::cout << "setting cellspacing"<<std::endl; 
       cellspacing_el= cellspacing_el->FindNestedElementWithName("cellspacing");
     }
   }
