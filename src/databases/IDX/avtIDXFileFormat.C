@@ -875,8 +875,17 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
         md->Add(mesh);
 
         md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
-        md->SetCyclesAreAccurate(true);
-
+        md->SetCyclesAreAccurate(false);
+	
+	/*for (int ti=0;ti<GetNTimesteps();ti++){
+	  metadata->SetCycle(ti, ti);
+	  metadata->SetCycleIsAccurate(true, ti);
+	  }*/
+	/*
+        printf("setting time %d",timestate);
+	md->SetTime(timestate, timeIndex[timestate]);
+        md->SetCycle(timestate, timestate);
+	*/
 #ifdef PARALLEL // only PIDX
    // md->SetFormatCanDoDomainDecomposition(true);
 #endif
@@ -884,6 +893,7 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     //if(timestate == 0){
         const std::vector<Field>& fields = reader->getFields();
         debug5 << "adding " << fields.size() << "fields" << std::endl;
+	std::cout << "adding " << fields.size() << "fields" << std::endl;
         int ndtype;
     // char testvar[128];
     // sprintf(testvar, "AA_var_%d",timestate);
@@ -900,7 +910,9 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
             AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
             //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
         }
+	md->SetMustRepopulateOnStateChange(true);
 
+	std::cout << rank << ": end meta" <<std::endl;
         debug5 << rank << ": end meta" <<std::endl;
       }
 
@@ -1314,6 +1326,8 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 void
 avtIDXFileFormat::GetCycles(std::vector<int> &cycles)
 {
+  cycles.clear();
+
   if(logTimeIndex.size()>0)
     cycles.swap(logTimeIndex);
   else{
@@ -1672,6 +1686,11 @@ avtIDXFileFormat::GetVar(int timestate, int domain, const char *varname)
 }
 
 void avtIDXFileFormat::ActivateTimestep(int ts){
+  if(is_gidx){
+    printf("opening time %d\n", ts);
+   reader->openDataset(gidx_datasets[ts].url);
+  }
+
 //printf("Activate timestep\n");
 }
 
