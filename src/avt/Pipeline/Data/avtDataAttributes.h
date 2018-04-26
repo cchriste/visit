@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -273,6 +273,9 @@ class     avtWebpage;
 //    Cyrus Harrison,Thu Feb  9 10:26:48 PST 2012
 //    Added logic to support presentGhostZoneTypes, which allows us to
 //    differentiate between ghost zones for boundaries & nesting.
+//
+//    Kathleen Biagas, Thu Jun  1 08:47:13 PDT 2017
+//    Added ResetAllExtents.
 //
 // ****************************************************************************
 
@@ -588,6 +591,8 @@ class PIPELINE_API avtDataAttributes
                                { constructMultipleCurves = n; }
     bool                     GetConstructMultipleCurves() const
                                { return constructMultipleCurves; }
+
+    void                     ResetAllExtents();
 
   protected:
     int                      spatialDimension;

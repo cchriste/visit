@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -220,7 +220,6 @@ avtZonePickQuery::Execute(vtkDataSet *ds, const int dom)
 
         pickAtts.SetElementNumber(pickedZone);
     }
-
     if (!pickAtts.GetMatSelected())
     {
         bool success = false;

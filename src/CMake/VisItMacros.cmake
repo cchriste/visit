@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -61,23 +61,25 @@ IF (WIN32)
   ENDMACRO(REPLACE_FLAG)
 
   # Remove /_DEBUG From debug builds
-  REPLACE_FLAG("/D_DEBUG" "" CMAKE_CXX_FLAGS_DEBUG
-               "Flags used by the compiler during debug builds")
-  REPLACE_FLAG("/D_DEBUG" "" CMAKE_C_FLAGS_DEBUG
-               "Flags used by the compiler during debug builds")
-  REPLACE_FLAG("/D_DEBUG" "" CMAKE_EXE_LINKER_FLAGS_DEBUG
-               "Flags used by the linker during debug builds")
-  REPLACE_FLAG("/D_DEBUG" "" CMAKE_MODULE_LINKER_FLAGS_DEBUG
-               "Flags used by the linker during debug builds")
+  if (VISIT_REPLACE_DEBUG_FLAGS)
+    REPLACE_FLAG("/D_DEBUG" "" CMAKE_CXX_FLAGS_DEBUG
+                 "Flags used by the compiler during debug builds")
+    REPLACE_FLAG("/D_DEBUG" "" CMAKE_C_FLAGS_DEBUG
+                 "Flags used by the compiler during debug builds")
+    REPLACE_FLAG("/D_DEBUG" "" CMAKE_EXE_LINKER_FLAGS_DEBUG
+                 "Flags used by the linker during debug builds")
+    REPLACE_FLAG("/D_DEBUG" "" CMAKE_MODULE_LINKER_FLAGS_DEBUG
+                 "Flags used by the linker during debug builds")
   # Change /MDd to /MD for debug builds
-  REPLACE_FLAG("/MDd" "/MD" CMAKE_CXX_FLAGS_DEBUG
-               "Flags used by the compiler during debug builds")
-  REPLACE_FLAG("/MDd" "/MD" CMAKE_C_FLAGS_DEBUG
-               "Flags used by the compiler during debug builds")
-  REPLACE_FLAG("/MDd" "/MD" CMAKE_EXE_LINKER_FLAGS_DEBUG
-               "Flags used by the linker during debug builds")
-  REPLACE_FLAG("/MDd" "/MD" CMAKE_MODULE_LINKER_FLAGS_DEBUG
-               "Flags used by the linker during debug builds")
+    REPLACE_FLAG("/MDd" "/MD" CMAKE_CXX_FLAGS_DEBUG
+                 "Flags used by the compiler during debug builds")
+    REPLACE_FLAG("/MDd" "/MD" CMAKE_C_FLAGS_DEBUG
+                 "Flags used by the compiler during debug builds")
+    REPLACE_FLAG("/MDd" "/MD" CMAKE_EXE_LINKER_FLAGS_DEBUG
+                 "Flags used by the linker during debug builds")
+    REPLACE_FLAG("/MDd" "/MD" CMAKE_MODULE_LINKER_FLAGS_DEBUG
+                 "Flags used by the linker during debug builds")
+  endif ()
 ENDIF (WIN32)
 
 FUNCTION(ADD_TARGET_INCLUDE target)

@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -40,7 +40,7 @@
 #define VTKM_EXPORTS_H
 
 #if defined(_WIN32)
-#if defined(VTKM_EXPORTS) || defined(vtkm_EXPORTS)
+#if defined(VISIT_VTKM_EXPORTS) || defined(visit_vtkm_EXPORTS)
 #define VTKM_API __declspec(dllexport)
 #else
 #define VTKM_API __declspec(dllimport)
@@ -54,7 +54,7 @@
 #pragma warning(disable:4786)
 #endif
 #else
-# if __GNUC__ >= 4 && (defined(VTKM_EXPORTS) || defined(vtkm_EXPORTS))
+# if __GNUC__ >= 4 && (defined(VISIT_VTKM_EXPORTS) || defined(visit_vtkm_EXPORTS))
 #   define VTKM_API __attribute__ ((visibility("default")))
 # else
 #   define VTKM_API /* hidden by default */

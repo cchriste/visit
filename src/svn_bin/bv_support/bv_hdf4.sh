@@ -1,21 +1,17 @@
 function bv_hdf4_initialize
 {
     export DO_HDF4="no"
-    export ON_HDF4="off"
 }
 
 function bv_hdf4_enable
 {
     DO_HDF4="yes"
-    ON_HDF4="on"
     DO_SZIP="yes"
-    ON_SZIP="on"
 }
 
 function bv_hdf4_disable
 {
     DO_HDF4="no"
-    ON_HDF4="off"
 }
 
 function bv_hdf4_depends_on
@@ -55,13 +51,7 @@ function bv_hdf4_print
 
 function bv_hdf4_print_usage
 {
-    printf "%-15s %s [%s]\n" "--hdf4" "Build HDF4" "${DO_HDF4}"
-}
-
-function bv_hdf4_graphical
-{
-    local graphical_out="HDF4     $HDF4_VERSION($HDF4_FILE)      $ON_HDF4"
-    echo $graphical_out
+    printf "%-20s %s [%s]\n" "--hdf4" "Build HDF4" "${DO_HDF4}"
 }
 
 function bv_hdf4_host_profile
@@ -1329,7 +1319,10 @@ function build_hdf4
     #
     # Set  Fortran compiler
     #
-    if [[ "$FC_COMPILER" == "no" ]] ; then
+    # Disable Fortran on Darwin since it causes HDF4 builds to fail.
+    if [[ "$OPSYS" == "Darwin" ]]; then
+        FORTRANARGS="--disable-fortran"
+    elif [[ "$FC_COMPILER" == "no" ]] ; then
         FORTRANARGS="--disable-fortran"
     else
         FORTRANARGS="FC=\"$FC_COMPILER\" F77=\"$FC_COMPILER\" FCFLAGS=\"$FCFLAGS\" FFLAGS=\"$FCFLAGS\" --enable-fortran"
@@ -1355,7 +1348,7 @@ function build_hdf4
         --with-jpeg=\"$VISITDIR/${VTK_INSTALL_DIR}/${VTK_VERSION}/$VISITARCH/include/vtk-${VTK_SHORT_VERSION}/vtkjpeg\",\"$VISITDIR/${VTK_INSTALL_DIR}/${VTK_VERSION}/$VISITARCH/lib\" \
         --with-szlib=\"$VISITDIR/szip/$SZIP_VERSION/$VISITARCH\" \
         --with-zlib=\"$VISITDIR/zlib/$ZLIB_VERSION/$VISITARCH\" \
-        --disable-dependency-tracking"
+        --disable-dependency-tracking --disable-netcdf"
         if [[ $? != 0 ]] ; then
             warn "HDF4 configure failed.  Giving up"\
                  "You can see the details of the build failure at $HDF4_BUILD_DIR/config.log\n"
@@ -1374,7 +1367,7 @@ function build_hdf4
         --prefix=\"$VISITDIR/hdf4/$HDF4_VERSION/$VISITARCH\" \
         --with-jpeg=\"$VISITDIR/${VTK_INSTALL_DIR}/${VTK_VERSION}/$VISITARCH/include/vtk-${VTK_SHORT_VERSION}/vtkjpeg\",\"$VISITDIR/${VTK_INSTALL_DIR}/${VTK_VERSION}/$VISITARCH/lib\" \
         --with-szlib=\"$VISITDIR/szip/$SZIP_VERSION/$VISITARCH\" \
-        --with-zlib=\"$VISITDIR/zlib/$ZLIB_VERSION/$VISITARCH\""
+        --with-zlib=\"$VISITDIR/zlib/$ZLIB_VERSION/$VISITARCH\" --disable-netcdf"
         if [[ $? != 0 ]] ; then
             warn "HDF4 configure failed.  Giving up.\n"\
                  "You can see the details of the build failure at $HDF4_BUILD_DIR/config.log\n"
@@ -1441,6 +1434,11 @@ function build_hdf4
             return 1
         fi
         cp libmfhdf.${SO_EXT} "$VISITDIR/hdf4/$HDF4_VERSION/$VISITARCH/lib"
+
+        # relocate the .a's we don't want them.
+        mkdir "$VISITDIR/hdf4/$HDF4_VERSION/$VISITARCH/lib/static"
+        mv "$VISITDIR/hdf4/$HDF4_VERSION/$VISITARCH/lib/libdf.a" "$VISITDIR/hdf4/$HDF4_VERSION/$VISITARCH/lib/static"
+        mv "$VISITDIR/hdf4/$HDF4_VERSION/$VISITARCH/lib/libmfhdf.a" "$VISITDIR/hdf4/$HDF4_VERSION/$VISITARCH/lib/static"
     fi
 
     if [[ "$DO_GROUP" == "yes" ]] ; then

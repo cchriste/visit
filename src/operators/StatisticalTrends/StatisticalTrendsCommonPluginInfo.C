@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -111,7 +111,7 @@ StatisticalTrendsCommonPluginInfo::CopyAttributes(AttributeSubject *to,
 // ****************************************************************************
 
 ExpressionList * 
-StatisticalTrendsCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md)
+StatisticalTrendsCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md) const
 {
     int t, i;
     char name[1024], defn[1024];
@@ -127,6 +127,9 @@ StatisticalTrendsCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaDa
         for (i = 0 ; i < numScalars ; i++)
         {
             const avtScalarMetaData *mmd = md->GetScalar(i);
+            if (mmd->hideFromGUI || !mmd->validVariable)
+                continue;
+
             {
                 Expression e2;
                 sprintf(name, "operators/StatisticalTrends/%s/%s",
@@ -151,7 +154,7 @@ StatisticalTrendsCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaDa
             const Expression &e = oldEL.GetExpressions(i);
             if (e.GetType() == Expression::ScalarMeshVar)
             {
-                if (e.GetFromOperator())
+                if (e.GetFromOperator() || e.GetAutoExpression())
                     continue; // weird ordering behavior otherwise
                 Expression e2;
                 sprintf(name, "operators/StatisticalTrends/%s/%s",

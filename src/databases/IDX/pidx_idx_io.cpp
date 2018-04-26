@@ -56,7 +56,7 @@ static void terminate_with_error_msg(const char *format, ...)
 void init_mpi()
 {
 
-#if PIDX_HAVE_MPI
+#ifdef MPI_VERSION//PIDX_HAVE_MPI
   int mpi_init;
   MPI_Initialized(&mpi_init);
   

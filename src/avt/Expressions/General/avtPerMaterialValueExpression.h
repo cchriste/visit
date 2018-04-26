@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -62,6 +62,9 @@ class     ExprPipelineState;
 //    Cyrus Harrison, Tue Feb 19 13:20:50 PST 2008
 //    Added doPostGhost memeber. 
 //
+//    Cyrus Harrison, Fri May 26 16:35:57 PDT 2017
+//    Added preexecute. 
+//
 // ****************************************************************************
 
 class EXPRESSION_API avtPerMaterialValueExpression
@@ -80,6 +83,8 @@ class EXPRESSION_API avtPerMaterialValueExpression
   protected:
     virtual int               GetVariableDimension(void) { return 1; };
     
+    virtual void              PreExecute(void);
+
     virtual avtContract_p
                               ModifyContract(avtContract_p);
 

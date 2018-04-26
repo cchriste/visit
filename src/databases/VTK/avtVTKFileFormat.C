@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -163,6 +163,12 @@ avtVTK_STSDFileFormat::GetAuxiliaryData(const char *var,
     const char *type, void *d, DestructorFunction &df)
 {
     return reader->GetAuxiliaryData(var, 0, type, d, df);
+}
+
+bool
+avtVTK_STSDFileFormat::IsEmpty()
+{
+    return reader->IsEmpty();
 }
 
 // ****************************************************************************

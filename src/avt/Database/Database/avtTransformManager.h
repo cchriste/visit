@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -167,6 +167,9 @@ class DATABASE_API avtTransformManager
                                    vtkDataSet *ds, int dom);
 
     vtkDataSet                *RemoveDuplicateNodes(vtkDataSet *ds);
+
+    vtkDataSet                *OverflowInducingToEmpty(avtDatabaseMetaData *md,
+                                   vtkDataSet *ds, int dom);
 
     avtVariableCache           cache;
     avtVariableCache          *gdbCache;

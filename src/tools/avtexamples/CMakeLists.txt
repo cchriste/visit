@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -104,7 +104,7 @@ visit_vtk
 ${ALL_THIRDPARTY_IO_LIB} 
 ${VTK_EXTRA_LIBS}
 ${MESA_LIBS}
-${GL_LIBS}
+${OPENGL_LIBRARIES}
 ${CMAKE_THREAD_LIBS} 
 ${ZLIB_LIB}
 )
@@ -130,7 +130,7 @@ visit_vtk
 ${ALL_THIRDPARTY_IO_LIB} 
 ${VTK_EXTRA_LIBS}
 ${MESA_LIBS}
-${GL_LIBS}
+${OPENGL_LIBRARIES}
 ${CMAKE_THREAD_LIBS} 
 ${ZLIB_LIB}
 )
@@ -152,7 +152,7 @@ visit_vtk
 ${ALL_THIRDPARTY_IO_LIB} 
 ${VTK_EXTRA_LIBS}
 ${MESA_LIBS}
-${GL_LIBS}
+${OPENGL_LIBRARIES}
 ${CMAKE_THREAD_LIBS} 
 ${ZLIB_LIB}
 )
@@ -178,7 +178,7 @@ visit_vtk
 ${ALL_THIRDPARTY_IO_LIB} 
 ${VTK_EXTRA_LIBS}
 ${MESA_LIBS}
-${GL_LIBS}
+${OPENGL_LIBRARIES}
 ${CMAKE_THREAD_LIBS} 
 ${ZLIB_LIB}
 )
@@ -205,7 +205,7 @@ visit_vtk
 ${ALL_THIRDPARTY_IO_LIB} 
 ${VTK_EXTRA_LIBS}
 ${MESA_LIBS}
-${GL_LIBS}
+${OPENGL_LIBRARIES}
 ${CMAKE_THREAD_LIBS} 
 ${ZLIB_LIB}
 )

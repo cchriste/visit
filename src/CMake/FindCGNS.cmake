@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -47,9 +47,9 @@
 
 INCLUDE(${VISIT_SOURCE_DIR}/CMake/SetUpThirdParty.cmake)
 
-IF (WIN32)
+if(WIN32 AND MSVC_VERSION LESS "1910")
   SET_UP_THIRD_PARTY(CGNS lib include cgnsdll)
-ELSE (WIN32)
+else()
   SET_UP_THIRD_PARTY(CGNS lib include cgns)
-ENDIF (WIN32)
+endif()
 

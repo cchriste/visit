@@ -1,6 +1,6 @@
 ##############################################################################
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # All rights reserved.
 #
@@ -36,6 +36,7 @@
 ##############################################################################
 
 import os, select, signal, socket, string, sys, thread
+import distutils.spawn
 from xmllib import *
 
 from visit_utils import encoding
@@ -62,6 +63,9 @@ def CommandInPath(command):
         cmd = "which %s > /dev/null" % command
         rv = os.system(cmd)
         if (rv == 0):
+            retval = 1
+    else:
+        if distutils.spawn.find_executable(command) != None:
             retval = 1
     return retval
 

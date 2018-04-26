@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -132,6 +132,9 @@ typedef void                   (*InitializeProgressCallback)(void *, int);
 //    Hank Childs, Tue Dec 11 14:39:58 PST 2012
 //    Add method for getting last data selections.
 //
+//    Kathleen Biagas, Mon Jun  5 16:41:17 PDT 2017
+//    Added ResetAllExtents.
+//
 // ****************************************************************************
 
 class PIPELINE_API avtOriginatingSource : virtual public avtQueryableSource
@@ -174,6 +177,7 @@ class PIPELINE_API avtOriginatingSource : virtual public avtQueryableSource
                                                         void_ref_ptr);
 
     virtual bool                   Update(avtContract_p);
+    virtual void                   ResetAllExtents(void);
     virtual bool                   CanDoStreaming(avtContract_p) {return true;}
 
     static void                    SetLoadBalancer(LoadBalanceFunction,void *);

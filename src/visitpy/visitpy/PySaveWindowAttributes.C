@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -240,7 +240,6 @@ PySaveWindowAttributes_ToString(const SaveWindowAttributes *atts, const char *pr
     else
         SNPRINTF(tmpStr, 1000, "%sadvancedMultiWindowSave = 0\n", prefix);
     str += tmpStr;
-    if(atts->GetAdvancedMultiWindowSave())
     { // new scope
         std::string objPrefix(prefix);
         objPrefix += "subWindowAtts.";

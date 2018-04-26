@@ -2,7 +2,6 @@ function bv_adios_initialize
 {
     export FORCE_ADIOS="no"
     export DO_ADIOS="no"
-    export ON_ADIOS="off"
     export USE_SYSTEM_ADIOS="no"
     add_extra_commandline_args "adios" "alt-adios-dir" 1 "Use alternative directory for adios"
 
@@ -15,13 +14,11 @@ function bv_adios_enable
     fi
 
     DO_ADIOS="yes"
-    ON_ADIOS="on"
 }
 
 function bv_adios_disable
 {
     DO_ADIOS="no"
-    ON_ADIOS="off"
 }
 
 function bv_adios_alt_adios_dir
@@ -40,13 +37,18 @@ function bv_adios_depends_on
 {
     if [[ "$USE_SYSTEM_ADIOS" == "yes" ]]; then
         echo ""
-        return 0;
-    fi
-
-    if [[ "$DO_MPICH" == "yes" ]] ; then
-        echo "mpich"
     else
-        echo ""
+        depends_on=""
+        
+        if [[ "$DO_MPICH" == "yes" ]] ; then
+            depends_on="$depends_on mpich"
+        fi
+
+        if [[ "$DO_HDF5" == "yes" ]] ; then
+            depends_on="$depends_on hdf5"
+        fi
+
+        echo $depends_on
     fi
 }
 
@@ -84,14 +86,8 @@ function bv_adios_print
 
 function bv_adios_print_usage
 {
-    printf "%-15s %s [%s]\n" "--adios" "Build ADIOS" "$DO_ADIOS"
-    printf "%-15s %s [%s]\n" "--alt-adios-dir" "Use ADIOS from an alternative directory"
-}
-
-function bv_adios_graphical
-{
-    local graphical_out="ADIOS    $ADIOS_VERSION($ADIOS_FILE)    $ON_ADIOS"
-    echo $graphical_out
+    printf "%-20s %s [%s]\n" "--adios" "Build ADIOS" "$DO_ADIOS"
+    printf "%-20s %s [%s]\n" "--alt-adios-dir" "Use ADIOS from an alternative directory"
 }
 
 function bv_adios_host_profile
@@ -296,27 +292,42 @@ function build_adios
     cd $ADIOS_BUILD_DIR || error "Can't cd to ADIOS build dir."
     
     info "Invoking command to configure ADIOS"
+
+    # MPI support
     if [[ "$VISIT_MPI_COMPILER" != "" ]] ; then
-        ADIOS_MPI_OPTS="MPICC=\"$VISIT_MPI_COMPILER\"  MPICXX=\"$VISIT_MPI_COMPILER_CXX\" LDFLAGS=\"$PAR_LINKER_FLAGS\""
-        ADIOS_MPI_INC="$PAR_INCLUDE"
+        WITH_MPI_ARGS="MPICC=\"$VISIT_MPI_COMPILER\" MPICXX=\"$VISIT_MPI_COMPILER_CXX\" LDFLAGS=\"-lpthread $PAR_LINKER_FLAGS\""
+        WITH_MPI_INC="$PAR_INCLUDE"
 
     else
-        ADIOS_MPI_OPTS="--without-mpi"
+        WITH_MPI_ARGS="--without-mpi"
     fi
-    info     ./configure ${OPTIONAL} CXX="$CXX_COMPILER" \
-             CC="$C_COMPILER" CFLAGS=\"$CFLAGS $C_OPT_FLAGS $ADIOS_MPI_INC\" \
-             CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS $ADIOS_MPI_INC\" \
-             $ADIOS_MPI_OPTS \
-             --disable-fortran \
-             --without-netcdf --without-nc4par --without-hdf5 --without-phdf5 --without-mxml \
-             --prefix="$VISITDIR/adios/$ADIOS_VERSION/$VISITARCH"
+
+    # HDF5 support
+    if [[ "$DO_HDF5" == "yes" ]] ; then
+        export HDF5ROOT="$VISITDIR/hdf5/$HDF5_VERSION/$VISITARCH"
+        export SZIPROOT="$VISITDIR/szip/$SZIP_VERSION/$VISITARCH"
+        WITH_HDF5_ARGS="--with-hdf5=$HDF5ROOT"
+        #HDF5_DYLIB="-L$HDF5ROOT/lib -L$SZIPROOT/lib -lhdf5 -lsz -lz"
+    else
+        WITH_HDF5_ARGS="--without-hdf5"
+        #HDF5_DYLIB=""
+    fi
+    
+    info   ./configure ${OPTIONAL} CXX="$CXX_COMPILER" CC="$C_COMPILER" \
+           CFLAGS=\"$CFLAGS $C_OPT_FLAGS $WITH_MPI_INC\" \
+           CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS $WITH_MPI_INC\" \
+           $WITH_MPI_ARGS $WITH_HDF5_ARGS \
+           --disable-fortran \
+           --without-netcdf --without-nc4par --without-phdf5 --without-mxml \
+           --prefix="$VISITDIR/adios/$ADIOS_VERSION/$VISITARCH"
     
     sh -c "./configure ${OPTIONAL} CXX=\"$CXX_COMPILER\" CC=\"$C_COMPILER\" \
-                CFLAGS=\"$CFLAGS $C_OPT_FLAGS $ADIOS_MPI_INC\" CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS $ADIOS_MPI_INC\" \
-                $ADIOS_MPI_OPTS \
-                --disable-fortran \
-                --without-netcdf --without-nc4par --without-hdf5 --without-phdf5 --without-mxml \
-                --prefix=\"$VISITDIR/adios/$ADIOS_VERSION/$VISITARCH\""
+           CFLAGS=\"$CFLAGS $C_OPT_FLAGS $WITH_MPI_INC\" \
+           CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS $WITH_MPI_INC\" \
+           $WITH_MPI_ARGS $WITH_HDF5_ARGS \
+           --disable-fortran \
+           --without-netcdf --without-nc4par --without-phdf5 --without-mxml \
+           --prefix=\"$VISITDIR/adios/$ADIOS_VERSION/$VISITARCH\""
 
     if [[ $? != 0 ]] ; then
         warn "ADIOS configure failed.  Giving up"

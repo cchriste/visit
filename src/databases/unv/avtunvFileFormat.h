@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -166,7 +166,8 @@ class avtunvFileFormat : public avtSTSDFileFormat
     virtual int getfastNbfaextv( ); // Provides the number of free faces nbfaextv
     virtual int getNbnodesFreeFaces( ); // Provides the number of nodes to build the Face Faces nbnff
     virtual void getNormal3D (float *one_entry, std::set<UnvElement, UnvElement::compare_UnvElement>::iterator itre, int iflo, int facloc); // Provides the normal to a face
-    virtual void getNormal2D (float *one_entry, std::set<UnvElement, UnvElement::compare_UnvElement>::iterator itre, int facloc); // Provides the normal to a face
+    virtual void getNormal2D (float *one_entry, std::set<UnvElement, UnvElement::compare_UnvElement>::iterator itre, int facloc); // Provides the normal to a segment
+    virtual void getvolNormal2D (float *one_entry, std::set<UnvElement, UnvElement::compare_UnvElement>::iterator itre); // Provides the normal to a 2D face 
 
     virtual int getNbfreeSets(); // Gets the number of boundaries, i.e. free connected faces
 

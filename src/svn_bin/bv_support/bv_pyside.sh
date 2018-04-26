@@ -2,12 +2,10 @@ function bv_pyside_initialize
 {
     if [[ "$DO_STATIC_BUILD" == "no" ]]; then
         export DO_PYSIDE="yes"
-        export ON_PYSIDE="on"
         export USE_SYSTEM_PYSIDE="no"
         add_extra_commandline_args "pyside" "alt-pyside-dir" 1 "Use alternative directory for pyside"
     else
         export DO_PYSIDE="no"
-        export ON_PYSIDE="off"
         export USE_SYSTEM_PYSIDE="no"
     fi
 }
@@ -15,15 +13,12 @@ function bv_pyside_initialize
 function bv_pyside_enable
 {
     DO_PYSIDE="yes"
-    ON_PYSIDE="on"
     DO_QT="yes"
-    ON_QT="on"
 }
 
 function bv_pyside_disable
 {
     DO_PYSIDE="no"
-    ON_PYSIDE="off"
 }
 
 function bv_pyside_alt_pyside_dir
@@ -46,16 +41,7 @@ function bv_pyside_depends_on
 function bv_pyside_initialize_vars
 {
     info "initialize PySide vars"
-    if [[ "$IS_QT5" == "yes" &&  "$PYSIDE_VERSION" == "1.2.2" ]]; then
-        unset PYSIDE_VERSION
-        unset PYSIDE_FILE
-        unset PYSIDE_BUILD_DIR
-        unset PYSIDE_MD5_CHECKSUM
-        export PYSIDE_VERSION=${PYSIDE_VERSION:-"2.0.0-2017.02.14"}
-        export PYSIDE_FILE=${PYSIDE_FILE:-"pyside2-combined.2017.02.14.tar.gz"}
-        export PYSIDE_BUILD_DIR=${PYSIDE_BUILD_DIR:-"pyside2-combined"}
-        export PYSIDE_MD5_CHECKSUM=""
-    elif [[ "$IS_QT5" == "no" &&  "$PYSIDE_VERSION" == "2.0.0-2017.02.14" ]]; then
+    if [[ "$IS_QT4" == "yes" &&  "$PYSIDE_VERSION" == "2.0.0-2017.08.30" ]]; then
         unset PYSIDE_VERSION
         unset PYSIDE_FILE
         unset PYSIDE_BUILD_DIR
@@ -64,22 +50,31 @@ function bv_pyside_initialize_vars
         export PYSIDE_FILE=${PYSIDE_FILE:-"pyside-combined-${PYSIDE_VERSION}.tar.gz"}
         export PYSIDE_BUILD_DIR=${PYSIDE_BUILD_DIR:-"${PYSIDE_FILE%.tar*}"}
         export PYSIDE_MD5_CHECKSUM="b33dde999cc4eb13933be43f49c1e890"
+    elif [[ "$IS_QT4" == "no" && "$PYSIDE_VERSION" == "1.2.2" ]]; then
+        unset PYSIDE_VERSION
+        unset PYSIDE_FILE
+        unset PYSIDE_BUILD_DIR
+        unset PYSIDE_MD5_CHECKSUM
+        export PYSIDE_VERSION=${PYSIDE_VERSION:-"2.0.0-2017.08.30"}
+        export PYSIDE_FILE=${PYSIDE_FILE:-"pyside2-combined.2017.08.30.tar.gz"}
+        export PYSIDE_BUILD_DIR=${PYSIDE_BUILD_DIR:-"pyside2-combined"}
+        export PYSIDE_MD5_CHECKSUM=""
     fi
 }
 
 function bv_pyside_info
 {
-    if [[ "$IS_QT5" == "yes" ]]; then
-        export PYSIDE_VERSION=${PYSIDE_VERSION:-"2.0.0-2017.02.14"}
-        export PYSIDE_FILE=${PYSIDE_FILE:-"pyside2-combined.2017.02.14.tar.gz"}
-        export PYSIDE_BUILD_DIR=${PYSIDE_BUILD_DIR:-"pyside2-combined"}
-        export PYSIDE_MD5_CHECKSUM=""
-        export PYSIDE_SHA256_CHECKSUM=""
-    else
+    if [[ "$IS_QT4" == "yes" ]]; then
         export PYSIDE_VERSION=${PYSIDE_VERSION:-"1.2.2"}
         export PYSIDE_FILE=${PYSIDE_FILE:-"pyside-combined-${PYSIDE_VERSION}.tar.gz"}
         export PYSIDE_BUILD_DIR=${PYSIDE_BUILD_DIR:-"${PYSIDE_FILE%.tar*}"}
         export PYSIDE_MD5_CHECKSUM="b33dde999cc4eb13933be43f49c1e890"
+        export PYSIDE_SHA256_CHECKSUM=""
+    else
+        export PYSIDE_VERSION=${PYSIDE_VERSION:-"2.0.0-2017.08.30"}
+        export PYSIDE_FILE=${PYSIDE_FILE:-"pyside2-combined.2017.08.30.tar.gz"}
+        export PYSIDE_BUILD_DIR=${PYSIDE_BUILD_DIR:-"pyside2-combined"}
+        export PYSIDE_MD5_CHECKSUM=""
         export PYSIDE_SHA256_CHECKSUM=""
     fi
 }
@@ -94,16 +89,10 @@ function bv_pyside_print
 
 function bv_pyside_print_usage
 {
-    printf "%-15s %s [%s]\n" "--pyside" "Build PySide" "$DO_PYSIDE"
+    printf "%-20s %s [%s]\n" "--pyside" "Build PySide" "$DO_PYSIDE"
     if [[ "$DO_STATIC_BUILD" == "no" ]]; then
-        printf "%-15s %s [%s]\n" "--alt-pyside-dir" "Use PySide from an alternative directory"
+        printf "%-20s %s [%s]\n" "--alt-pyside-dir" "Use PySide from an alternative directory"
     fi
-}
-
-function bv_pyside_graphical
-{
-    local graphical_out="PySide    $PYSIDE_VERSION($PYSIDE_FILE)     $ON_PYSIDE"
-    echo "$graphical_out"
 }
 
 function bv_pyside_host_profile
@@ -190,7 +179,7 @@ function build_pyside_component
     popts="${popts} -DPYTHON_LIBRARY:FILEPATH=\"$PYTHON_LIBRARY\""
     popts="${popts} -DDISABLE_DOCSTRINGS:BOOL=true"
 
-    if [[ "$IS_QT5" == "yes" ]]; then
+    if [[ "$IS_QT4" == "no" ]]; then
         popts="${popts} -DBUILD_TESTS:BOOL=false"
         popts="${popts} -DENABLE_VERSION_SUFFIX:BOOL=false"
         popts="${popts} -DCMAKE_PREFIX_PATH=${QT_INSTALL_DIR}/lib/cmake"
@@ -229,6 +218,73 @@ function build_pyside_component
     cd ../../
 }
 
+function apply_pyside_2_0_0_patch
+{
+    info "Patching Pyside2"
+    patch -p0 << \EOF
+diff -c pyside2-combined/pyside2/orig/CMakeLists.txt pyside2-combined/pyside2/CMakeLists.txt 
+*** pyside2-combined/pyside2/orig/CMakeLists.txt        Thu Dec 14 16:03:50 2017
+--- pyside2-combined/pyside2/CMakeLists.txt     Thu Dec 14 16:06:34 2017
+***************
+*** 273,280 ****
+  COLLECT_MODULE_IF_FOUND(Xml)
+  COLLECT_MODULE_IF_FOUND(XmlPatterns opt)
+  COLLECT_MODULE_IF_FOUND(Help opt)
+! COLLECT_MODULE_IF_FOUND(Multimedia opt)
+! COLLECT_MODULE_IF_FOUND(MultimediaWidgets opt)
+  COLLECT_MODULE_IF_FOUND(OpenGL opt)
+  COLLECT_MODULE_IF_FOUND(Qml opt)
+  COLLECT_MODULE_IF_FOUND(Quick opt)
+--- 273,282 ----
+  COLLECT_MODULE_IF_FOUND(Xml)
+  COLLECT_MODULE_IF_FOUND(XmlPatterns opt)
+  COLLECT_MODULE_IF_FOUND(Help opt)
+! #COLLECT_MODULE_IF_FOUND(Multimedia opt)
+! set(DISABLE_QtMultimedia 1)
+! #COLLECT_MODULE_IF_FOUND(MultimediaWidgets opt)
+! set(DISABLE_QtMultimediaWidgets 1)
+  COLLECT_MODULE_IF_FOUND(OpenGL opt)
+  COLLECT_MODULE_IF_FOUND(Qml opt)
+  COLLECT_MODULE_IF_FOUND(Quick opt)
+***************
+*** 297,304 ****
+  # still forgotten:
+  #COLLECT_MODULE_IF_FOUND(WebEngineCore opt)
+  #COLLECT_MODULE_IF_FOUND(WebEngine opt)
+! COLLECT_MODULE_IF_FOUND(WebEngineWidgets opt)
+! COLLECT_MODULE_IF_FOUND(WebKit opt)
+  if(NOT MSVC)
+      # right now this does not build on windows
+      COLLECT_MODULE_IF_FOUND(WebKitWidgets opt)
+--- 299,306 ----
+  # still forgotten:
+  #COLLECT_MODULE_IF_FOUND(WebEngineCore opt)
+  #COLLECT_MODULE_IF_FOUND(WebEngine opt)
+! #COLLECT_MODULE_IF_FOUND(WebEngineWidgets opt)
+! #COLLECT_MODULE_IF_FOUND(WebKit opt)
+  if(NOT MSVC)
+      # right now this does not build on windows
+      COLLECT_MODULE_IF_FOUND(WebKitWidgets opt)
+EOF
+    if [[ $? != 0 ]] ; then
+        warn "Pyside2 patch failed."
+        return 1
+    fi
+
+    return 0
+}
+
+function apply_pyside_patch
+{
+    if [[ ${PYSIDE_VERSION} == 2.0.0-2017.08.30 ]] ; then
+        apply_pyside_2_0_0_patch
+        if [[ $? != 0 ]] ; then
+            return 1
+        fi
+    fi
+
+    return 0
+}
 
 function build_pyside
 {
@@ -245,23 +301,40 @@ function build_pyside
         return 1
     fi
 
+    ##
+    ## Apply patches
+    ##
+
+    apply_pyside_patch
+    if [[ $? != 0 ]] ; then
+        if [[ $untarred_pyside == 1 ]] ; then
+            warn "Giving up on pyside build because the patch failed."
+            return 1
+        else
+            warn "Patch failed, but continuing. I believe that this script\n" \
+                 "tried to apply a patch to an existing directory that had\n" \
+                 "already been patched ... that is, the patch is\n" \
+                 "failing harmlessly on a second application."
+        fi
+    fi
+
     cd $PYSIDE_BUILD_DIR || error "Can't cd to PySide build dir."
 
 
-    if [[ "$IS_QT5" == "yes" ]]; then
-        build_pyside_component shiboken2
-    else
+    if [[ "$IS_QT4" == "yes" ]]; then
         build_pyside_component shiboken-${PYSIDE_VERSION}
+    else
+        build_pyside_component shiboken2
     fi
 
     if [[ $? != 0 ]] ; then
         return 1
     fi
 
-    if [[ "$IS_QT5" == "yes" ]]; then
-        build_pyside_component pyside2
-    else
+    if [[ "$IS_QT4" == "yes" ]]; then
         build_pyside_component pyside-qt4.8+${PYSIDE_VERSION}
+    else
+        build_pyside_component pyside2
     fi
 
     if [[ $? != 0 ]] ; then
@@ -303,16 +376,15 @@ function bv_pyside_is_installed
         return 0
     fi
 
-    if [[ "IS_QT5" == "yes" ]]; then
-        if  [[ ! -e "${VISIT_PYSIDE_DIR}/shiboken2_success" ||
-                 ! -e "${VISIT_PYSIDE_DIR}/pyside2_success" ]]; then
+    if [[ "$IS_QT4" == "yes" ]]; then
+        if  [[ ! -e "${VISIT_PYSIDE_DIR}/shiboken-${PYSIDE_VERSION}_success" ||
+                 ! -e "${VISIT_PYSIDE_DIR}/pyside-qt4.8+${PYSIDE_VERSION}_success" ]]; then
             info "pyside not installed completely"
             return 0
         fi
     else
-
-        if  [[ ! -e "${VISIT_PYSIDE_DIR}/shiboken-${PYSIDE_VERSION}_success" ||
-                 ! -e "${VISIT_PYSIDE_DIR}/pyside-qt4.8+${PYSIDE_VERSION}_success" ]]; then
+        if  [[ ! -e "${VISIT_PYSIDE_DIR}/shiboken2_success" ||
+                 ! -e "${VISIT_PYSIDE_DIR}/pyside2_success" ]]; then
             info "pyside not installed completely"
             return 0
         fi

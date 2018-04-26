@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- * Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+ * Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
  * Produced at the Lawrence Livermore National Laboratory
  * LLNL-CODE-442911
  * All rights reserved.
@@ -40,11 +40,8 @@
 //                         avtGyRadiusQuery.C                                //
 // ************************************************************************* //
 #include <avtGyRadiusQuery.h>
-#include <avtQueryableSource.h>
 #include <avtOriginatingSource.h>
-#include <avtSILRestrictionTraverser.h>
 #include <avtParallel.h>
-#include <avtSourceFromAVTDataset.h>
 #include <avtCentroidQuery.h>
 #include <avtSummationQuery.h>
 
@@ -57,7 +54,6 @@
 
 #include <ImproperUseException.h>
 #include <QueryArgumentException.h>
-#include <BadCellException.h>
 #include <DebugStream.h>
 
 using std::string;

@@ -59,9 +59,9 @@ rm -rf checksum_dir
 mkdir checksum_dir
 cd checksum_dir
 echo "Downloading third_party..."
-svn co svn+ssh://brugger@edison.nersc.gov/project/projectdirs/visit/svn/visit/tags/$version/third_party
+svn co svn+ssh://brugger@cori.nersc.gov/project/projectdirs/visit/svn/visit/tags/$version/third_party
 echo "Downloading $version..."
-svn co svn+ssh://brugger@edison.nersc.gov/project/projectdirs/visit/svn/visit/trunk/releases/$version
+svn co svn+ssh://brugger@cori.nersc.gov/project/projectdirs/visit/svn/visit/trunk/releases/$version
 
 #
 # Create an awk script for use with the filesize command
@@ -115,17 +115,19 @@ do
    echo ""                                                >> ../$output
    $cmd INSTALL_NOTES                                     >> ../$output
    $cmd VisIt-$version.dmg                                >> ../$output
+   $cmd VisIt-$version-10.11.dmg                          >> ../$output
    $cmd jvisit$version.tar.gz                             >> ../$output
    $cmd visit${version}.exe                               >> ../$output
    $cmd visit-install$version2                            >> ../$output
    $cmd visit${version}_x64.exe                           >> ../$output
    $cmd visit$version2.darwin-x86_64.tar.gz               >> ../$output
-   $cmd visit$version2.linux-x86_64-ubuntu11.tar.gz       >> ../$output
-   $cmd visit$version2.linux-x86_64-ubuntu11-wmesa.tar.gz >> ../$output
+   $cmd visit${version2}-10.11.darwin-x86_64.tar.gz       >> ../$output
    $cmd visit$version2.linux-x86_64-ubuntu14.tar.gz       >> ../$output
    $cmd visit$version2.linux-x86_64-ubuntu14-wmesa.tar.gz >> ../$output
    $cmd visit$version2.linux-x86_64-rhel7.tar.gz          >> ../$output
    $cmd visit$version2.linux-x86_64-rhel7-wmesa.tar.gz    >> ../$output
+   $cmd visit$version2.linux-x86_64-fc27.tar.gz           >> ../$output
+   $cmd visit$version2.linux-x86_64-fc27-wmesa.tar.gz     >> ../$output
 
    echo ""                                                >> ../$output
    echo "The VisIt source code $property"                 >> ../$output

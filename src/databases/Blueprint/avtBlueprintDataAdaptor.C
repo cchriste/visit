@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -60,6 +60,7 @@
 
 #include "vtkCellArray.h"
 #include "vtkCellType.h"
+#include "vtkCellData.h"
 #include "vtkIdTypeArray.h"
 #include "vtkPoints.h"
 #include "vtkRectilinearGrid.h"
@@ -155,7 +156,7 @@ VTKCellTypeSize(int cell_type)
 
 // ****************************************************************************
 template<typename T> void 
-Blueprint_MulitCompArray_To_VTKDataArray(const Node &n,
+Blueprint_MultiCompArray_To_VTKDataArray(const Node &n,
                                          int ncomps,
                                          int ntuples,
                                          vtkDataArray *darray)
@@ -241,7 +242,7 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     if (vals_dtype.is_unsigned_char())
     {
         retval = vtkUnsignedCharArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_UNSIGNED_CHAR>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_UNSIGNED_CHAR>(n,
                                                                                ncomps,
                                                                                ntuples,
                                                                                retval);
@@ -249,7 +250,7 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     else if (vals_dtype.is_unsigned_short())
     {
         retval = vtkUnsignedShortArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_UNSIGNED_SHORT>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_UNSIGNED_SHORT>(n,
                                                                                 ncomps,
                                                                                 ntuples,
                                                                                 retval);
@@ -257,7 +258,7 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     else if (vals_dtype.is_unsigned_int())
     {
         retval = vtkUnsignedIntArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_UNSIGNED_INT>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_UNSIGNED_INT>(n,
                                                                               ncomps,
                                                                               ntuples,
                                                                               retval);
@@ -265,7 +266,7 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     else if (vals_dtype.is_char())
     {
         retval = vtkCharArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_CHAR>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_CHAR>(n,
                                                                       ncomps,
                                                                       ntuples,
                                                                       retval);
@@ -274,7 +275,7 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     else if (vals_dtype.is_short())
     {
         retval = vtkShortArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_SHORT>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_SHORT>(n,
                                                                        ncomps,
                                                                        ntuples,
                                                                        retval);
@@ -282,15 +283,33 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     else if (vals_dtype.is_int())
     {
         retval = vtkIntArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_INT>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_INT>(n,
                                                                      ncomps,
                                                                      ntuples,
                                                                      retval);
     }
+    else if (vals_dtype.is_long())
+    {
+        retval = vtkLongArray::New();
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_LONG>(n,
+                                                                      ncomps,
+                                                                      ntuples,
+                                                                      retval);
+    }
+#if CONDUIT_USE_LONG_LONG
+    else if (vals_dtype.id() == CONDUIT_NATIVE_LONG_LONG_ID)
+    {
+        retval = vtkLongLongArray::New();
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_LONG_LONG>(n,
+                                                                              ncomps,
+                                                                              ntuples,
+                                                                              retval);
+    }
+#endif
     else if (vals_dtype.is_float())
     {
         retval = vtkFloatArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_FLOAT>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_FLOAT>(n,
                                                                        ncomps,
                                                                        ntuples,
                                                                        retval);
@@ -298,7 +317,7 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     else if (vals_dtype.is_double())
     {
         retval = vtkDoubleArray::New();
-        Blueprint_MulitCompArray_To_VTKDataArray<CONDUIT_NATIVE_DOUBLE>(n,
+        Blueprint_MultiCompArray_To_VTKDataArray<CONDUIT_NATIVE_DOUBLE>(n,
                                                                         ncomps,
                                                                         ntuples,
                                                                         retval);
@@ -360,6 +379,12 @@ UniformCoordsToVTKRectilinearGrid(const Node &n_coords)
             da = vtkShortArray::New();
         else if (dt.is_int())
             da = vtkIntArray::New();
+        else if (dt.is_long())
+            da = vtkLongArray::New();
+#if CONDUIT_USE_LONG_LONG
+        else if (dt.id() == CONDUIT_NATIVE_LONG_LONG_ID)
+            da = vtkLongLongArray::New();
+#endif 
         else if (dt.is_float())
             da = vtkFloatArray::New();
         else if (dt.is_double())
@@ -508,51 +533,10 @@ ExplicitCoordsToVTKPoints(const Node &n_coords)
         double z = have_z ? z_vals[i] : 0;
         points->SetPoint(i, x, y, z);
     }
-    
-    // This old path preserves the original data type, but 
-    // creates doubles in the process and does many
-    // string comparisons per coord value, we want to avoid that. 
-    
-    /*
-    
-    int npts = (int) n_coords_values["x"].dtype().number_of_elements();
-    DataType dt = n_coords_values["x"].dtype();
-    if(dt.is_char())
-        points->SetDataTypeToChar();
-    else if (dt.is_unsigned_char())
-        points->SetDataTypeToUnsignedChar();
-    else if (dt.is_short())
-        points->SetDataTypeToShort();
-    else if (dt.is_unsigned_short())
-        points->SetDataTypeToUnsignedShort();
-    else if (dt.is_int())
-        points->SetDataTypeToInt();
-    else if (dt.is_unsigned_int())
-        points->SetDataTypeToUnsignedInt();
-    else if (dt.is_float())
-        points->SetDataTypeToFloat();
-    else if (dt.is_double())
-        points->SetDataTypeToDouble();
-    else
-    {
-        BP_PLUGIN_ERROR("unsupported data type " << dt.name());
-        EXCEPTION2(UnexpectedValueException, "A standard data type", "unknown");
-    }
-    points->SetNumberOfPoints(npts);
-    
-    
-    
-    for (vtkIdType i = 0; i < npts; i++)
-    {
-        double x = NodeValueAsDouble(n_coords_values["x"], i);
-        double y = n_coords_values.has_child("y") ? NodeValueAsDouble(n_coords_values["y"], i) : 0;
-        double z = n_coords_values.has_child("z") ? NodeValueAsDouble(n_coords_values["z"], i) : 0;
-        points->SetPoint(i, x, y, z);
-    }
-    
-    */
+
     return points;
 }
+
 
 // ****************************************************************************
 vtkDataSet *
@@ -606,10 +590,21 @@ HomogeneousShapeTopologyToVTKCellArray(const Node &n_topo,
         int csize = VTKCellTypeSize(ctype);
         int ncells = n_topo["elements/connectivity"].dtype().number_of_elements() / csize;
 
+        int_array topo_conn;
         ida->SetNumberOfTuples(ncells * (csize + 1));
         for (int i = 0 ; i < ncells; i++)
         {
-            int_array topo_conn = n_topo["elements/connectivity"].as_int_array();
+            Node n_tmp;
+            if(n_topo["elements/connectivity"].dtype().is_int())
+            {
+                topo_conn = n_topo["elements/connectivity"].as_int_array();
+            }
+            else
+            {
+                n_topo["elements/connectivity"].to_int_array(n_tmp);
+                topo_conn = n_tmp.as_int_array();
+            }
+            
             ida->SetComponent((csize+1)*i, 0, csize);
             for (int j = 0; j < csize; j++)
             {
@@ -624,8 +619,33 @@ HomogeneousShapeTopologyToVTKCellArray(const Node &n_topo,
 
 // ****************************************************************************
 vtkDataSet *
+UnstructuredTopologyToVTKUnstructuredGrid(const Node &n_coords,
+                                          const Node &n_topo)
+{
+    vtkPoints *points = ExplicitCoordsToVTKPoints(n_coords);
+
+    vtkUnstructuredGrid *ugrid = vtkUnstructuredGrid::New();
+    ugrid->SetPoints(points);
+    points->Delete();
+
+    //
+    // Now, add explicit topology
+    //
+    vtkCellArray *ca = HomogeneousShapeTopologyToVTKCellArray(n_topo, points->GetNumberOfPoints());
+    ugrid->SetCells(ElementShapeNameToVTKCellType(n_topo["elements/shape"].as_string()), ca);
+    ca->Delete();
+    
+    return ugrid;
+}
+
+
+// ****************************************************************************
+vtkDataSet *
 avtBlueprintDataAdaptor::VTK::MeshToVTK(const Node &n_mesh)
 {
+    //NOTE: this assumes one coordset and one topo
+    // that is the case for the blueprint plugin, but may not be the case
+    // generally if we want to reuse this code. 
     BP_PLUGIN_INFO("BlueprintVTK::MeshToVTKDataSet Begin");
 
     const Node &n_coords = n_mesh["coordsets"][0];
@@ -652,19 +672,8 @@ avtBlueprintDataAdaptor::VTK::MeshToVTK(const Node &n_mesh)
         }
         else
         {
-            vtkPoints *points = ExplicitCoordsToVTKPoints(n_coords);
-
-            vtkUnstructuredGrid *ugrid = vtkUnstructuredGrid::New();
-            ugrid->SetPoints(points);
-            points->Delete();
-
-            //
-            // Now, add explicit topology
-            //
-            vtkCellArray *ca = HomogeneousShapeTopologyToVTKCellArray(n_topo, points->GetNumberOfPoints());
-            ugrid->SetCells(ElementShapeNameToVTKCellType(n_topo["elements/shape"].as_string()), ca);
-            ca->Delete();
-            res = ugrid;
+            BP_PLUGIN_INFO("BlueprintVTK::MeshToVTKDataSet UnstructuredTopologyToVTKUnstructuredGrid");
+            res = UnstructuredTopologyToVTKUnstructuredGrid(n_coords, n_topo);
         }
     }
     else
@@ -716,7 +725,9 @@ ConduitElementShapeSize(const std::string &shape_name)
 mfem::Geometry::Type
 ElementShapeNameToMFEMShape(const std::string &shape_name)
 {
-    mfem::Geometry::Type res;
+    // init to somethign to avoid invalid memory access 
+    // in the mfem mesh constructor 
+    mfem::Geometry::Type res = mfem::Geometry::POINT;
     if(shape_name == "point")
         res = mfem::Geometry::POINT;
     else if(shape_name == "line")
@@ -736,183 +747,546 @@ ElementShapeNameToMFEMShape(const std::string &shape_name)
 }
 
 
+//---------------------------------------------------------------------------//
+std::string
+ElementTypeToShapeName(Element::Type element_type)
+{
+   // Adapted from SidreDataCollection
+
+   // Note -- the mapping from Element::Type to string is based on
+   //   enum Element::Type { POINT, SEGMENT, TRIANGLE, QUADRILATERAL,
+   //                        TETRAHEDRON, HEXAHEDRON };
+   // Note: -- the string names are from conduit's blueprint
+
+   switch (element_type)
+   {
+      case Element::POINT:          return "point";
+      case Element::SEGMENT:        return "line";
+      case Element::TRIANGLE:       return "tri";
+      case Element::QUADRILATERAL:  return "quad";
+      case Element::TETRAHEDRON:    return "tet";
+      case Element::HEXAHEDRON:     return "hex";
+   }
+
+   return "unknown";
+}
 
 
-// ****************************************************************************
+//---------------------------------------------------------------------------//
+mfem::Geometry::Type
+ShapeNameToGeomType(const std::string &shape_name)
+{
+   // Note: must init to something to avoid invalid memory access
+   // in the mfem mesh constructor
+   mfem::Geometry::Type res = mfem::Geometry::POINT;
+
+   if (shape_name == "point")
+   {
+      res = mfem::Geometry::POINT;
+   }
+   else if (shape_name == "line")
+   {
+      res =  mfem::Geometry::SEGMENT;
+   }
+   else if (shape_name == "tri")
+   {
+      res =  mfem::Geometry::TRIANGLE;
+   }
+   else if (shape_name == "quad")
+   {
+      res =  mfem::Geometry::SQUARE;
+   }
+   else if (shape_name == "tet")
+   {
+      res =  mfem::Geometry::TETRAHEDRON;
+   }
+   else if (shape_name == "hex")
+   {
+      res =  mfem::Geometry::CUBE;
+   }
+   else
+   {
+      BP_PLUGIN_ERROR("Unsupported Element Shape: " << shape_name);
+   }
+
+   return res;
+}
+
+
+//---------------------------------------------------------------------------//
+//---------------------------------------------------------------------------//
+// TODO: 
+// In the future: these methods will be in MFEM's ConduitDataCollection
+// we will those, instead of VisIt's own implementation.
+//---------------------------------------------------------------------------//
+mfem::Mesh *
+avtBlueprintDataAdaptor::MFEM::MeshToMFEM(const Node &n_mesh,
+                                          const std::string &topology_name)
+{
+   bool zero_copy = true;
+   // n_conv holds converted data (when necessary for mfem api)
+   // if n_conv is used ( !n_conv.dtype().empty() ) we
+   // now that some data allocation was necessary, so we
+   // can't return a mesh that zero copies the conduit data
+   Node n_conv;
+   
+   // we need to find the topology and its coordset.
+   //
+   
+   std::string topo_name = topology_name;
+   // if topo name is not set, look for first topology
+   if (topo_name == "")
+   {
+       topo_name = n_mesh["topologies"].schema().child_name(0);
+   }
+   
+   if(!n_mesh.has_path("topologies/" + topo_name))
+   {
+        BP_PLUGIN_ERROR("Expected topology named \"" + topo_name + "\" "
+                        "(node is missing path \"topologies/" + topo_name + "\")");
+   }
+   
+   // find coord set
+   
+   std::string coords_name = n_mesh["topologies"][topo_name]["coordset"].as_string();
+   
+
+   if(!n_mesh.has_path("coordsets/" + coords_name))
+   {
+        BP_PLUGIN_ERROR("Expected topology named \"" + coords_name + "\" "
+                       "(node is missing path \"coordsets/" + coords_name + "\")")
+   }
+
+   const Node &n_coordset = n_mesh["coordsets"][coords_name];
+   const Node &n_coordset_vals = n_coordset["values"];
+
+   // get the number of dims of the coordset
+   int ndims = n_coordset_vals.number_of_children();
+
+   // get the number of points
+   int num_verts = n_coordset_vals[0].dtype().number_of_elements();
+   // get vals for points
+   const double *verts_ptr = NULL;
+
+   // the mfem mesh constructor needs coords with interleaved (aos) type
+   // ordering, even for 1d + 2d we always need 3 doubles b/c it uses
+   // Array<Vertex> and Vertex is a pod of 3 doubles. we check for this
+   // case, if we don't have it we convert the data
+
+   if (ndims == 3 &&
+       n_coordset_vals[0].dtype().is_double() &&
+       blueprint::mcarray::is_interleaved(n_coordset_vals) )
+   {
+      // already interleaved mcarray of 3 doubles,
+      // return ptr to beginning
+      verts_ptr = n_coordset_vals[0].value();
+   }
+   else
+   {
+      Node n_tmp;
+      // check all vals, if we don't have doubles convert
+      // to doubles
+      NodeConstIterator itr = n_coordset_vals.children();
+      while (itr.has_next())
+      {
+         const Node &c_vals = itr.next();
+         std::string c_name = itr.name();
+
+         if ( c_vals.dtype().is_double() )
+         {
+            // zero copy current coords
+            n_tmp[c_name].set_external(c_vals);
+
+         }
+         else
+         {
+            // convert
+            c_vals.to_double_array(n_tmp[c_name]);
+         }
+      }
+
+      // check if we need to add extra dims to get
+      // proper interleaved array
+      if (ndims < 3)
+      {
+         // add dummy z
+         n_tmp["z"].set(DataType::c_double(num_verts));
+      }
+
+      if (ndims < 2)
+      {
+         // add dummy y
+         n_tmp["y"].set(DataType::c_double(num_verts));
+      }
+
+      Node &n_conv_coords_vals = n_conv["coordsets"][coords_name]["values"];
+      blueprint::mcarray::to_interleaved(n_tmp,
+                                         n_conv_coords_vals);
+      verts_ptr = n_conv_coords_vals[0].value();
+   }
+
+
+   const Node &n_mesh_topo    = n_mesh["topologies"][topo_name];
+   std::string mesh_ele_shape = n_mesh_topo["elements/shape"].as_string();
+
+   mfem::Geometry::Type mesh_geo = ShapeNameToGeomType(mesh_ele_shape);
+   int num_idxs_per_ele = Geometry::NumVerts[mesh_geo];
+
+   const Node &n_mesh_conn = n_mesh_topo["elements/connectivity"];
+
+   const int *elem_indices = NULL;
+   // mfem requires ints, we could have int64s, etc convert if necessary
+   if (n_mesh_conn.dtype().is_int() &&
+       n_mesh_conn.is_compact() )
+   {
+      elem_indices = n_mesh_topo["elements/connectivity"].value();
+   }
+   else
+   {
+      Node &n_mesh_conn_conv= n_conv["topologies"][topo_name]["elements/connectivity"];
+      n_mesh_conn.to_int_array(n_mesh_conn_conv);
+      elem_indices = n_mesh_conn_conv.value();
+   }
+
+   int num_mesh_ele        =
+      n_mesh_topo["elements/connectivity"].dtype().number_of_elements();
+   num_mesh_ele            = num_mesh_ele / num_idxs_per_ele;
+
+
+   const int *bndry_indices = NULL;
+   int num_bndry_ele        = 0;
+   // init to something b/c the mesh constructor will use this for a
+   // table lookup, even if we don't have boundary info.
+   mfem::Geometry::Type bndry_geo = mfem::Geometry::POINT;
+
+   if ( n_mesh_topo.has_child("boundary_topology") )
+   {
+      std::string bndry_topo_name = n_mesh_topo["boundary_topology"].as_string();
+      const Node &n_bndry_topo    = n_mesh["topologies"][bndry_topo_name];
+      std::string bndry_ele_shape = n_bndry_topo["elements/shape"].as_string();
+
+      bndry_geo = ShapeNameToGeomType(bndry_ele_shape);
+      int num_idxs_per_bndry_ele = Geometry::NumVerts[mesh_geo];
+
+      const Node &n_bndry_conn = n_bndry_topo["elements/connectivity"];
+
+      // mfem requires ints, we could have int64s, etc convert if necessary
+      if ( n_bndry_conn.dtype().is_int() &&
+           n_bndry_conn.is_compact())
+      {
+         bndry_indices = n_bndry_conn.value();
+      }
+      else
+      {
+         Node &(n_bndry_conn_conv) = n_conv["topologies"][bndry_topo_name]["elements/connectivity"];
+         n_bndry_conn.to_int_array(n_bndry_conn_conv);
+         bndry_indices = (n_bndry_conn_conv).value();
+
+      }
+
+      num_bndry_ele =
+         n_bndry_topo["elements/connectivity"].dtype().number_of_elements();
+      num_bndry_ele = num_bndry_ele / num_idxs_per_bndry_ele;
+   }
+   else
+   {
+      // Skipping Boundary Element Data
+   }
+
+   const int *mesh_atts  = NULL;
+   const int *bndry_atts = NULL;
+
+   int num_mesh_atts_entires = 0;
+   int num_bndry_atts_entires = 0;
+
+   // the attribute fields could have several names
+   // for the element attributes check for first occurrence of field with
+   // name containing "_attribute", that doesn't contain "boundary"
+   std::string main_att_name = "";
+
+   const Node &n_fields = n_mesh["fields"];
+   NodeConstIterator itr = n_fields.children();
+
+   while ( itr.has_next() && main_att_name == "" )
+   {
+      itr.next();
+      std::string fld_name = itr.name();
+      if ( fld_name.find("boundary")   == std::string::npos &&
+           fld_name.find("_attribute") != std::string::npos )
+      {
+         main_att_name = fld_name;
+      }
+   }
+
+   if ( main_att_name != "" )
+   {
+      const Node &n_mesh_atts_vals = n_fields[main_att_name]["values"];
+
+      // mfem requires ints, we could have int64s, etc convert if necessary
+      if (n_mesh_atts_vals.dtype().is_int() &&
+          n_mesh_atts_vals.is_compact() )
+      {
+         mesh_atts = n_mesh_atts_vals.value();
+      }
+      else
+      {
+         Node &n_mesh_atts_vals_conv = n_conv["fields"][main_att_name]["values"];
+         n_mesh_atts_vals.to_int_array(n_mesh_atts_vals_conv);
+         mesh_atts = n_mesh_atts_vals_conv.value();
+      }
+
+      num_mesh_atts_entires = n_mesh_atts_vals.dtype().number_of_elements();
+   }
+   else
+   {
+      // Skipping Mesh Attribute Data
+   }
+
+   // for the boundary attributes check for first occurrence of field with
+   // name containing "_attribute", that also contains "boundary"
+   std::string bnd_att_name = "";
+   itr = n_fields.children();
+
+   while ( itr.has_next() && bnd_att_name == "" )
+   {
+      itr.next();
+      std::string fld_name = itr.name();
+      if ( fld_name.find("boundary")   != std::string::npos &&
+           fld_name.find("_attribute") != std::string::npos )
+      {
+         bnd_att_name = fld_name;
+      }
+   }
+
+   if ( bnd_att_name != "" )
+   {
+      // Info: "Getting Boundary Attribute Data"
+      const Node &n_bndry_atts_vals =n_fields[bnd_att_name]["values"];
+
+      // mfem requires ints, we could have int64s, etc convert if necessary
+      if ( n_bndry_atts_vals.dtype().is_int() &&
+           n_bndry_atts_vals.is_compact())
+      {
+         bndry_atts = n_bndry_atts_vals.value();
+      }
+      else
+      {
+         Node &n_bndry_atts_vals_conv = n_conv["fields"][bnd_att_name]["values"];
+         n_bndry_atts_vals.to_int_array(n_bndry_atts_vals_conv);
+         bndry_atts = n_bndry_atts_vals_conv.value();
+      }
+
+      num_bndry_atts_entires = n_bndry_atts_vals.dtype().number_of_elements();
+
+   }
+   else
+   {
+      // Skipping Boundary Attribute Data
+   }
+
+   // Info: "Number of Vertices: " << num_verts  << endl
+   //         << "Number of Mesh Elements: "    << num_mesh_ele   << endl
+   //         << "Number of Boundary Elements: " << num_bndry_ele  << endl
+   //         << "Number of Mesh Attribute Entries: "
+   //         << num_mesh_atts_entires << endl
+   //         << "Number of Boundary Attribute Entries: "
+   //         << num_bndry_atts_entires << endl);
+
+   // Construct MFEM Mesh Object with externally owned data
+   // Note: if we don't have a gf, we need to provide the proper space dim
+   //       if nodes gf is attached later, it resets the space dim based
+   //       on the gf's fes.
+   Mesh *mesh = new Mesh(// from coordset
+      const_cast<double*>(verts_ptr),
+      num_verts,
+      // from topology
+      const_cast<int*>(elem_indices),
+      mesh_geo,
+      // from mesh_attribute field
+      const_cast<int*>(mesh_atts),
+      num_mesh_ele,
+      // from boundary topology
+      const_cast<int*>(bndry_indices),
+      bndry_geo,
+      // from boundary_attribute field
+      const_cast<int*>(bndry_atts),
+      num_bndry_ele,
+      ndims, // dim
+      ndims); // space dim
+
+   // Attach Nodes Grid Function, if it exists
+   if (n_mesh_topo.has_child("grid_function"))
+   {
+      std::string nodes_gf_name = n_mesh_topo["grid_function"].as_string();
+
+      // fetch blueprint field for the nodes gf
+      const Node &n_mesh_gf = n_mesh["fields"][nodes_gf_name];
+      // create gf
+      mfem::GridFunction *nodes = FieldToMFEM(mesh,
+                                              n_mesh_gf);
+      // attach to mesh
+      mesh->NewNodes(*nodes,true);
+   }
+
+
+   if (zero_copy && !n_conv.dtype().is_empty())
+   {
+      //Info: "Cannot zero-copy since data conversions were necessary"
+      zero_copy = false;
+   }
+
+   Mesh *res = NULL;
+
+   if (zero_copy)
+   {
+      res = mesh;
+   }
+   else
+   {
+      // the mesh above contains references to external data, to get a
+      // copy independent of the conduit data, we use:
+      res = new Mesh(*mesh,true);
+      delete mesh;
+   }
+
+   return res;
+}
+
+
+//---------------------------------------------------------------------------//
 mfem::GridFunction *
 avtBlueprintDataAdaptor::MFEM::FieldToMFEM(mfem::Mesh *mesh, 
-                                           const Node &field)
+                                           const Node &n_field)
 {
-    BP_PLUGIN_INFO("Creating MFEM GridFunction");
-    BP_PLUGIN_INFO("field schema:" << field.schema().to_json());
-
-    // we need basis name to create the proper mfem fec
-    string fec_name = field["basis"].as_string();
-
-    // TODO: Create a container class that can hold on to these
-    // pointers, so we can clean them up and not leak. 
+    bool zero_copy = true;
     
-    // TODO: unless the gf takes ownership of the fec or fes, we are leaking
-    mfem::FiniteElementCollection *fec = FiniteElementCollection::New(fec_name.c_str());
+   // n_conv holds converted data (when necessary for mfem api)
+   // if n_conv is used ( !n_conv.dtype().empty() ) we
+   // know that some data allocation was necessary, so we
+   // can't return a gf that zero copies the conduit data
+   Node n_conv;
 
-    // TODO: the gf can't take ownership of the data memory, we are leaking ....
-    Node *field_vals= new Node();
+   const double *vals_ptr = NULL;
 
-    // TODO: USE OREDERING IN CONSTRUCTOR TO AVOID REPACKING
-    int vdim = 1;
-    if(field["values"].dtype().is_object())
-    {
-        // for mcarray case, the mfem gf constructor we need to use 
-        // requires a contiguous (soa) ordering
-        vdim = field["values"].number_of_children();
-        blueprint::mcarray::to_contiguous(field["values"],
-                                           *field_vals);
-    }
-    else
-    {
-        field["values"].compact_to(*field_vals);
-    }
-    
-    // TODO: unless the gf takes ownership of the fec or fes, we are leaking
-    mfem::FiniteElementSpace *fes = new FiniteElementSpace(mesh, fec, vdim);
+   int vdim = 1;
 
-    // TODO: Assumes doubles, mfem only supports doubles but source data 
-    // may not be doubles ... 
-    double *vals_ptr = NULL;
-    if(field["values"].dtype().is_object())
-    {
-        //the vals are contiguous, we fetch the pointer
-        // to the first component in the mcarray
-        vals_ptr = field_vals->child_ptr(0)->value();
-    }
-    else
-    {
-        vals_ptr = field_vals->value();
-    }
-    
-    mfem::GridFunction *res = new GridFunction(fes,vals_ptr);
-    
-    return res;
+   Ordering::Type ordering = Ordering::byNODES;
+
+   if (n_field["values"].dtype().is_object())
+   {
+      vdim = n_field["values"].number_of_children();
+
+      // need to check that we have doubles and
+      // cover supported layouts
+
+      if ( n_field["values"][0].dtype().is_double() )
+      {
+         // check for contig
+         if (n_field["values"].is_contiguous())
+         {
+            // conduit mcarray contig  == mfem byNODES
+            vals_ptr = n_field["values"].child(0).value();
+         }
+         // check for interleaved
+         else if (blueprint::mcarray::is_interleaved(n_field["values"]))
+         {
+            // conduit mcarray interleaved == mfem byVDIM
+            ordering = Ordering::byVDIM;
+            vals_ptr = n_field["values"].child(0).value();
+         }
+         else
+         {
+            // for mcarray generic case --  default to byNODES
+            // and provide values w/ contiguous (soa) ordering
+            blueprint::mcarray::to_contiguous(n_field["values"],
+                                              n_conv["values"]);
+            vals_ptr = n_conv["values"].child(0).value();
+         }
+      }
+      else // convert to doubles and use contig
+      {
+         Node n_tmp;
+         // check all vals, if we don't have doubles convert
+         // to doubles
+         NodeConstIterator itr = n_field["values"].children();
+         while (itr.has_next())
+         {
+            const Node &c_vals = itr.next();
+            std::string c_name = itr.name();
+
+            if ( c_vals.dtype().is_double() )
+            {
+               // zero copy current coords
+               n_tmp[c_name].set_external(c_vals);
+
+            }
+            else
+            {
+               // convert
+               c_vals.to_double_array(n_tmp[c_name]);
+            }
+         }
+
+         // for mcarray generic case --  default to byNODES
+         // and provide values w/ contiguous (soa) ordering
+         blueprint::mcarray::to_contiguous(n_tmp,
+                                           n_conv["values"]);
+         vals_ptr = n_conv["values"].child(0).value();
+      }
+   }
+   else
+   {
+      if (n_field["values"].dtype().is_double() &&
+          n_field["values"].is_compact())
+      {
+         vals_ptr = n_field["values"].value();
+      }
+      else
+      {
+         n_field["values"].to_double_array(n_conv["values"]);
+         vals_ptr = n_conv["values"].value();
+      }
+   }
+
+   if (zero_copy && !n_conv.dtype().is_empty())
+   {
+      //Info: "Cannot zero-copy since data conversions were necessary"
+      zero_copy = false;
+   }
+
+   // we need basis name to create the proper mfem fec
+   std::string fec_name = n_field["basis"].as_string();
+
+   GridFunction *res = NULL;
+   mfem::FiniteElementCollection *fec = FiniteElementCollection::New(
+                                           fec_name.c_str());
+   mfem::FiniteElementSpace *fes = new FiniteElementSpace(mesh,
+                                                          fec,
+                                                          vdim,
+                                                          ordering);
+
+   if (zero_copy)
+   {
+      res = new GridFunction(fes,const_cast<double*>(vals_ptr));
+   }
+   else
+   {
+      // copy case, this constructor will alloc the space for the GF data
+      res = new GridFunction(fes);
+      // create an mfem vector that wraps the conduit data
+      Vector vals_vec(const_cast<double*>(vals_ptr),fes->GetVSize());
+      // copy values into the result
+      (*res) = vals_vec;
+   }
+
+   // TODO: I believe the GF already has ownership of fes, so this should be all
+   // we need to do to avoid leaking objs created here?
+   res->MakeOwner(fec);
+
+   return res;
 }
 
-// ****************************************************************************
-mfem::Mesh *
-avtBlueprintDataAdaptor::MFEM::MeshToMFEM(const Node &mesh)
-{
-    BP_PLUGIN_INFO("Creating MFEM Mesh");
-    
-    // get the number of dims of the coordset
-    const Node n_coordset = mesh["coordsets"][0];
-    
-    int ndims = n_coordset["values"].number_of_children();
 
-    BP_PLUGIN_INFO("Coordset Dimensions: " << ndims);
-    BP_PLUGIN_INFO("Getting Coordset Data");
-
-    // mfem mesh constructor needs coords with interleaved (aos) type ordering
-    Node coords_values;
-    blueprint::mcarray::to_interleaved(n_coordset["values"],coords_values);
-
-    int num_verts         = coords_values[0].dtype().number_of_elements();
-    double *verts_indices = coords_values[0].value();
-
-    BP_PLUGIN_INFO("Getting Mesh Element Data ");
-    const Node &mesh_topo = mesh["topologies"][0];
-    string mesh_ele_shape = mesh_topo["elements/shape"].as_string();
-    mfem::Geometry::Type mesh_geo = ElementShapeNameToMFEMShape(mesh_ele_shape);
-    const int *elem_indices = mesh_topo["elements/connectivity"].value();
-    int num_mesh_ele        = mesh_topo["elements/connectivity"].dtype().number_of_elements();
-    num_mesh_ele            = num_mesh_ele / ConduitElementShapeSize(mesh_ele_shape);
-
-
-    const int *bndry_indices = NULL;
-    int num_bndry_ele        = 0;
-    mfem::Geometry::Type bndry_geo;
-    
-    if( mesh.has_child("boundary") )
-    {
-        BP_PLUGIN_INFO("Getting Boundary Element Data");
-        const Node &bndry_topo = mesh["boundary"];  
-        string bndry_ele_shape = bndry_topo["elements/shape"].as_string();
-        bndry_geo     = ElementShapeNameToMFEMShape(bndry_ele_shape);
-        bndry_indices = bndry_topo["elements/connectivity"].value();    
-        num_bndry_ele = bndry_topo["elements/connectivity"].dtype().number_of_elements();
-        num_bndry_ele = num_bndry_ele / ConduitElementShapeSize(bndry_ele_shape);
-    }
-    else
-    {
-        BP_PLUGIN_INFO("Skipping Boundary Element Data");
-    }
-
-    const int *mesh_atts  = NULL;
-    const int *bndry_atts = NULL;
-
-    int num_mesh_atts_entires = 0;
-    int num_bndry_atts_entires = 0;
-
-    if( mesh.has_child("mesh_attribute") )
-    {
-        BP_PLUGIN_INFO("Getting Mesh Attribute Data");
-        const Node &n_mesh_atts_vals = mesh["mesh_attribute/values"];
-        mesh_atts  = n_mesh_atts_vals.value();
-        num_mesh_atts_entires = n_mesh_atts_vals.dtype().number_of_elements();
-    }
-    else
-    {
-        BP_PLUGIN_INFO("Skipping Mesh Attribute Data");
-    }
-    
-    if( mesh.has_child("boundary_attribute") )
-    {
-        BP_PLUGIN_INFO("Getting Boundary Attribute Data");
-        bndry_atts = mesh["boundary_attribute/values"].value();
-        const Node &n_bndry_atts_vals = mesh["boundary_attribute/values"];
-        bndry_atts  = n_bndry_atts_vals.value();
-        num_bndry_atts_entires = n_bndry_atts_vals.dtype().number_of_elements();
-        
-    }
-    else
-    {
-        BP_PLUGIN_INFO("Skipping Boundary Attribute Data");
-    }
-
-    BP_PLUGIN_INFO("Number of Vertices: " << num_verts  << endl
-                   << "Number of Mesh Elements: "    << num_mesh_ele   << endl
-                   << "Number of Boundary Elements: " << num_bndry_ele  << endl
-                   << "Number of Mesh Attribute Entries: " 
-                   << num_mesh_atts_entires << endl
-                   << "Number of Boundary Attribute Entries: " 
-                   << num_bndry_atts_entires << endl);
-
-    BP_PLUGIN_INFO("Constructing MFEM Mesh Object");
-    mfem::Mesh *res = new mfem::Mesh(// from coordset
-                                     verts_indices,
-                                     num_verts,
-                                     // from topology
-                                     const_cast<int*>(elem_indices),
-                                     mesh_geo,
-                                     // from mesh_attribute field
-                                     const_cast<int*>(mesh_atts),
-                                     num_mesh_ele,
-                                     // from boundary topology
-                                     const_cast<int*>(bndry_indices),
-                                     bndry_geo,
-                                     // from boundary_attribute field
-                                     const_cast<int*>(bndry_atts),
-                                     num_bndry_ele,
-                                     ndims,
-                                     1); // we need this flag
-
-    BP_PLUGIN_INFO("Attaching Nodes Grid Function");
-    
-    mfem::GridFunction *nodes = FieldToMFEM(res,
-                                            mesh["grid_function"]);
-    
-    res->NewNodes(*nodes);
-    
-    BP_PLUGIN_INFO("Done creating MFEM Mesh");
-    return res;
-}
 
 
 //---------------------------------------------------------------------------//
@@ -1136,8 +1510,9 @@ avtBlueprintDataAdaptor::MFEM::RefineGridFunctionToVTK(mfem::Mesh *mesh,
 //   finite elements of a mfem mesh.
 //
 //  Arguments:
-//   mesh:  MFEM mesh object
-//   lod:   number of refinement steps 
+//   mesh:        MFEM mesh object
+//   domain_id :  domain id, use for rng seed
+//   lod:         number of refinement steps 
 //
 //  Programmer: Cyrus Harrison
 //  Creation:   Sat Jul  5 11:38:31 PDT 2014
@@ -1147,6 +1522,7 @@ avtBlueprintDataAdaptor::MFEM::RefineGridFunctionToVTK(mfem::Mesh *mesh,
 // ****************************************************************************
 vtkDataArray *
 avtBlueprintDataAdaptor::MFEM::RefineElementColoringToVTK(mfem::Mesh *mesh,
+                                                          int domain_id,
                                                           int lod)
 {
     BP_PLUGIN_INFO("Creating Refined MFEM Element Coloring with lod:" << lod);
@@ -1177,7 +1553,9 @@ avtBlueprintDataAdaptor::MFEM::RefineElementColoringToVTK(mfem::Mesh *mesh,
     // Use mfem's mesh coloring algo
     //
     
-    //srandom(time(0)); don't seed, may have side effects for other parts of visit
+    // seed using domain id for predictable results
+    srand(domain_id);
+    
 #ifdef _WIN32
     double a = double(rand()) / (double(RAND_MAX) + 1.);
 #else

@@ -8,11 +8,11 @@
 # Date:   October 26, 1996
 #
 # Usage
-#    visit-install    [-c anag | anl | arl | asu | awe | clemson | cscs |"
+#    visit-install    [-c anl | arl | asu | awe | chombo | clemson | cscs |"
 #                         eth_zurich | llnl_open | llnl_open_rz |"
 #                         llnl_open_cz | llnl_closed | lsu | ncar |"
 #                         nersc | nics | ohio | ornl | princeton |"
-#                         sandia | sandia_closed | tacc | umich | utah]"
+#                         sandia | sandia_closed | umich | utah]"
 #                      [-g group] [-b bank] [-gw] [-l] [-dmg] [-test]"
 #                      [-beta | -private] version platform directory"
 #
@@ -395,6 +395,15 @@
 #    the specified bank, since the default bank in all the llnl host
 #    profiles is now "wbronze" instead of "bdivp".
 #
+#    Eric Brugger, Tue Sep  5 08:38:50 PDT 2017
+#    I removed the TACC option. TACC doesn't support client server and
+#    they support their own host profiles and custom launcher for use
+#    on the machines themselves, so there is no need to support it here.
+#    In fact they will only get out of date and cause confusion.
+#
+#    Eric Brugger, Tue Sep  5 17:12:29 PDT 2017
+#    I unified the LLNL custom launchers and configs.
+#
 #-----------------------------------------------------------------------
 
 Compress=COMPRESS
@@ -465,11 +474,11 @@ while [ "$option_found" = "true" ]; do
 done
 
 if [ "$#" != "3" ]; then
-   echo "Usage: visit-install [-c anag | anl | arl | asu | awe | clemson | cscs |"
+   echo "Usage: visit-install [-c anl | arl | asu | awe | chombo | clemson | cscs |"
    echo "                         eth_zurich | llnl_open | llnl_open_rz |"
    echo "                         llnl_open_cz | llnl_closed | lsu | ncar |"
    echo "                         nersc | nics | ohio | ornl | princeton | "
-   echo "                         sandia | sandia_closed | tacc | umich | utah]"
+   echo "                         sandia | sandia_closed | umich | utah]"
    echo "                     [-g group] [-b bank] [-gw] [-l] [-dmg] [-test]"
    echo "                     [-beta | -private] version platform directory"
    echo ""
@@ -586,9 +595,9 @@ if [ "$test" = "true" ]; then
        echo "failed"
        exit 1
     fi
-    echo "Testing anag configuration..."
+    echo "Testing chombo configuration..."
     rm -rf $dir
-    $0 -c anag $version $platform $dir > /dev/null 2>&1
+    $0 -c chombo $version $platform $dir > /dev/null 2>&1
     files=`ls $dir/$version/bin/customlauncher` 
     if [ "$files" == "" ]; then
        echo "failed"
@@ -754,14 +763,6 @@ if [ "$test" = "true" ]; then
        echo "failed"
        exit 1
     fi
-    echo "Testing tacc configuration..."
-    rm -rf $dir
-    $0 -c tacc $version $platform $dir > /dev/null 2>&1
-    files=`ls $dir/$version/.visit/hosts/host_tacc*` 
-    if [ "$files" == "" ]; then
-       echo "failed"
-       exit 1
-    fi
     echo "Testing umich configuration..."
     rm -rf $dir
     $0 -c umich $version $platform $dir > /dev/null 2>&1
@@ -809,9 +810,8 @@ while [ "$config" = "prompt" ]; do
    echo "   18) Sandia network"
    echo "   19) Sandia closed network"
    echo "   20) Swiss National Supercomputing Center (CSCS) network"
-   echo "   21) TACC network"
-   echo "   22) U of Michigan Advanced Research Computing (ARC-TS) network"
-   echo "   23) U of Utah Center for High Performance Computing (CHPC) network"
+   echo "   21) U of Michigan Advanced Research Computing (ARC-TS) network"
+   echo "   22) U of Utah Center for High Performance Computing (CHPC) network"
    echo ""
    echo "Enter (1-23):"
 
@@ -821,7 +821,7 @@ while [ "$config" = "prompt" ]; do
          config=none
          ;;
       2)
-         config=anag
+         config=chombo
          ;;
       3)
          config=anl
@@ -878,12 +878,9 @@ while [ "$config" = "prompt" ]; do
          config=cscs
          ;;
       21)
-         config=tacc
-         ;;
-      22)
          config=umich
          ;;
-      23)
+      22)
          config=utah
          ;;
       *)
@@ -895,7 +892,7 @@ done
 case "$config" in
    none)
       ;;
-   anag)
+   chombo)
       ;;
    anl)
       ;;
@@ -937,17 +934,15 @@ case "$config" in
       ;;
    cscs)
       ;;
-   tacc)
-      ;;
    umich)
       ;;
    utah)
       ;;
    *)
-      echo "Illegal configuration option, choices are none, anag, anl,"
+      echo "Illegal configuration option, choices are none, chombo, anl,"
       echo "arl, asu, awe, clemson, cscs, eth_zurich, llnl_open, llnl_open_rz,"
       echo "llnl_open_cz, llnl_closed, lsu, ncar, nersc, nics, ohio, ornl,"
-      echo "princeton, sandia, sandia_closed, tacc, umich, utah"
+      echo "princeton, sandia, sandia_closed, umich, utah"
       exit 4
       ;;
 esac
@@ -1057,11 +1052,11 @@ echo "1;$config;$bank;$platform" > "$dir"/$version+/$platformDir/.installinfo
 rm -rf "$dir"/$version+/.visit
 mkdir  "$dir"/$version+/.visit
 mkdir  "$dir"/$version+/.visit/hosts
-if [ "$config" = "anag" ]; then
-   cp "$dir"/$version+/$platformDir/resources/hosts/anag/config                 "$dir"/$version+/.visit/
-   cp "$dir"/$version+/$platformDir/resources/hosts/anag/guiconfig              "$dir"/$version+/.visit/
-   cp "$dir"/$version+/$platformDir/resources/hosts/anag/visitrc                "$dir"/$version+/.visit/
-   cp "$dir"/$version+/$platformDir/resources/hosts/anag/customlauncher         "$dir"/$version+/bin/
+if [ "$config" = "chombo" ]; then
+   cp "$dir"/$version+/$platformDir/resources/hosts/chombo/config               "$dir"/$version+/.visit/
+   cp "$dir"/$version+/$platformDir/resources/hosts/chombo/guiconfig            "$dir"/$version+/.visit/
+   cp "$dir"/$version+/$platformDir/resources/hosts/chombo/visitrc              "$dir"/$version+/.visit/
+   cp "$dir"/$version+/$platformDir/resources/hosts/chombo/customlauncher       "$dir"/$version+/bin/
 elif [ "$config" = "anl" ]; then
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/*.xml               "$dir"/$version+/.visit/hosts/
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/customlauncher      "$dir"/$version+/bin/
@@ -1100,13 +1095,12 @@ elif [ "$config" = "llnl_open_cz" ]; then
    cp "$dir"/$version+/$platformDir/resources/hosts/llnl/host_llnl_syrah.xml    "$dir"/$version+/.visit/hosts/
    cp "$dir"/$version+/$platformDir/resources/hosts/llnl/host_llnl_vulcan.xml   "$dir"/$version+/.visit/hosts/
    cp "$dir"/$version+/$platformDir/resources/hosts/llnl/host_slac_red.xml      "$dir"/$version+/.visit/hosts/
-
    cp "$dir"/$version+/$platformDir/resources/hosts/llnl/customlauncher         "$dir"/$version+/bin/
    cp "$dir"/$version+/$platformDir/resources/hosts/llnl/config                 "$dir"/$version+/.visit/
 elif [ "$config" = "llnl_closed" ]; then
-   cp "$dir"/$version+/$platformDir/resources/hosts/$config/*.xml               "$dir"/$version+/.visit/hosts/
-   cp "$dir"/$version+/$platformDir/resources/hosts/$config/customlauncher      "$dir"/$version+/bin/
-   cp "$dir"/$version+/$platformDir/resources/hosts/$config/config              "$dir"/$version+/.visit/
+   cp "$dir"/$version+/$platformDir/resources/hosts/llnl_closed/*.xml           "$dir"/$version+/.visit/hosts/
+   cp "$dir"/$version+/$platformDir/resources/hosts/llnl/customlauncher         "$dir"/$version+/bin/
+   cp "$dir"/$version+/$platformDir/resources/hosts/llnl/config                 "$dir"/$version+/.visit/
 elif [ "$config" = "lsu" ]; then
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/*.xml               "$dir"/$version+/.visit/hosts/
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/customlauncher      "$dir"/$version+/bin/
@@ -1133,9 +1127,6 @@ elif [ "$config" = "sandia" ]; then
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/*.xml               "$dir"/$version+/.visit/hosts/
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/customlauncher      "$dir"/$version+/bin/
 elif [ "$config" = "sandia_closed" ]; then
-   cp "$dir"/$version+/$platformDir/resources/hosts/$config/*.xml               "$dir"/$version+/.visit/hosts/
-   cp "$dir"/$version+/$platformDir/resources/hosts/$config/customlauncher      "$dir"/$version+/bin/
-elif [ "$config" = "tacc" ]; then
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/*.xml               "$dir"/$version+/.visit/hosts/
    cp "$dir"/$version+/$platformDir/resources/hosts/$config/customlauncher      "$dir"/$version+/bin/
 elif [ "$config" = "umich" ]; then

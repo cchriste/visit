@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -66,7 +66,7 @@ def pyside_test(fn):
     we aren't running in the cli.
     """
     def run_fn(*args):
-        if "PySide.QtCore" in sys.modules.keys():
+        if "PySide2.QtCore" in sys.modules.keys():
             return fn(*args)
         else:
             print "[PySide not found, skipping test that requires PySide]"

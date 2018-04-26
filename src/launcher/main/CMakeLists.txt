@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -69,13 +69,24 @@ ${VISIT_SOURCE_DIR}/launcher/proxy
 LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${VTK_LIBRARY_DIRS})
 
 ADD_EXECUTABLE(vcl ${VISIT_APPLICATION_STYLE} ${VCL_SOURCES} ${VISIT_VCL_RESOURCE_FILE})
-TARGET_LINK_LIBRARIES(vcl vclrpc visitcommon ${CMAKE_THREAD_LIBS} ${DL_LIB})
+TARGET_LINK_LIBRARIES(vcl
+    ${VISIT_EXE_LINKER_FLAGS}
+    vclrpc
+    visitcommon
+    ${CMAKE_THREAD_LIBS}
+    ${DL_LIB}
+)
 
-IF (VISIT_CREATE_SOCKET_RELAY_EXECUTABLE)
+IF(VISIT_CREATE_SOCKET_RELAY_EXECUTABLE AND NOT WIN32)
     ADD_EXECUTABLE(visit_socket_relay SocketRelayMain.C)
-    TARGET_LINK_LIBRARIES(visit_socket_relay visitcommon ${CMAKE_THREAD_LIBS} ${DL_LIB})
+    TARGET_LINK_LIBRARIES(visit_socket_relay
+        ${VISIT_EXE_LINKER_FLAGS}
+        visitcommon
+        ${CMAKE_THREAD_LIBS}
+        ${DL_LIB}
+    )
     VISIT_INSTALL_TARGETS(visit_socket_relay)
-ENDIF (VISIT_CREATE_SOCKET_RELAY_EXECUTABLE)
+ENDIF()
 
 IF (NOT WIN32)
     ADD_EXECUTABLE(testvcl EXCLUDE_FROM_ALL testvcl.C)

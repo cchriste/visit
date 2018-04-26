@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -226,6 +226,10 @@ avtVTKWriter::WriteHeaders(const avtDatabaseMetaData *md,
 //    Kathleen Biagas, Fri Feb 17 15:43:28 PST 2017
 //    Multi-block files now write individual files (chunks) to subdir.
 //
+//    Kathleen Biagas, Mon Nov 20 13:06:01 PST 2017
+//    When writing ascii xml files, set DataMode to Ascii to prevent data
+//    being appended, which is always binary.
+//
 // ****************************************************************************
 
 void
@@ -310,7 +314,14 @@ avtVTKWriter::WriteChunk(vtkDataSet *ds, int chunk)
             if (nblocks > 1)
                 fileNames.push_back(chunkname);
             if(doBinary)
+            {
                 wrtr->SetDataModeToBinary();
+            }
+            else
+            {
+                wrtr->SetDataModeToAscii();
+                wrtr->SetCompressorTypeToNone();
+            }
             wrtr->SetInputData(ds);
             wrtr->SetFileName(chunkname);
             wrtr->Write();

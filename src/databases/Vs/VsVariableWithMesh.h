@@ -29,12 +29,18 @@ public:
   /** Get the number of spatial dimensions */
   size_t getNumSpatialDims() const;
 
+  /** Get the number of topological dimensions - ALWAYS 0, i.e. points */
+  size_t getNumTopologicalDims() const { return 0; };
+
   /** Retrieve a particular spatial dimension index from the list
     returns -1 on failure */
   int getSpatialDim(size_t index) const;
 
   /** Retrieve the entire list of spatial indices */
   std::vector<int> getSpatialIndices() const;
+
+  /** Retrieve axis labels */
+  std::string getAxisLabel(size_t axis) const;
   
   /** Handles tranformation attributes for the "mesh" part of this object */
   virtual bool hasTransform() const;
@@ -58,6 +64,7 @@ public:
   /** Get dimensions of associated dataset. */
   std::vector<int> getDims() const;
 
+  size_t getNumCells() const;
   size_t getNumPoints() const;
 
   virtual void getCellDims(std::vector<int>& dims) const;
@@ -82,7 +89,8 @@ public:
   VsAttribute* getAttribute(const std::string& name) const;
 
   /** Retrieve the value of the attribute with the given name */
-  std::string getStringAttribute(const std::string& name) const;
+  //std::string getStringAttribute(const std::string& name) const;
+  void getStringAttribute(std::string attName, std::string* value) const; 
 
   /** Retrieve the user-specified label for component number i */
   std::string getLabel(size_t i) const;
@@ -128,6 +136,9 @@ private:
 
   /** List of user-specified names for the components of this variable */
   std::vector<std::string> labelNames;
+
+  /** List of user-specified names for axis labels */
+  std::vector<std::string> axisLabels;
   
   /** Fully qualified path to this object */
   std::string path;

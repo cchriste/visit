@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -81,7 +81,7 @@
 
 IF(NOT "${QT_BIN}" MATCHES "OFF")
   IF(WIN32)
-    IF(VISIT_MSVC_VERSION AND EXISTS ${QT_DIR}/lib)
+    IF(VISIT_MSVC_VERSION AND QT_DIR AND EXISTS ${QT_DIR}/lib)
       # using VisIt's windowsbuild Qt
       SET(USE_CMAKE_FIND OFF)
     ELSE()

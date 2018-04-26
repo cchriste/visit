@@ -1,19 +1,16 @@
 function bv_mesa_initialize
 {
     export DO_MESA="no"
-    export ON_MESA="off"
 }
 
 function bv_mesa_enable
 {
     DO_MESA="yes"
-    ON_MESA="on"
 }
 
 function bv_mesa_disable
 {
     DO_MESA="no"
-    ON_MESA="off"
 }
 
 function bv_mesa_depends_on
@@ -40,13 +37,7 @@ function bv_mesa_print
 
 function bv_mesa_print_usage
 {
-    printf "%-15s %s [%s]\n" "--mesa" "Build Mesa" "$DO_MESA"
-}
-
-function bv_mesa_graphical
-{
-    local graphical_out="Mesa     $MESA_VERSION($MESA_FILE)      $ON_MESA"
-    echo $graphical_out
+    printf "%-20s %s [%s]\n" "--mesa" "Build Mesa" "$DO_MESA"
 }
 
 function bv_mesa_host_profile
@@ -65,11 +56,25 @@ function bv_mesa_selected
     args=$@
     if [[ $args == "--mesa" ]]; then
         DO_MESA="yes"
-        ON_MESA="on"
         return 1
     fi
 
     return 0
+}
+
+function bv_mesa_initialize_vars
+{
+    info "initalizing mesa vars"
+    if [[ "$DO_MESA" == "yes" ]]; then
+        MESA_INSTALL_DIR="${VISITDIR}/mesa/${MESA_VERSION}/${VISITARCH}"
+        MESA_INCLUDE_DIR="${MESA_INSTALL_DIR}/include"
+        MESA_LIB_DIR="${MESA_INSTALL_DIR}/lib"
+        if [[ "$DO_STATIC_BUILD" == "yes" ]]; then
+            MESA_LIB="${MESA_LIB_DIR}/libOSMesa.a"
+        else
+            MESA_LIB="${MESA_LIB_DIR}/libOSMesa.${SO_EXT}"
+        fi
+    fi
 }
 
 function bv_mesa_ensure
@@ -691,10 +696,11 @@ function build_mesa
 
     info 
     
-    # Neither of these should be necessary, but we use them as a temporary
-    # workaround for a mesa issue.
+    # None of these should be necessary, but we use them as a temporary
+    # workarounds for a mesa issues. The __STDC_CONSTANT_MACROS is for
+    # gcc 4.8.2 and 4.9.2.
     if test `uname` = "Linux" ; then
-        HACK_FLAGS="-fPIC -DGLX_USE_TLS"
+        HACK_FLAGS="-fPIC -DGLX_USE_TLS -D__STDC_CONSTANT_MACROS"
     fi
 
     # Do not build libGLU unless we're on MacOS X

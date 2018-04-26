@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -346,8 +346,9 @@ avtTimeIteratorExpression::Execute(void)
 void
 avtTimeIteratorExpression::UpdateExpressions(int ts)
 {
-    ParsingExprList *pel = ParsingExprList::Instance();
-    ExpressionList new_list = *(pel->GetList());
+    ExpressionList const *curExprList = ParsingExprList::Instance()->GetList();
+    ExpressionList exprsToAdd;
+    std::vector<std::pair<int, std::string> > exprsToRedefine;
 
     int nvars = (int)varnames.size();
     if (cmfeType == POS_CMFE)
@@ -376,26 +377,32 @@ avtTimeIteratorExpression::UpdateExpressions(int ts)
 
         std::string exp_name = GetInternalVarname(i);
         
-        bool alreadyInList = false;
-        for (int j = 0 ; j < new_list.GetNumExpressions() ; j++)
-        {
-            if (new_list[j].GetName() == exp_name)
-            {
-                alreadyInList = true;
-                new_list[j].SetDefinition(expr_defn);
-            }
-        }
-        if (!alreadyInList)
+        // These lookups on curExprList will be fast due to const
+        int eidx = curExprList->IndexOf(exp_name.c_str());
+        if (eidx == -1)
         {
             Expression exp;
             exp.SetName(exp_name);
             exp.SetDefinition(expr_defn);
             exp.SetType(Expression::Unknown);
-            new_list.AddExpressions(exp);
+            exprsToAdd.AddExpressions(exp);
+        }
+        else
+        {
+            exprsToRedefine.push_back(std::pair<int, std::string>(eidx, expr_defn));
         }
     }
 
-    *(pel->GetList()) = new_list;
+    // Handle the expressions to redefine
+    for (size_t i = 0; i < exprsToRedefine.size(); i++)
+    {
+        Expression &e = ParsingExprList::Instance()->GetList()->GetExpressions(exprsToRedefine[i].first);
+        e.SetDefinition(exprsToRedefine[i].second);
+    }
+
+    // Handle the expressions to add
+    for (int i = 0; i < exprsToAdd.GetNumExpressions(); i++)
+        ParsingExprList::Instance()->GetList()->AddExpressions(exprsToAdd.GetExpressions(i));
 }
 
 

@@ -1,19 +1,16 @@
 function bv_openswr_initialize
 {
     export DO_OPENSWR="no"
-    export ON_OPENSWR="off"
 }
 
 function bv_openswr_enable
 {
     DO_OPENSWR="yes"
-    ON_OPENSWR="on"
 }
 
 function bv_openswr_disable
 {
     DO_OPENSWR="no"
-    ON_OPENSWR="off"
 }
 
 function bv_openswr_depends_on
@@ -42,18 +39,21 @@ function bv_openswr_print
 
 function bv_openswr_print_usage
 {
-    printf "%-15s %s [%s]\n" "--openswr" "Build OpenSWR" "$DO_OPENSWR"
-}
-
-function bv_openswr_graphical
-{
-    local graphical_out="OpenSWR  $OPENSWR_VERSION($OPENSWR_FILE)      $ON_OPENSWR"
-    echo $graphical_out
+    printf "%-20s %s [%s]\n" "--openswr" "Build OpenSWR" "$DO_OPENSWR"
 }
 
 function bv_openswr_host_profile
 {
-    if [[ "$DO_OPENSWR" == "yes" ]] ; then
+    # If we are using openswr as the GL for VTK in a static build, we'll tell VisIt
+    # about openswr using a different mechanism.
+    addhp="yes"
+    if [[ "$DO_STATIC_BUILD" == "yes" ]] ; then
+        if [[ "$DO_SERVER_COMPONENTS_ONLY" == "yes" || "$DO_ENGINE_ONLY" == "yes" ]] ; then
+            addhp="no"
+        fi
+    fi
+
+    if [[ "$DO_OPENSWR" == "yes" && "$addhp" == "yes" ]] ; then
         echo >> $HOSTCONF
         echo "##" >> $HOSTCONF
         echo "## OpenSWR" >> $HOSTCONF
@@ -67,11 +67,25 @@ function bv_openswr_selected
     args=$@
     if [[ $args == "--openswr" ]]; then
         DO_OPENSWR="yes"
-        ON_OPENSWR="on"
         return 1
     fi
 
     return 0
+}
+
+function bv_openswr_initialize_vars
+{
+    info "initalizing openswr vars"
+    if [[ "$DO_OPENSWR" == "yes" ]]; then
+        OPENSWR_INSTALL_DIR="${VISITDIR}/openswr/${OPENSWR_VERSION}/${VISITARCH}"
+        OPENSWR_INCLUDE_DIR="${OPENSWR_INSTALL_DIR}/include"
+        OPENSWR_LIB_DIR="${OPENSWR_INSTALL_DIR}/lib"
+        if [[ "$DO_STATIC_BUILD" == "yes" ]]; then
+            OPENSWR_LIB="${OPENSWR_LIB_DIR}/libOSMesa.a"
+        else
+            OPENSWR_LIB="${OPENSWR_LIB_DIR}/libOSMesa.${SO_EXT}"
+        fi
+    fi
 }
 
 function bv_openswr_ensure
@@ -110,10 +124,18 @@ function build_openswr
     #
     cd $OPENSWR_BUILD_DIR || error "Couldn't cd to openswr build dir."
 
+    if [[ "$DO_STATIC_BUILD" == "yes" ]]; then
+        OPENSWR_STATIC_DYNAMIC="--disable-shared --disable-shared-glapi --enable-static --enable-static-glapi"
+    fi
+
     info "Configuring OpenSWR . . ."
     LLVM_INSTALL=${VISIT_LLVM_DIR}/bin
     export PATH=${LLVM_INSTALL}:${PATH}
-    env LDFLAGS="-Wl,-rpath=${VISIT_LLVM_DIR}/lib" \
+    echo env LDFLAGS="-Wl,-rpath=${VISIT_LLVM_DIR}/lib" \
+        CXXFLAGS="${CXXFLAGS} ${CXX_OPT_FLAGS}" \
+        CXX=${CXX_COMPILER} \
+        CFLAGS="${CFLAGS} ${C_OPT_FLAGS}" \
+        CC=${C_COMPILER} \
         ./autogen.sh \
         --prefix=${VISITDIR}/openswr/${OPENSWR_VERSION}/${VISITARCH} \
         --disable-dri \
@@ -127,7 +149,26 @@ function build_openswr
         --disable-va \
         --disable-glx \
         --with-gallium-drivers=swrast,swr \
-        --enable-gallium-osmesa
+        --enable-gallium-osmesa $OPENSWR_STATIC_DYNAMIC
+    env LDFLAGS="-Wl,-rpath=${VISIT_LLVM_DIR}/lib" \
+        CXXFLAGS="${CXXFLAGS} ${CXX_OPT_FLAGS}" \
+        CXX=${CXX_COMPILER} \
+        CFLAGS="${CFLAGS} ${C_OPT_FLAGS}" \
+        CC=${C_COMPILER} \
+        ./autogen.sh \
+        --prefix=${VISITDIR}/openswr/${OPENSWR_VERSION}/${VISITARCH} \
+        --disable-dri \
+        --disable-egl \
+        --disable-gbm \
+        --disable-gles1 \
+        --disable-gles2 \
+        --disable-xvmc \
+        --disable-vdpau \
+        --disable-omx \
+        --disable-va \
+        --disable-glx \
+        --with-gallium-drivers=swrast,swr \
+        --enable-gallium-osmesa $OPENSWR_STATIC_DYNAMIC
 
     if [[ $? != 0 ]] ; then
         warn "OpenSWR configure failed.  Giving up"
@@ -135,14 +176,14 @@ function build_openswr
     fi
 
     info "Building OpenSWR . . ."
-    ${MAKE}
+    ${MAKE} ${MAKE_OPT_FLAGS}
     if [[ $? != 0 ]] ; then
         warn "OpenSWR build failed.  Giving up"
         return 1
     fi
 
     info "Installing OpenSWR ..."
-    ${MAKE} install
+    ${MAKE} ${MAKE_OPT_FLAGS} install
     if [[ $? != 0 ]] ; then
         warn "OpenSWR install failed.  Giving up"
         return 1

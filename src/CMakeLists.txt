@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -418,6 +418,11 @@
 #    Eric Brugger, Wed May 17 16:53:48 PDT 2017
 #    I added support for the LLVM and OpenSWR packages.
 #
+#    Eric Brugger, Tue Mar 13 13:24:56 PDT 2018
+#    I modified the header install command to exclude any directories named
+#    icons. Previously, this resulted in a couple of invalid symbolic links
+#    ending up in the distribution file.
+#
 #****************************************************************************/
 
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0 FATAL_ERROR)
@@ -524,15 +529,19 @@ SET(VTK_MINIMUM_VERSION "6.0.0" CACHE INTERNAL "minimum version of vtk that VisI
 
 SET(NEKTAR++_MINIMUM_VERSION "4.0.0" CACHE INTERNAL "minimum version of Nektar++ that VisIt can use")
 
-FUNCTION(SETUP_APP_VERSION name ver )
-  IF(${ver} VERSION_LESS ${${name}_MINIMUM_VERSION}})
+FUNCTION(SETUP_APP_VERSION name ver_ascii )
+  IF(${ver_ascii} VERSION_LESS ${${name}_MINIMUM_VERSION}})
       MESSAGE(FATAL_ERROR "${name} version must be at least ${${name}_MINIMUM_VERSION}}")
   ENDIF()
-  STRING( REGEX REPLACE "([0-9]+).[0-9]+.[0-9]+" "\\1" vmaj ${ver} )
-  STRING( REGEX REPLACE "[0-9]+.([0-9]+).[0-9]+" "\\1" vmin ${ver} )
-  SET(${name}_VERSION "${ver}"  CACHE INTERNAL "")
-  SET(${name}_MAJOR_VERSION   "${vmaj}" CACHE INTERNAL "")
-  SET(${name}_MINOR_VERSION   "${vmin}" CACHE INTERNAL "")
+  STRING( REGEX REPLACE "([0-9]+).[0-9]+.[0-9]+" "\\1" ver_major ${ver_ascii} )
+  STRING( REGEX REPLACE "[0-9]+.([0-9]+).[0-9]+" "\\1" ver_minor ${ver_ascii} )
+  STRING( REGEX REPLACE "[0-9]+.[0-9]+.([0-9]+)" "\\1" ver_patch ${ver_ascii} )
+  SET(${name}_VERSION "${ver_ascii}"  CACHE INTERNAL "")
+  SET(${name}_MAJOR_VERSION "${ver_major}" CACHE INTERNAL "")
+  SET(${name}_MINOR_VERSION "${ver_minor}" CACHE INTERNAL "")
+  SET(${name}_PATCH_VERSION "${ver_patch}" CACHE INTERNAL "")
+  math( EXPR ver_hex "(${ver_major}<<16)|(${ver_minor}<<8)|(${ver_patch})")
+  SET(${name}_VERSION_HEX "${ver_hex}" CACHE INTERNAL "")
 ENDFUNCTION()
 
 #-----------------------------------------------------------------------------
@@ -710,7 +719,7 @@ OPTION(VISIT_DISABLE_SELECT "Disable use of the select() function" OFF)
 OPTION(VISIT_USE_NOSPIN_BCAST "Use VisIt's no-spin Bcast in parallel" ON)
 OPTION(VISIT_INSTALL_THIRD_PARTY "Install VisIt's 3rd party I/O libs and includes to permit plugin development" OFF)
 OPTION(VISIT_NOLINK_MPI_WITH_LIBRARIES "Do not link MPI with VisIt's parallel shared libraries; just with executables" OFF)
-OPTION(VISIT_CREATE_SOCKET_RELAY_EXECUTABLE "Create a separate executable that forwards VisIt's socket connection between engine and component launcher" OFF)
+OPTION(VISIT_CREATE_SOCKET_RELAY_EXECUTABLE "Create a separate executable that forwards VisIt's socket connection between engine and component launcher" ON)
 OPTION(VISIT_RPATH_RELATIVE_TO_EXECUTABLE_PATH "Install rpath relative to executable location using \$ORIGIN tag" OFF)
 OPTION(VISIT_FORTRAN "Enable compilation of Fortran example progams" OFF)
 OPTION(VISIT_DATA_MANUAL_EXAMPLES "Build Getting Data Into VisIt examples" OFF)
@@ -1051,6 +1060,7 @@ ELSE(VISIT_HEADERS_SKIP_INSTALL)
         PATTERN "*.hpp"
         PATTERN ".svn" EXCLUDE
         PATTERN "CMakeFiles" EXCLUDE
+        PATTERN "icons" EXCLUDE
     )
 ENDIF(VISIT_HEADERS_SKIP_INSTALL)
 
@@ -1129,21 +1139,37 @@ IF(NOT VISIT_DBIO_ONLY)
         SET(OPENGL_FOUND ON)
         SET(OPENGL_GLU_FOUND ON)
         SET(OPENGL_INCLUDE_DIR ${VISIT_OPENGL_DIR}/include)
-        # Hack for BG/Q.
-        IF(BLUEGENEQ)
-            SET(LIBGL OSMesa)
-        ELSE(BLUEGENEQ)
-            SET(LIBGL GL)
-        ENDIF(BLUEGENEQ)
-        IF(VISIT_STATIC)
-            SET(OPENGL_gl_LIBRARY ${VISIT_OPENGL_DIR}/lib/lib${LIBGL}.a)
-            SET(OPENGL_glu_LIBRARY ${VISIT_OPENGL_DIR}/lib/libGLU.a)
-        ELSE(VISIT_STATIC)
-            SET(OPENGL_gl_LIBRARY ${VISIT_OPENGL_DIR}/lib/lib${LIBGL}.so)
-            SET(OPENGL_glu_LIBRARY ${VISIT_OPENGL_DIR}/lib/libGLU.so)
-        ENDIF(VISIT_STATIC)
+
+        IF(VISIT_OPENGL_LIBRARY)
+            SET(OPENGL_gl_LIBRARY ${VISIT_OPENGL_LIBRARY})
+        ELSE(VISIT_OPENGL_LIBRARY)
+            # Hack for BG/Q.
+            IF(BLUEGENEQ)
+                SET(LIBGL OSMesa)
+            ELSE(BLUEGENEQ)
+                SET(LIBGL GL)
+            ENDIF(BLUEGENEQ)
+            IF(VISIT_STATIC)
+                SET(OPENGL_gl_LIBRARY ${VISIT_OPENGL_DIR}/lib/lib${LIBGL}.a)
+            ELSE(VISIT_STATIC)
+                SET(OPENGL_gl_LIBRARY ${VISIT_OPENGL_DIR}/lib/lib${LIBGL}.so)
+            ENDIF(VISIT_STATIC)
+        ENDIF(VISIT_OPENGL_LIBRARY)
+
+        IF(VISIT_GLU_LIBRARY)
+            SET(OPENGL_glu_LIBRARY ${VISIT_GLU_LIBRARY})
+        ELSE(VISIT_GLU_LIBRARY)
+            IF(VISIT_STATIC)
+                SET(OPENGL_glu_LIBRARY ${VISIT_OPENGL_DIR}/lib/libGLU.a)
+            ELSE(VISIT_STATIC)
+                SET(OPENGL_glu_LIBRARY ${VISIT_OPENGL_DIR}/lib/libGLU.so)
+            ENDIF(VISIT_STATIC)
+        ENDIF(VISIT_GLU_LIBRARY)
+
         SET(OPENGL_LIBRARIES ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY})
+
         MESSAGE(STATUS "Found OpenGL ${OPENGL_gl_LIBRARY}")
+        MESSAGE(STATUS "Found GLU ${OPENGL_glu_LIBRARY}")
     ELSE(VISIT_OPENGL_DIR)
         INCLUDE(${CMAKE_ROOT}/Modules/FindOpenGL.cmake)
     ENDIF(VISIT_OPENGL_DIR)
@@ -1634,7 +1660,7 @@ FUNCTION(ADD_PARALLEL_EXECUTABLE target)
     # PARALLEL_TARGET_LINK_LIBRARIES function to actually link the
     # target with MPI.
     IF(NOT VISIT_NOLINK_MPI_WITH_LIBRARIES) # This is a new if test
-        TARGET_LINK_LIBRARIES(${target} ${VISIT_PARALLEL_LIBS})
+        TARGET_LINK_LIBRARIES(${target} ${VISIT_EXE_LINKER_FLAGS} ${VISIT_PARALLEL_LIBS})
     ENDIF(NOT VISIT_NOLINK_MPI_WITH_LIBRARIES)
 ENDFUNCTION(ADD_PARALLEL_EXECUTABLE)
 
@@ -1670,7 +1696,7 @@ FUNCTION(ADD_PARALLEL_FORTRAN_EXECUTABLE target)
             )
         ENDIF(VISIT_PARALLEL_RPATH)
         ENDIF(VISIT_PARALLEL_FORTRAN_LINKER_FLAGS)
-        TARGET_LINK_LIBRARIES(${target} ${VISIT_PARALLEL_FORTRAN_LIBS})
+        TARGET_LINK_LIBRARIES(${target} ${VISIT_EXE_LINKER_FLAGS} ${VISIT_PARALLEL_FORTRAN_LIBS})
     ENDIF(VISIT_PARALLEL_FORTRAN_FLAGS)
 ENDFUNCTION(ADD_PARALLEL_FORTRAN_EXECUTABLE)
 
@@ -1678,7 +1704,11 @@ FUNCTION(PARALLEL_EXECUTABLE_LINK_LIBRARIES target)
     IF(VISIT_NOLINK_MPI_WITH_LIBRARIES)
         TARGET_LINK_LIBRARIES(${target} ${ARGN} link_mpi_libs)
     ELSE(VISIT_NOLINK_MPI_WITH_LIBRARIES)
-        TARGET_LINK_LIBRARIES(${target} ${ARGN})
+        IF(VISIT_STATIC)
+            TARGET_LINK_LIBRARIES(${target} ${ARGN} ${VISIT_PARALLEL_LIBS})
+        ELSE(VISIT_STATIC)
+            TARGET_LINK_LIBRARIES(${target} ${ARGN})
+        ENDIF(VISIT_STATIC)
     ENDIF(VISIT_NOLINK_MPI_WITH_LIBRARIES)
 ENDFUNCTION(PARALLEL_EXECUTABLE_LINK_LIBRARIES)
 
@@ -1704,6 +1734,11 @@ SET(VISIT_COMMON_INCLUDES
 if(HAVE_ZLIB_H)
     list(APPEND VISIT_COMMON_INCLUDES ${ZLIB_INCLUDE_DIR})
 endif()
+
+# macros/defines needed by CMake/VisItMacros.cmake
+if (NOT DEFINED VISIT_REPLACE_DEBUG_FLAGS)
+  set(VISIT_REPLACE_DEBUG_FLAGS TRUE)
+endif ()
 
 # macros/defines also needed by PluginVsInstall.cmake.in
 INCLUDE(${VISIT_SOURCE_DIR}/CMake/VisItMacros.cmake)
@@ -2587,7 +2622,6 @@ ELSE (NOT WIN32)
                     /DVISIT_SOURCE_DIR=${VSD_NATIVE}
                     /DINSTALL_PREFIX=${CIP_NATIVE}
                     /DBIN_DIR=${CBD_NATIVE}
-                    /DCL_64=${CMAKE_CL_64}
                     /DQT5=${VISIT_QT5}
                     ${VISIT_WINDOWS_DIR}/distribution/installation/CreateDBSections.nsi
             COMMAND ${MAKENSIS}
@@ -2596,8 +2630,8 @@ ELSE (NOT WIN32)
                     /DVISIT_SOURCE_DIR=${VSD_NATIVE}
                     /DINSTALL_PREFIX=${CIP_NATIVE}
                     /DBIN_DIR=${CBD_NATIVE}
-                    /DCL_64=${CMAKE_CL_64}
                     /DQT5=${VISIT_QT5}
+                    /DMPI_VERSION=${VISIT_MSMPI_VERSION}
                     ${VISIT_WINDOWS_DIR}/distribution/installation/binaryinstallation.nsi
             DEPENDS ${VISIT_WINDOWS_DIR}/distribution/installation/CreateDBSections.nsi
                     ${VISIT_WINDOWS_DIR}/distribution/installation/binaryinstallation.nsi

@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -66,6 +66,9 @@ class MapNode;
 //   added GetElementRange to detect if a range of picks has been entered in 
 //   the pick window.
 //
+//   Matt Larsen, June 17, 2017 
+//   added GetElementLabel to support label picks
+//
 // ****************************************************************************
 
 class GUI_API QvisPickQueryWidget : public QWidget
@@ -90,6 +93,7 @@ private:
     bool                 GetDomain(int *);
     bool                 GetElement(int *);
     bool                 GetElementRange(std::string &);
+    bool                 GetElementLabel(std::string &);
     int                  GetPlotType(void);
     int                  GetElementType(void);
     bool                 GetTimePreservesCoord(void);

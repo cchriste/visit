@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -172,11 +172,13 @@ public:
     virtual void ConstructToolbar(QToolBar *toolbar);
 private slots:
     void addPlot(int, const QString &);
+    void addPlotAboutToShow();
     void changeMenuIconSize(bool);
 private:
     void CreatePlotMenu(int);
     void DeletePlotMenu(int);
     int                   maxPixmapWidth, maxPixmapHeight;
+    bool                  addPlotMenuHasBeenShown;
     PluginEntryVector     pluginEntries;
     VariableMenuPopulator menuPopulator;
 };

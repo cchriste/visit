@@ -1,6 +1,6 @@
 // ***************************************************************************
 //
-// Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+// Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 // Produced at the Lawrence Livermore National Laboratory
 // LLNL-CODE-442911
 // All rights reserved.
@@ -73,9 +73,6 @@ public class QueryAttributes extends AttributeSubject
     public final static int VARTYPE_SPECIES = 8;
     public final static int VARTYPE_CURVE = 9;
     public final static int VARTYPE_UNKNOWN = 10;
-
-    public final static int DATATYPE_ACTUALDATA = 0;
-    public final static int DATATYPE_ORIGINALDATA = 1;
 
 
     public QueryAttributes()

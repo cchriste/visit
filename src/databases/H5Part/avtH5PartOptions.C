@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -44,8 +44,9 @@
 
 #include <DBOptionsAttributes.h>
 
-#include <string>
+#include <visit-config.h>
 
+#include <string>
 
 // ****************************************************************************
 //  Function: GetH5PartReadOptions
@@ -71,8 +72,12 @@ DBOptionsAttributes *
 GetH5PartReadOptions(void)
 {
     DBOptionsAttributes *rv = new DBOptionsAttributes;
+    rv->SetBool("Enable domain decomposition", true);
+    rv->SetString("Variable path prefix", "Step#");
+#ifdef HAVE_LIBFASTQUERY
     rv->SetBool("Use FastBit index", true);
-    rv->SetBool("Disable domain decomposition", false);
+    rv->SetString("FastBit index path prefix", "__H5PartIndex__");
+#endif    
     return rv;
 }
 
@@ -97,9 +102,13 @@ DBOptionsAttributes *
 GetH5PartWriteOptions(void)
 {
     DBOptionsAttributes *rv = new DBOptionsAttributes;
+    rv->SetString("Variable path prefix", "Step#");
+#ifdef HAVE_LIBFASTQUERY
     rv->SetBool("Add FastBit indexing", true);
+    rv->SetString("FastBit index path prefix", "__H5PartIndex__");
     // rv->SetBool("Sort variable", "unsorted");
     rv->SetBool("Create a parent file", false);
+#endif
     rv->SetString("Parent file name", "visit_ex_db_parent");
     return rv;
 }

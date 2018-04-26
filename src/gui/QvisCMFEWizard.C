@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -1134,10 +1134,10 @@ QvisCMFEWizard::CreateActivityPage(void)
     exprDiffTypeSelect = new QButtonGroup(main_widget);
 
     // Min/Max
-    QRadioButton *r01 = new QRadioButton(tr("Minimum of valves"));
+    QRadioButton *r01 = new QRadioButton(tr("Minimum of values"));
     exprDiffTypeSelect->addButton(r01, 0);
     glayout2->addWidget(r01, 1, 1);
-    QRadioButton *r02 = new QRadioButton(tr("Maximum of valves"));
+    QRadioButton *r02 = new QRadioButton(tr("Maximum of values"));
     exprDiffTypeSelect->addButton(r02, 1);
     glayout2->addWidget(r02, 2, 1);
 
@@ -1404,7 +1404,7 @@ QvisCMFEWizard::GetVarType(const std::string &str)
     int numExpressions = exprList->GetNumExpressions();
     for (int i = 0 ; i < numExpressions ; i++)
     {
-        Expression &e = exprList->GetExpressions(i);
+        Expression const &e = exprList->GetExpressions(i);
         if (str == e.GetName())
             return e.GetType();
     }

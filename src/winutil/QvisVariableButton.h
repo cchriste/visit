@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -184,7 +184,7 @@ protected:
         virtual ~VariablePopupInfo();
 
         void Initialize();
-        void UpdateMenus(VariableMenuPopulator *pop);
+        void UpdateMenus(VariableMenuPopulator *pop, bool destroyMenuItems=false);
         void CreateMenu(int);
         void DeleteMenu(int);
         void connect(QvisBaseVariableButton *);
@@ -224,8 +224,10 @@ class WINUTIL_API QvisVariableButton : public QvisBaseVariableButton
     //
     // Static methods that are used in connection with all variable menus.
     //
-    static void UpdateActiveSourceButtons(VariableMenuPopulator *pop);
-    static void UpdatePlotSourceButtons(VariableMenuPopulator *pop);
+    static void UpdateActiveSourceButtons(VariableMenuPopulator *pop,
+        bool destroyMenuItems=false);
+    static void UpdatePlotSourceButtons(VariableMenuPopulator *pop,
+        bool destroyMenyItems=false);
 #endif
 
   protected:

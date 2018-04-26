@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -185,7 +185,13 @@ ENDIF(MESA_FOUND)
 
 ADD_EXECUTABLE(engine_ser_exe ${VISIT_APPLICATION_STYLE} main.C ${ENGINE_STATIC_SOURCES} ${VISIT_ENGINE_SER_RESOURCE_FILE})
 SET_TARGET_PROPERTIES(engine_ser_exe PROPERTIES OUTPUT_NAME engine_ser)
+
+if(WIN32 AND MSVC)
+    set_target_properties(engine_ser_exe PROPERTIES LINK_FLAGS "/STACK:4000000")
+endif()
+
 TARGET_LINK_LIBRARIES(engine_ser_exe 
+    ${VISIT_EXE_LINKER_FLAGS}
     ${engine_ser_exe_IDatabase}
     ${engine_ser_exe_EDatabase_ser}
     ${engine_ser_exe_IOperator}
@@ -287,6 +293,10 @@ IF(VISIT_PARALLEL)
     ENDIF(ICET_FOUND AND VISIT_STATIC)
 
     SET_TARGET_PROPERTIES(engine_par_exe PROPERTIES OUTPUT_NAME engine_par)
+    if(WIN32 AND MSVC)
+        set_target_properties(engine_par_exe PROPERTIES
+            LINK_FLAGS "/STACK:4000000")
+    endif()
 
     PARALLEL_EXECUTABLE_LINK_LIBRARIES(engine_par_exe
         ${engine_par_exe_IDatabase_par}

@@ -1,8 +1,9 @@
+#svn import -m "added Uintah to the fold" Uintah-2.5.0_beta.tar.gz svn+ssh://allens@edison.nersc.gov/project/projectdirs/visit/svn/visit/trunk/third_party/Uintah-2.5.0_beta.tar.gz
+
 function bv_uintah_initialize
 {
     export FORCE_UINTAH="no"
     export DO_UINTAH="no"
-    export ON_UINTAH="off"
     export USE_SYSTEM_UINTAH="no"
     add_extra_commandline_args "uintah" "alt-uintah-dir" 1 "Use alternative directory for uintah"
 }
@@ -14,13 +15,11 @@ function bv_uintah_enable
     fi
 
     DO_UINTAH="yes"
-    ON_UINTAH="on"
 }
 
 function bv_uintah_disable
 {
     DO_UINTAH="no"
-    ON_UINTAH="off"
 }
 
 function bv_uintah_alt_uintah_dir
@@ -28,7 +27,7 @@ function bv_uintah_alt_uintah_dir
     echo "Using alternate Uintah directory"
 
     # Check to make sure the directory or a particular include file exists.
-    [ ! -e "$1/../src/StandAlone/tools/uda2vis/udaData.h" ] && error "Uintah not found in $1"
+    [ ! -e "$1/../src/VisIt/uda2vis/udaData.h" ] && error "Uintah not found in $1"
 
     bv_uintah_enable
     USE_SYSTEM_UINTAH="yes"
@@ -48,8 +47,6 @@ function bv_uintah_depends_on
     else
         echo ""
     fi
-    
-    
 }
 
 function bv_uintah_initialize_vars
@@ -67,12 +64,11 @@ function bv_uintah_initialize_vars
 
 function bv_uintah_info
 {
-    export UINTAH_VERSION=${UINTAH_VERSION:-"1.6.0"}
-    export UINTAH_FILE=${UINTAH_FILE:-"Uintah-${UINTAH_VERSION}.tar.gz"}
-    export UINTAH_COMPATIBILITY_VERSION=${UINTAH_COMPATIBILITY_VERSION:-"1.6"}
+    export UINTAH_VERSION=${UINTAH_VERSION:-"2.5.0"}
+    export UINTAH_FILE=${UINTAH_FILE:-"Uintah-${UINTAH_VERSION}_beta.tar.gz"}
+    export UINTAH_COMPATIBILITY_VERSION=${UINTAH_COMPATIBILITY_VERSION:-"2.5"}
     export UINTAH_BUILD_DIR=${UINTAH_BUILD_DIR:-"Uintah-${UINTAH_VERSION}/optimized"}
-    #export UINTAH_URL=${UINTAH_URL:-"http://www.sci.utah.edu/releases/uintah_v${UINTAH_VERSION}/${UINTAH_FILE}"}
-    export UINTAH_URL=${UINTAH_URL:-"http://www.sci.utah.edu/devbuilds/icse/uintah/${UINTAH_VERSION}"}
+    export UINTAH_URL=${UINTAH_URL:-"http://www.sci.utah.edu/releases/uintah_v${UINTAH_VERSION}"}
     
     export UINTAH_MD5_CHECKSUM=""
     export UINTAH_SHA256_CHECKSUM=""
@@ -88,14 +84,8 @@ function bv_uintah_print
 
 function bv_uintah_print_usage
 {
-    printf "%-15s %s [%s]\n" "--uintah" "Build Uintah" "${DO_UINTAH}"
-    printf "%-15s %s [%s]\n" "--alt-uintah-dir" "Use Uintah from an alternative directory"
-}
-
-function bv_uintah_graphical
-{
-    local graphical_out="UINTAH     $UINTAH_VERSION($UINTAH_FILE)      $ON_UINTAH"
-    echo $graphical_out
+    printf "%-20s %s [%s]\n" "--uintah" "Build Uintah" "${DO_UINTAH}"
+    printf "%-20s %s [%s]\n" "--alt-uintah-dir" "Use Uintah from an alternative directory"
 }
 
 function bv_uintah_host_profile
@@ -107,8 +97,8 @@ function bv_uintah_host_profile
         echo "##" >> $HOSTCONF
 
         if [[ "$USE_SYSTEM_UINTAH" == "yes" ]]; then
-            warn "Assuming version 1.7.0 for Uintah"
-            echo "SETUP_APP_VERSION(UINTAH 1.7.0)" >> $HOSTCONF
+            warn "Assuming version 2.5.1 for Uintah"
+            echo "SETUP_APP_VERSION(UINTAH 2.5.1)" >> $HOSTCONF
             echo "VISIT_OPTION_DEFAULT(VISIT_UINTAH_DIR $UINTAH_INSTALL_DIR)" >> $HOSTCONF 
             echo "SET(VISIT_USE_SYSTEM_UINTAH TRUE)" >> $HOSTCONF
         else
@@ -242,17 +232,6 @@ function build_uintah
         fi
     fi
 
-    if [[ "$FC_COMPILER" == "no" ]] ; then
-
-        warn "Uintah may require fortran to be enabled. It does not appear that the --fortran "
-        warn "agrument was set. If Uintah fails to build try adding the --fortran argument"
-        FORTRANARGS="--without-fortran"
-        #return 1
-
-    else
-        FORTRANARGS="FC=\"$FC_COMPILER\" F77=\"$FC_COMPILER\" FCFLAGS=\"$FCFLAGS\" FFLAGS=\"$FCFLAGS\" --enable-fortran"
-    fi
-
     #
     # Prepare build dir
     #
@@ -264,25 +243,25 @@ function build_uintah
     fi
 
     #
-    mkdir $UINTAH_BUILD_DIR
+    if [[ ! -d $UINTAH_BUILD_DIR ]] ; then
+        echo "Making build directory $UINTAH_BUILD_DIR"
+        mkdir $UINTAH_BUILD_DIR
+    fi
     cd $UINTAH_BUILD_DIR || error "Can't cd to UINTAH build dir."
 
     info "Configuring UINTAH . . ."
     cf_darwin=""
     if [[ "$DO_STATIC_BUILD" == "yes" ]]; then
-        cf_build_type="--disable-shared --enable-static"
+        cf_build_type="--enable-static"
     else
-        cf_build_type="--enable-shared --disable-static"
+        cf_build_type="--disable-static"
     fi
 
     ZLIB_ARGS=""
     
     if [[ "$DO_ZLIB" == "yes" ]]; then
-        ZLIB_ARGS="--with-zlib=$VISITDIR/zlib/$ZLIB_VERSION/$VISITARCH"
+        ZLIB_ARGS="--with-zlib=${VISITDIR}/zlib/${ZLIB_VERSION}/${VISITARCH}"
     fi
-
-    # In order to ensure $FORTRANARGS is expanded to build the arguments to
-    # configure, we wrap the invokation in 'sh -c "..."' syntax
 
     if [[ "$OPSYS" == "Darwin" ]]; then
 
@@ -290,13 +269,14 @@ function build_uintah
         info "../src/configure CXX=\"$CXX_COMPILER\" CC=\"$C_COMPILER\" \
         CFLAGS=\"$CFLAGS $C_OPT_FLAGS -headerpad_max_install_names\" CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS\" \
         MPI_EXTRA_LIB_FLAG=\"$PAR_LIBRARY_NAMES\" \
-        $FORTRANARGS \
         $ZLIB_ARGS \
         --prefix=\"$VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH\" \
         ${cf_darwin} \
         ${cf_build_type} \
-        --enable-optimize --without-petc --without-hypre \
-        --with-mpi="${PAR_INCLUDE_DIR}/.." "
+	--enable-minimal --enable-optimize \
+	--with-fortran=no --with-petsc=no --with-hypre=no \
+	--with-lapack=no --with-blas=no \
+        --with-mpi=\"$PAR_INCLUDE_DIR/..\" "
 
         #        --with-mpi-include="${PAR_INCLUDE_DIR}/" \
         #        --with-mpi-lib="${PAR_INCLUDE_DIR}/../lib" "
@@ -304,13 +284,14 @@ function build_uintah
         sh -c "../src/configure CXX=\"$CXX_COMPILER\" CC=\"$C_COMPILER\" \
         CFLAGS=\"$CFLAGS $C_OPT_FLAGS -headerpad_max_install_names\" CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS\" \
         MPI_EXTRA_LIB_FLAG=\"$PAR_LIBRARY_NAMES\" \
-        $FORTRANARGS \
         $ZLIB_ARGS \
         --prefix=\"$VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH\" \
         ${cf_darwin} \
         ${cf_build_type} \
-        --enable-optimize --without-petc --without-hypre \
-        --with-mpi="${PAR_INCLUDE_DIR}/.." "
+        --enable-minimal --enable-optimize \
+	--with-fortran=no --with-petsc=no --with-hypre=no \
+	--with-lapack=no --with-blas=no \
+        --with-mpi=\"$PAR_INCLUDE_DIR/..\" "
 
         #        --with-mpi-include="${PAR_INCLUDE_DIR}/" \
         #        --with-mpi-lib="${PAR_INCLUDE_DIR}/../lib" "
@@ -321,22 +302,24 @@ function build_uintah
         info "../src/configure CXX=\"$PAR_COMPILER_CXX\" CC=\"$PAR_COMPILER\" \
         CFLAGS=\"$CFLAGS $C_OPT_FLAGS\" CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS\" \
         MPI_EXTRA_LIB_FLAG=\"$PAR_LIBRARY_NAMES\" \
-        $FORTRANARGS \
         $ZLIB_ARGS \
         --prefix=\"$VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH\" \
         ${cf_build_type} \
-        --enable-optimize --without-petc --without-hypre" \
-        $ZLIBARGS 
+        --enable-minimal --enable-optimize \
+	--with-fortran=no --with-petsc=no --with-hypre=no \
+	--with-lapack=no --with-blas=no \
+        --with-mpi=built-in"
 
         sh -c "../src/configure CXX=\"$PAR_COMPILER_CXX\" CC=\"$PAR_COMPILER\" \
         CFLAGS=\"$CFLAGS $C_OPT_FLAGS\" CXXFLAGS=\"$CXXFLAGS $CXX_OPT_FLAGS\" \
         MPI_EXTRA_LIB_FLAG=\"$PAR_LIBRARY_NAMES\" \
-        $FORTRANARGS \
         $ZLIB_ARGS \
         --prefix=\"$VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH\" \
         ${cf_build_type} \
-        --enable-optimize --without-petc --without-hypre" \
-        $ZLIBARGS
+        --enable-minimal --enable-optimize \
+        --with-fortran=no --with-petsc=no --with-hypre=no \
+	--with-lapack=no --with-blas=no \
+        --with-mpi=built-in"
     fi
 
 
@@ -364,23 +347,22 @@ function build_uintah
     fi
 
     if [[ ! -e $VISITDIR/uintah/$UINTAH_VERSION ]] ; then
-	mkdir $VISITDIR/uintah/$UINTAH_VERSION || error "Can't make UINTAH install dir."
+        mkdir $VISITDIR/uintah/$UINTAH_VERSION || error "Can't make UINTAH install dir."
     fi
 
     if [[ ! -e $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH ]] ; then
-	mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH || error "Can't make UINTAH install dir."
-    else	
+        mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH || error "Can't make UINTAH install dir."
+    else        
         rm -rf $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/* || error "Can't remove old UINTAH install dir."
     fi
 
     mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/lib || error "Can't make UINTAH install dir."
     mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include || error "Can't make UINTAH install dir."
-    mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include/StandAlone || error "Can't make UINTAH install dir."
-    mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include/StandAlone/tools || error "Can't make UINTAH install dir."
-    mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include/StandAlone/tools/uda2vis || error "Can't make UINTAH install dir."
+    mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include/VisIt || error "Can't make UINTAH install dir."
+    mkdir $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include/VisIt/uda2vis || error "Can't make UINTAH install dir."
 
     cp lib/* $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/lib
-    cp ../src/StandAlone/tools/uda2vis/udaData.h $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include/StandAlone/tools/uda2vis
+    cp ../src/VisIt/uda2vis/udaData.h $VISITDIR/uintah/$UINTAH_VERSION/$VISITARCH/include/VisIt/uda2vis
 
     #    $MAKE install
     if [[ $? != 0 ]] ; then

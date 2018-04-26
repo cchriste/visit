@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -389,7 +389,16 @@ VisWinAnnotations::SetFrameAndState(int nFrames,
 bool
 VisWinAnnotations::AddAnnotationObject(int annotType, const std::string &annotName)
 {
+    int const static CREATE_ANNOTATION_OBJECT_AS_NOT_VISIBLE = 0x00010000;
     const char *mName = "VisWinAnnotations::AddAnnotationObject: ";
+    bool visible = true;
+
+    if (!(0 <= annotType && annotType <= 8))
+    {
+        if (annotType & CREATE_ANNOTATION_OBJECT_AS_NOT_VISIBLE)
+            visible = false;
+        annotType &= ~CREATE_ANNOTATION_OBJECT_AS_NOT_VISIBLE;
+    }
 
     //
     // Make sure that the name is unique.
@@ -446,6 +455,9 @@ VisWinAnnotations::AddAnnotationObject(int annotType, const std::string &annotNa
     //
     if(annot)
     {
+        if (!visible)
+            annot->SetVisible(false);
+
         // Set the annotation's name.
         if(annotName == "")
         {

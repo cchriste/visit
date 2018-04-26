@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -282,11 +282,7 @@ avtOriginatingDatasetSource::MergeExtents(vtkDataSet *ds, int dom, int ts,
     }
 
     int nvars = atts.GetNumberOfVariables();
-    // We will probably use only 2 of the 6.  But this avoids a UMR where
-    // the avtExtents object copies 6 values for vectors (even though it only
-    // uses the first 2 -- but that's a bigger battle.)
-    double dextents[6] = 
-                   { FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX };
+    double dextents[2] = { FLT_MAX, -FLT_MAX};
     for (int i = 0 ; i < nvars ; i++)
     {
         const char *vname = atts.GetVariableName(i).c_str();

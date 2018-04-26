@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -108,6 +108,8 @@ class QvisNoDefaultColorTableButton;
 //   Kathleen Biagas, Fri Aug 8 08:50:31 PDT 2014
 //   Added support for grouping color tables according to a category name.
 //
+//   Mark C. Miller, Wed Feb 28 14:56:09 PST 2018
+//   Handling "smoothing" label correctly.
 // ****************************************************************************
 
 class GUI_API QvisColorTableWindow : public QvisPostableWindowObserver
@@ -198,6 +200,7 @@ private:
     QSpinBox                 *colorNumColors;
     QButtonGroup             *colorTableTypeGroup;
 
+    QLabel                   *smoothLabel;
     QComboBox                *smoothingMethod;
     QCheckBox                *equalCheckBox;
     QvisSpectrumBar          *spectrumBar;

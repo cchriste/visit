@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -45,8 +45,11 @@
 
 #include <avtSTMDFileFormat.h>
 #include <avtDataSelection.h>
-#include <vector>
+
 #include <map>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mfem.hpp"
 class JSONRoot;
@@ -66,6 +69,8 @@ class JSONRoot;
 //   Cyrus Harrison, Wed Sep 24 10:47:00 PDT 2014
 //   Enable time varying metadata and SIL.
 //
+//   Mark C. Miller, Mon Dec 11 15:50:16 PST 2017
+//   Add support for an mfem_cat file
 // ****************************************************************************
 
 class avtMFEMFileFormat : public avtSTMDFileFormat
@@ -122,8 +127,13 @@ class avtMFEMFileFormat : public avtSTMDFileFormat
                                                                 int lod);
                                              
     JSONRoot                        *root;  
-    
-};
 
+    // For handling .mfem_cat files
+    void                             BuildCatFileMap(const std::string &cat_path);
+    void                             FetchDataFromCatFile(const std::string &cat_path,
+                                                          const std::string &mesh_path,
+                                                          std::istringstream &imeshstr);
+    std::map<std::string, std::pair<size_t,size_t> > catFileMap;
+};
 
 #endif

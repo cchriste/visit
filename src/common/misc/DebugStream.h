@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -74,5 +74,7 @@ namespace DebugStream
 #define debug3 if (!DebugStream::Level3()) ; else (DebugStream::Stream3())
 #define debug4 if (!DebugStream::Level4()) ; else (DebugStream::Stream4())
 #define debug5 if (!DebugStream::Level5()) ; else (DebugStream::Stream5())
+
+#define vcerr(c) if (VisItInit::IsComponent(#c)) std::cerr << #c ": "
 
 #endif

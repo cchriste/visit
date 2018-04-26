@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -91,5 +91,9 @@ bool        MISC_API VisItVersionsCompatible(const char*, const char*);
 bool        MISC_API VersionGreaterThan(const std::string &v1, const std::string &v2);
 void        MISC_API SetIsDevelopmentVersion(bool val);
 bool        MISC_API GetIsDevelopmentVersion();
+
+// Process IDs
+std::string MISC_API GetVisItPIDString();
+
 
 #endif

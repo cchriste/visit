@@ -1,6 +1,6 @@
 // ***************************************************************************
 //
-// Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+// Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 // Produced at the Lawrence Livermore National Laboratory
 // LLNL-CODE-442911
 // All rights reserved.
@@ -102,7 +102,7 @@ public class SaveWindowAttributes extends AttributeSubject
         binary = false;
         lastRealFilename = new String("");
         stereo = false;
-        compression = COMPRESSIONTYPE_PACKBITS;
+        compression = COMPRESSIONTYPE_NONE;
         forceMerge = false;
         resConstraint = RESCONSTRAINT_SCREENPROPORTIONS;
         advancedMultiWindowSave = false;
@@ -127,7 +127,7 @@ public class SaveWindowAttributes extends AttributeSubject
         binary = false;
         lastRealFilename = new String("");
         stereo = false;
-        compression = COMPRESSIONTYPE_PACKBITS;
+        compression = COMPRESSIONTYPE_NONE;
         forceMerge = false;
         resConstraint = RESCONSTRAINT_SCREENPROPORTIONS;
         advancedMultiWindowSave = false;

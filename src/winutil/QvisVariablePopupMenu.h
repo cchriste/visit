@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -72,9 +72,12 @@ class WINUTIL_API QvisVariablePopupMenu : public QMenu
 public:
     QvisVariablePopupMenu(int plotType_, QWidget *parent);
     virtual ~QvisVariablePopupMenu();
-    int getPlotType() const { return plotType; };
     void setPlotType(int p) { plotType = p; };
+    int getPlotType() const { return plotType; };
     void setVarPath(const QString &str) { varPath = str; };
+    QString getVarPath() const { return varPath; };
+    unsigned int getHashVal() const { return myHashVal; };
+    void setHashVal(unsigned int hv) { myHashVal = hv; };
 
     QAction *addVar(const QString &, bool valid = true);
     int count() const;
@@ -86,6 +89,7 @@ private:
     QActionGroup *actions;
     QString       varPath;
     int           plotType;
+    unsigned int  myHashVal;
 };
 
 #endif

@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -100,7 +100,7 @@ DataBinningCommonPluginInfo::CopyAttributes(AttributeSubject *to,
 }
 
 ExpressionList *
-DataBinningCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md)
+DataBinningCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md) const
 {
     char name[1024];
     char defn[1024];
@@ -109,6 +109,9 @@ DataBinningCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md
     for (int i = 0 ; i < md->GetNumMeshes() ; i++)
     {
         const char *mesh = md->GetMeshes(i).name.c_str();
+
+        if (md->GetMeshes(i).hideFromGUI || !md->GetMeshes(i).validVariable)
+            continue;
 
         Expression e2; 
         sprintf(name, "operators/DataBinning/1D/%s", mesh);

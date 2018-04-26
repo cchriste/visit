@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -74,43 +74,6 @@ QueryAttributes::VarType_FromString(const std::string &s, QueryAttributes::VarTy
         if(s == VarType_strings[i])
         {
             val = (VarType)i;
-            return true;
-        }
-    }
-    return false;
-}
-
-//
-// Enum conversion methods for QueryAttributes::DataType
-//
-
-static const char *DataType_strings[] = {
-"ActualData", "OriginalData"};
-
-std::string
-QueryAttributes::DataType_ToString(QueryAttributes::DataType t)
-{
-    int index = int(t);
-    if(index < 0 || index >= 2) index = 0;
-    return DataType_strings[index];
-}
-
-std::string
-QueryAttributes::DataType_ToString(int t)
-{
-    int index = (t < 0 || t >= 2) ? 0 : t;
-    return DataType_strings[index];
-}
-
-bool
-QueryAttributes::DataType_FromString(const std::string &s, QueryAttributes::DataType &val)
-{
-    val = QueryAttributes::ActualData;
-    for(int i = 0; i < 2; ++i)
-    {
-        if(s == DataType_strings[i])
-        {
-            val = (DataType)i;
             return true;
         }
     }
@@ -1223,15 +1186,6 @@ QueryAttributes::GetVariables()
     if (queryInputParams.HasEntry("vars"))
         return queryInputParams.GetEntry("vars")->AsStringVector();
     return defaultVars;
-}
-
-QueryAttributes::DataType
-QueryAttributes::GetDataType() const
-{
-    if (queryInputParams.HasNumericEntry("data_type"))
-        return (QueryAttributes::DataType)queryInputParams.GetEntry("data_type")->ToInt();
-    else
-        return QueryAttributes::ActualData;
 }
 
 void

@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -166,6 +166,8 @@ extern const char *visit_PickByGlobalNode_doc;
 extern const char *visit_PickByGlobalZone_doc;
 extern const char *visit_PickByNode_doc;
 extern const char *visit_PickByZone_doc;
+extern const char *visit_PickByZoneLabel_doc;
+extern const char *visit_PickByNodeLabel_doc;
 extern const char *visit_PlotPlugins_doc;
 extern const char *visit_PrintWindow_doc;
 extern const char *visit_PromoteOperator_doc;

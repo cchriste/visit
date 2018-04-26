@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -149,7 +149,7 @@ avtMacroExpressionFilter::ReplaceMacroInExpressionList(void)
     int num_expr = new_list.GetNumExpressions();
     for (int i = num_expr-1 ; i >= 0 ; i--)
     {
-        Expression &expr = new_list.GetExpressions(i);
+        Expression const &expr = new_list.GetExpressions(i);
         if (expr.GetName() == outputVariableName)
         {
             new_list.RemoveExpressions(i);

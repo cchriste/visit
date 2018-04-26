@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -70,6 +70,7 @@
 #include <DBPluginInfoAttributes.h>
 #include <EngineKey.h>
 #include <EngineList.h>
+#include <Environment.h>
 #include <ExportDBAttributes.h>
 #include <FileOpenOptions.h>
 #include <FileFunctions.h>
@@ -201,6 +202,12 @@ static int nConfigArgs = 1;
 #include <visit-config.h>
 #ifdef HAVE_OSMESA
 #include <vtkVisItOSMesaRenderingFactory.h>
+#endif
+
+// We do this so that the strings command on the .o file
+// can tell us whether or not DEBUG_MEMORY_LEAKS was turned on
+#ifdef DEBUG_MEMORY_LEAKS
+static const char *dummy_string1 = "DEBUG_MEMORY_LEAKS";
 #endif
 
 // ****************************************************************************
@@ -373,6 +380,11 @@ ViewerSubject::ViewerSubject() : ViewerBaseUI(),
     interpretCommands(), xfer(), clients(),
     unknownArguments(), clientArguments()
 {
+#ifdef DEBUG_MEMORY_LEAKS
+    // ensure dummy_string1 cannot optimized away
+    char const *dummy = dummy_string1; dummy++;
+#endif
+
     //
     // Initialize pointers to some Qt objects that don't get created
     // until later.
@@ -3467,14 +3479,24 @@ ViewerSubject::SimConnect(EngineKey &ek)
 //
 // Modifications:
 //
+//    Mark C. Miller, Thu Jun  8 15:07:19 PDT 2017
+//    Do nothing if SEG is disabled. Since GetOperatorCreatedExpressions
+//    already updates the global expression list, don't pass it in here. 
+//    Just pass in a dummy, empty list.
 // ****************************************************************************
 
 void
 ViewerSubject::UpdateExpressionCallback(const avtDatabaseMetaData *md, void *)
 {
-    ExpressionList *adder = ParsingExprList::Instance()->GetList();
-    VariableMenuPopulator::GetOperatorCreatedExpressions(*adder, md, 
-                                                         ViewerBase::GetOperatorPluginManager());
+    if (md->ShouldDisableSEG(Environment::exists(md->GetSEGEnvVarName())))
+        return;
+
+    ExpressionList dummyList;
+    // A side effect of calling GetOperatorCreatedExpression is that
+    // global expression list is updated.
+    VariableMenuPopulator::GetOperatorCreatedExpressions(dummyList, md,
+        ViewerBase::GetOperatorPluginManager(),
+        VariableMenuPopulator::GlobalOnly);
 }
 
 // ****************************************************************************

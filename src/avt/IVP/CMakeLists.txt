@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -108,7 +108,6 @@ ${VISIT_SOURCE_DIR}/avt/VisWindow/VisWindow
 ${VISIT_SOURCE_DIR}/visit_vtk/lightweight
 ${VISIT_SOURCE_DIR}/visit_vtk/full
 ${VISIT_SOURCE_DIR}/third_party_builtin/nek5000/jl
-${VISIT_SOURCE_DIR}/third_party_builtin/nektar++
 ${VTK_INCLUDE_DIRS}
 ${NEKTAR++_INCLUDE_DIR}
 ${NEKTAR++_INCLUDE_DIRS}

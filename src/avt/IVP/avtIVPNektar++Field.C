@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -207,7 +207,7 @@ avtIVPNektarPPField::operator()( const double &t,
     int nt_el = nektar_element_lookup[el];
 
     // Set up the point in the Nektar++ format.
-    Nektar::Array<OneD, NekDouble> coords(3);
+    Nektar::Array<Nektar::OneD, Nektar::NekDouble> coords(3);
     coords[0] = p[0];
     coords[1] = p[1];
     coords[2] = p[2];

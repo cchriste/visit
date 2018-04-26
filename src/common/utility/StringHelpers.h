@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -91,8 +91,8 @@ namespace StringHelpers
     std::string UTILITY_API ExtractRESubstr(const char *stringToSearch,
                                             const char *re);
 
-    bool UTILITY_API ValidatePrintfFormatString(const char *fmtStr,
-                                                const char *arg1Type, ...);
+    bool UTILITY_API ValidatePrintfFormatString(const char *fmtStr, ...);
+    bool UTILITY_API ValidatePrintfFormatString(int nargs, const char *fmtStr, ...);
 
     std::string UTILITY_API car(const std::string, const char separator);
     std::string UTILITY_API cdr(const std::string, const char separator);

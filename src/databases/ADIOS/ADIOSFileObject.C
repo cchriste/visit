@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -495,11 +495,9 @@ ADIOSFileObject::ReadScalarData(const std::string &nm, int ts, int block, vtkDat
     map<string, ADIOS_VARINFO*>::const_iterator it = variables.find(nm);
     if (it == variables.end())
         return false;
-    
+
     ADIOS_SELECTION *s = CreateSelection(it->second, block);
     ReadScalarData(nm, ts, s, arr);
-    delete [] s->u.bb.start;
-    delete [] s->u.bb.count;
     adios_selection_delete(s);
     return true;
 }

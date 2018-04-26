@@ -1,12 +1,6 @@
 function bv_qwt_initialize
 {
-    if [[ "$DO_SERVER_COMPONENTS_ONLY" == "yes" ]]; then
-        export DO_QT="no"
-    else
-        export DO_QT="yes"
-    fi
     export DO_QWT="yes"
-    export ON_QWT="on"
     export FORCE_QWT="no"
     export USE_SYSTEM_QWT="no"
     add_extra_commandline_args "qwt" "alt-qwt-dir" 1 "Use alternative directory for Qwt"
@@ -15,15 +9,13 @@ function bv_qwt_initialize
 function bv_qwt_enable
 {
     DO_QWT="yes"
-    ON_QWT="on"
     FORCE_QWT="yes"
 }
 
 function bv_qwt_disable
 {
     DO_QWT="no"
-    ON_QWT="off"
-    FORCE_QT="no"
+    FORCE_QWT="no"
 }
 
 function bv_qwt_force
@@ -79,14 +71,8 @@ function bv_qwt_print
 
 function bv_qwt_print_usage
 {
-    printf "%-15s %s [%s]\n" "--qwt" "Build with Qwt" "$DO_QWT"  
-    printf "%-15s %s [%s]\n" "--alt-qwt-dir" "Use Qwt from an alternative directory"
-}
-
-function bv_qwt_graphical
-{
-    local graphical_out="Qwt     $QWT_VERSION($QWT_FILE)      $ON_QWT"
-    echo "$graphical_out"
+    printf "%-20s %s [%s]\n" "--qwt" "Build with Qwt" "$DO_QWT"  
+    printf "%-20s %s [%s]\n" "--alt-qwt-dir" "Use Qwt from an alternative directory"
 }
 
 function bv_qwt_host_profile

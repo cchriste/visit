@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -911,7 +911,7 @@ QvisExpressionsWindow::UpdateWindowSingleItem()
     }
     else
     {
-        Expression &e = (*exprList)[indexMap[index]];
+        Expression const &e = (*exprList)[indexMap[index]];
 
         nameEdit->setText(e.GetName().c_str());
 
@@ -1653,7 +1653,12 @@ QvisExpressionsWindow::ExpandFunction(const QString &func_name)
     }
 
 
-    if (func_name == "conn_cmfe" || func_name == "curve_cmfe")
+    if (func_name == "curve_cmfe")
+    {
+        res += QString("(<filename:curve>, <curvename>)");
+        doParens = false;
+    }
+    else if (func_name == "conn_cmfe")
     {
         res += QString("(<filename:var>, <meshname>)");
         doParens = false;

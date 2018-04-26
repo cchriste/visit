@@ -1,19 +1,16 @@
 function bv_boxlib_initialize
 {
     export DO_BOXLIB="no"
-    export ON_BOXLIB="off"
 }
 
 function bv_boxlib_enable
 {
     DO_BOXLIB="yes"
-    ON_BOXLIB="on"
 }
 
 function bv_boxlib_disable
 {
     DO_BOXLIB="no"
-    ON_BOXLIB="off"
 }
 
 function bv_boxlib_depends_on
@@ -42,13 +39,7 @@ function bv_boxlib_print
 
 function bv_boxlib_print_usage
 {
-    printf "%-15s %s [%s]\n" "--boxlib"  "Build Boxlib" "$DO_BOXLIB" 
-}
-
-function bv_boxlib_graphical
-{
-    local graphical_output="Boxlib   $BOXLIB_VERSION($BOXLIB_FILE)    $ON_BOXLIB"
-    echo $graphical_output
+    printf "%-20s %s [%s]\n" "--boxlib"  "Build Boxlib" "$DO_BOXLIB" 
 }
 
 function bv_boxlib_host_profile
@@ -87,6 +78,35 @@ function bv_boxlib_dry_run
 #                         Function 8.8, build_boxlib                          #
 # *************************************************************************** #
 
+function apply_boxlib_patch
+{
+    patch -p0 << \EOF
+diff -c a/Src/C_BaseLib/FArrayBox.cpp ccse-1.3.5/Src/C_BaseLib/FArrayBox.cpp
+*** a/Src/C_BaseLib/FArrayBox.cpp
+--- ccse-1.3.5/Src/C_BaseLib/FArrayBox.cpp
+***************
+*** 21,30 ****
+  #include <BL_CXX11.H>
+  #include <MemPool.H>
+  
+- #ifdef BL_Darwin
+  using std::isinf;
+  using std::isnan;
+- #endif
+  
+  #if defined(DEBUG) || defined(BL_TESTING)
+  bool FArrayBox::do_initval = true;
+--- 21,28 ----
+EOF
+    if [[ $? != 0 ]] ; then
+        warn "boxlib patch failed."
+        return 1
+    fi
+
+    return 0;
+
+}
+
 function build_boxlib
 {
     #
@@ -97,6 +117,23 @@ function build_boxlib
     if [[ $untarred_boxlib == -1 ]] ; then
         warn "Unable to prepare Boxlib Build Directory. Giving Up"
         return 1
+    fi
+
+    #
+    # Apply patches
+    #
+    info "Patching Boxlib . . ."
+    apply_boxlib_patch
+    if [[ $? != 0 ]] ; then
+        if [[ $untarred_boxlib == 1 ]] ; then
+            warn "Giving up on Boxlib build because the patch failed."
+            return 1
+        else
+            warn "Patch failed, but continuing.  I believe that this script\n" \
+                 "tried to apply a patch to an existing directory that had\n" \
+                 "already been patched ... that is, the patch is\n" \
+                 "failing harmlessly on a second application."
+        fi
     fi
 
     cd $BOXLIB_BUILD_DIR || error "Can't cd to BoxLib build dir."

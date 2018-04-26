@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -65,6 +65,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#define AVT_SUBSET_LEGEND_MAX_LABELS 100
 
 using std::sort;
 using std::string;
@@ -849,7 +851,7 @@ avtSubsetPlot::NeedZBufferToCompositeEvenIn2D(void)
 void 
 avtSubsetPlot::SetColors()
 {
-    vector < string > allLabels = atts.GetSubsetNames();
+    const vector < string > &allLabels = atts.GetSubsetNames();
     vector < string > labels; 
     LevelColorMap levelColorMap;
 
@@ -859,7 +861,17 @@ avtSubsetPlot::SetColors()
     {
         levelsLegend->SetColorBarVisibility(0);
         levelsLegend->SetMessage("No subsets present");
-    }  
+    }
+    else if(labels.size() > AVT_SUBSET_LEGEND_MAX_LABELS)
+    {
+        char msg[100];
+        SNPRINTF(msg, 100, "%d subsets", static_cast<int>(labels.size()));
+        levelsLegend->SetColorBarVisibility(0);
+        levelsLegend->SetMessage(msg);
+
+        // Limit the number of labels.
+        labels.resize(AVT_SUBSET_LEGEND_MAX_LABELS);
+    }
     else 
     {
         levelsLegend->SetColorBarVisibility(1);

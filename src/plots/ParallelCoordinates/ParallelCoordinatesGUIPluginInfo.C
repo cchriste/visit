@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -140,7 +140,7 @@ ParallelCoordinatesGUIPluginInfo::CreatePluginWizard(AttributeSubject *attr,
     const ExpressionList *expList)
 {
     bool showWizard  = true;
-    if (md->GetScalar(varName) == NULL)
+    if (md->GetScalar(varName) == NULL && md->GetCurve(varName) == NULL)
     {
         int expressionCount = expList->GetNumExpressions();
         int expNum;

@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -45,6 +45,16 @@
 #MESSAGE(STATUS "  NEKTAR++_VERSION=${NEKTAR++_VERSION}")
 #MESSAGE(STATUS "  VISIT_NEKTAR++_DIR=${VISIT_NEKTAR++_DIR}")
 
+# The libraries as of Nektar++ 4.4
+SET(NEKTAR++_LIBRARIES LibUtilities
+                       StdRegions
+                       SpatialDomains
+                       LocalRegions
+                       MultiRegions
+                       Collections
+                       GlobalMapping
+                       FieldUtils)
+
 If( EXISTS ${VISIT_NEKTAR++_DIR} )
 
     IF(EXISTS ${VISIT_NEKTAR++_DIR}/lib64)
@@ -80,15 +90,12 @@ INCLUDE(${VISIT_SOURCE_DIR}/CMake/SetUpThirdParty.cmake)
 SET_UP_THIRD_PARTY(NEKTAR++
     ${LIB}/nektar++-${NEKTAR++_VERSION}
     include/nektar++-${NEKTAR++_VERSION}
-    Collections
-    LibUtilities
-    LocalRegions
-    MultiRegions
-    SolverUtils
-    SpatialDomains
-    StdRegions)
+    ${NEKTAR++_LIBRARIES}
+    )
 
 IF(NEKTAR++_FOUND)
     SET(HAVE_NEKTAR_PP true CACHE BOOL "Have Nektar++ lib")
+else()
+    unset(NEKTAR++_LIBRARIES)
 ENDIF(NEKTAR++_FOUND)
 

@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -44,10 +44,29 @@
 #include <vector>
 #include "Buffer.h"
 
+
+#if defined(_WIN32)
+# if defined(mpicom_EXPORTS)
+#  define VISITMPICOM_API __declspec(dllexport)
+# else
+#  define VISITMPICOM_API __declspec(dllimport)
+# endif
+#else
+# if __GNUC__ >= 4
+#   define VISITMPICOM_API __attribute__ ((visibility("default")))
+# else
+#   define VISITMPICOM_API /* not affected */
+# endif
+#endif
+
+
 using namespace std;
 
 // Make the initmpicom function callable from C.
-extern "C" { void initmpicom(void); }
+extern "C"
+{ 
+    VISITMPICOM_API void initmpicom(void);
+}
 
 MPI_Comm mpi_group = MPI_COMM_WORLD;
 void *mpi_comm_ptr = &mpi_group;
@@ -1221,7 +1240,6 @@ initmpicom(void)
     PyObject *pyobj = PyLong_FromLong((long) MPI_PROC_NULL);
     PyObject_SetAttrString(mpicom_mod, "MPI_PROC_NULL", pyobj);
     Py_DECREF(pyobj);
-
 }
 
 

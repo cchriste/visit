@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -50,7 +50,7 @@ from visit_test import *
 from visit_utils.qannote import *
 
 try:
-    import PySide.QtCore
+    import PySide2.QtCore
 except:
     pass
 
@@ -59,6 +59,8 @@ output_dir  = pjoin(os.path.split(__file__)[0],"_output")
 data_dir    = pjoin(os.path.split(__file__)[0],"_data")
 
 def out_path(fname):
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
     odir = pjoin(output_dir,"qannote")
     if not os.path.isdir(odir):
         os.mkdir(odir)

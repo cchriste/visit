@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -101,6 +101,8 @@ class avtSpecies;
 //    Mark C. Miller, Mon Nov  5 19:34:12 PST 2007
 //    Added support for sparse material representation and expressions
 //
+//    Mark C. Miller, Mon Dec  4 13:29:42 PST 2017
+//    Add support for databases that specify the mesh name
 // ****************************************************************************
 
 class avtSAMRAIFileFormat : public avtSTMDFileFormat
@@ -189,6 +191,7 @@ class avtSAMRAIFileFormat : public avtSTMDFileFormat
     vtkDataSet                 ***cached_patches;
     std::string                   file_name;
     std::string                   dir_name;
+    std::string                   mesh_name;
     bool                          have_read_metadata_file;
 
     std::string                   grid_type;
@@ -240,6 +243,7 @@ class avtSAMRAIFileFormat : public avtSTMDFileFormat
 
     var_extents_t               **var_extents; 
     patch_extents_t              *patch_extents;
+    int                          *patch_bdry_type;
     patch_map_t                  *patch_map;
 
     int                          *child_array;
@@ -272,6 +276,8 @@ class avtSAMRAIFileFormat : public avtSTMDFileFormat
 
     void            ReadAndCheckVDRVersion(hid_t &h5_file);
 
+    void            ReadMeshName(hid_t &h5_file);
+
     void            ReadGridType(hid_t &h5_file);
 
     void            ReadTime(hid_t &h5_file);
@@ -299,6 +305,7 @@ class avtSAMRAIFileFormat : public avtSTMDFileFormat
     
     void            ReadVarExtents(hid_t &h5_file);
     void            ReadPatchExtents(hid_t &h5_file);
+    void            ReadPatchBoundaryType(hid_t &h5_file);
     void            ReadPatchMap(hid_t &h5_file);
     
     void            ReadChildArrayLength(hid_t &h5_file);

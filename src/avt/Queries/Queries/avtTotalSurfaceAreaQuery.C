@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -187,11 +187,9 @@ avtTotalSurfaceAreaQuery::ApplyFilters(avtDataObject_p inData)
 
     if (timeVarying) 
     { 
-        avtDataRequest_p oldSpec = inData->GetOriginatingSource()->
-            GetGeneralContract()->GetDataRequest();
+        avtDataRequest_p oldSpec = contract->GetDataRequest();
 
-        avtDataRequest_p newDS = new 
-            avtDataRequest(oldSpec, querySILR);
+        avtDataRequest_p newDS = new avtDataRequest(oldSpec, querySILR);
         newDS->SetTimestep(queryAtts.GetTimeStep());
 
         contract = new avtContract(newDS, contract->GetPipelineIndex());

@@ -1,19 +1,16 @@
 function bv_mpich_initialize
 {
     export DO_MPICH="no"
-    export ON_MPICH="off"
 }
 
 function bv_mpich_enable
 {
     DO_MPICH="yes"
-    ON_MPICH="on"
 }
 
 function bv_mpich_disable
 {
     DO_MPICH="no"
-    ON_MPICH="off"
 }
 
 function bv_mpich_depends_on
@@ -44,13 +41,7 @@ function bv_mpich_print
 
 function bv_mpich_print_usage
 {
-    printf "%-15s %s [%s]\n" "--mpich" "Build MPICH support" "$DO_MPICH"
-}
-
-function bv_mpich_graphical
-{
-    local graphical_out="MPICH     $MPICH_VERSION($MPICH_FILE)      $ON_MPICH"
-    echo "$graphical_out"
+    printf "%-20s %s [%s]\n" "--mpich" "Build MPICH support" "$DO_MPICH"
 }
 
 function bv_mpich_host_profile

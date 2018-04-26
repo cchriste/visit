@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -136,6 +136,9 @@ class     avtVariableCache;
 //
 //    Burlen Loring, Tue Sep 29 13:39:15 PDT 2015
 //    Clean up some warnings
+//
+//    Matt Larsen, Sat Jul 1 11:32:01 PDT 2017
+//    Adding helper function to add element label meta data 
 //
 // ****************************************************************************
 
@@ -289,6 +292,9 @@ class DATABASE_API avtFileFormat
                                       const double * = NULL);
     void       AddTensorVarToMetaData(avtDatabaseMetaData *, std::string,
                                       std::string, avtCentering, int = 3);
+    void       AddLabelVarToMetaData(avtDatabaseMetaData *, std::string,
+                                     std::string, avtCentering, int = 3,
+                                     bool hideFromGUI = false);
     void       AddSymmetricTensorVarToMetaData(avtDatabaseMetaData *,
                               std::string, std::string, avtCentering, int = 3);
     void       AddMaterialToMetaData(avtDatabaseMetaData *, std::string,

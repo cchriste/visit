@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -75,11 +75,6 @@ public:
         Species,
         Curve,
         Unknown
-    };
-    enum DataType
-    {
-        ActualData,
-        OriginalData
     };
 
     // These constructors are for objects of this class
@@ -168,11 +163,6 @@ public:
 protected:
     static std::string VarType_ToString(int);
 public:
-    static std::string DataType_ToString(DataType);
-    static bool DataType_FromString(const std::string &, DataType &);
-protected:
-    static std::string DataType_ToString(int);
-public:
 
     // Keyframing methods
     virtual std::string               GetFieldName(int index) const;
@@ -186,7 +176,6 @@ public:
     std::string &GetName();
     const stringVector &GetVariables() const;
     stringVector &GetVariables();
-    DataType GetDataType() const;
     void Reset();
     void PrintSelf(ostream &os);
     void SetResultsValue(const double);

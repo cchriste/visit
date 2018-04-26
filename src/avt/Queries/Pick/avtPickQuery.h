@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -142,8 +142,14 @@ class avtExpressionEvaluatorFilter;
 //    Fix a couple of warnings
 //
 //    Matt Larsen, Fri Jul 8 08:15:00 PDT 2016
-//    Added method ExtractZonePickHighlights to support 
+//    Added method ExtractZonePickHighlights to support
 //    zone highlights
+//
+//    Kathleen Biagas, Wed Jun 28 15:35:59 PDT 2017
+//    Added invTransform data member.
+//
+//    Matt Laren, Thur May 4 13:55:01 PDT 2017
+//    Added method to translate between element label and id
 //
 // ****************************************************************************
 
@@ -181,6 +187,7 @@ class QUERY_API avtPickQuery : public avtDatasetQuery
     int                             blockOrigin;
     avtGhostType                    ghostType;
     const avtMatrix                *transform;
+    const avtMatrix                *invTransform;
     bool                            singleDomain;
     bool                            needTransform;
     bool                            skippedLocate;
@@ -195,13 +202,17 @@ class QUERY_API avtPickQuery : public avtDatasetQuery
     bool                            DeterminePickedNode(vtkDataSet *, int &);
     void                            GetNodeCoords(vtkDataSet *, const int);
     void                            GetZoneCoords(vtkDataSet *, const int);
-
     void                            RetrieveVarInfo(vtkDataSet *);
     void                            RetrieveVarInfo(vtkDataSet *, const int);
     void                            RetrieveVarInfo(vtkDataSet *, const int,
                                                     const intVector &);
     bool                            RetrieveNodes(vtkDataSet *, int, bool = false);
     bool                            RetrieveZones(vtkDataSet *, int, bool = false);
+
+    bool                            GetElementIdByLabel(const std::string &,
+                                                        bool,
+                                                        int &,
+                                                        int);
 
     int                             GetCurrentNodeForOriginal(vtkDataSet *,
                                                               const int);
@@ -216,8 +227,8 @@ class QUERY_API avtPickQuery : public avtDatasetQuery
 
     void                            ExtractZonePickHighlights(const int &,
                                                               vtkDataSet *,
-                                                              const int &);                   
-    
+                                                              const int &);
+
     PickAttributes                  pickAtts;
     avtExpressionEvaluatorFilter   *eef;
     avtQueryableSource             *src;

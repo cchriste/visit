@@ -82,18 +82,23 @@ function initialize_build_visit()
             export MACOSX_DEPLOYMENT_TARGET=10.11
             export C_COMPILER=${C_COMPILER:-"clang"}
             export CXX_COMPILER=${CXX_COMPILER:-"clang++"}
+        elif [[ ${VER%%.*} == 16 ]] ; then
+            export MACOSX_DEPLOYMENT_TARGET=10.12
+            export C_COMPILER=${C_COMPILER:-"clang"}
+            export CXX_COMPILER=${CXX_COMPILER:-"clang++"}
+        elif [[ ${VER%%.*} == 17 ]] ; then
+            export MACOSX_DEPLOYMENT_TARGET=10.13
+            export C_COMPILER=${C_COMPILER:-"clang"}
+            export CXX_COMPILER=${CXX_COMPILER:-"clang++"}
         else
-            export MACOSX_DEPLOYMENT_TARGET=10.11
+            export MACOSX_DEPLOYMENT_TARGET=10.13
             export C_COMPILER=${C_COMPILER:-"clang"}
             export CXX_COMPILER=${CXX_COMPILER:-"clang++"}
         fi
 
-
         export C_COMPILER=${C_COMPILER:-"gcc"}
         export CXX_COMPILER=${CXX_COMPILER:-"g++"}
-
-        # Disable Fortran on Darwin since it causes HDF5, H5Part, Silo, ADIOS builds to explode.
-        export FC_COMPILER=""
+        export FC_COMPILER=${FC_COMPILER:-$GFORTRAN}
         export C_OPT_FLAGS=${C_OPT_FLAGS:-"-O2"}
         export CFLAGS=${CFLAGS:-"-fno-common -fexceptions"}
         export CXX_OPT_FLAGS=${CXX_OPT_FLAGS:-"-O2"}
@@ -280,48 +285,28 @@ function initialize_build_visit()
     done
 
     export DO_HOSTCONF="yes"
-    export ON_HOSTCONF="on"
+    export DO_QT_SILENT="yes"
 
     export DO_DEBUG="no"
-    export ON_DEBUG="off"
     export DO_GROUP="no"
-    export ON_GROUP="off"
     export DO_LOG="no"
-    export ON_LOG="off"
     parallel="no"
-    ON_parallel="off"
     export DO_SVN="no"
     export DO_SVN_ANON="no"
-    export ON_SVN="off"
     export DO_REVISION="no"
-    export ON_REVISION="off"
     USE_VISIT_FILE="no"
-    ON_USE_VISIT_FILE="off"
     export DO_PATH="no"
-    export ON_PATH="off"
     export DO_VERSION="no"
-    export ON_VERSION="off"
     export DO_VERBOSE="no"
-    export ON_VERBOSE="off"
     export DO_JAVA="no"
-    export ON_JAVA="off"
     export DO_FORTRAN="no"
-    export ON_FORTRAN="off"
     export DO_SLIVR="no"
-    export ON_SLIVR="off"
     export DO_PARADIS="no"
-    export ON_PARADIS="off"
     export PREVENT_ICET="no"
-    GRAPHICAL="no"
-    ON_GRAPHICAL="off"
     verify="no"
-    ON_verify="off"
     export DO_OPTIONAL="yes"
-    export ON_OPTIONAL="on"
     export DO_OPTIONAL2="no"
-    export ON_OPTIONAL2="off"
     export DO_MORE="no"
-    export ON_MORE="off"
     export DO_DBIO_ONLY="no"
     export DO_ENGINE_ONLY="no"
     export DO_SERVER_COMPONENTS_ONLY="no"
@@ -332,6 +317,7 @@ function initialize_build_visit()
     export VISIT_BUILD_MODE="Release"
     export VISIT_SELECTED_DATABASE_PLUGINS=""
     export DO_XDB="no"
+    export VISIT_INSTALL_NETWORK=""
     DOWNLOAD_ONLY="no"
 
 
@@ -346,9 +332,9 @@ function initialize_build_visit()
     export SVN_ANON_ROOT_PATH="http://visit.ilight.com/svn/visit"
     # Setup svn path: use SVN_NERSC_NAME if set
     if test -z "$SVN_NERSC_NAME" ; then
-        export SVN_REPO_ROOT_PATH="svn+ssh://edison.nersc.gov/project/projectdirs/visit/svn/visit"
+        export SVN_REPO_ROOT_PATH="svn+ssh://cori.nersc.gov/project/projectdirs/visit/svn/visit"
     else
-        export SVN_REPO_ROOT_PATH="svn+ssh://$SVN_NERSC_NAME@edison.nersc.gov/project/projectdirs/visit/svn/visit"
+        export SVN_REPO_ROOT_PATH="svn+ssh://$SVN_NERSC_NAME@cori.nersc.gov/project/projectdirs/visit/svn/visit"
     fi
 
 
@@ -375,7 +361,6 @@ function initialize_build_visit()
     #
     if [[ "$VISIT_FILE" != "" ]] ; then
         USE_VISIT_FILE="yes"
-        ON_USE_VISIT_FILE="on"
     fi
     export VISIT_FILE=${VISIT_FILE:-"visit${VISIT_VERSION}.tar.gz"}
 
@@ -392,16 +377,9 @@ function initialize_build_visit()
     done
 
 
-    # Dialog-related variables.
-    DLG="dialog"
-    DLG_BACKTITLE="VisIt $VISIT_VERSION Build Process"
-    DLG_HEIGHT="5"
-    DLG_HEIGHT_TALL="25"
-    DLG_WIDTH="60"
-    DLG_WIDTH_WIDE="80"
     WRITE_UNIFIED_FILE=""
     VISIT_INSTALLATION_BUILD_DIR=""
-    VISIT_DRY_RUN=0
+    VISIT_DRY_RUN="no"
     DO_SUPER_BUILD="no"
     DO_MANGLED_LIBRARIES="no"
 }
@@ -491,6 +469,9 @@ function bv_enable_group
         do
             if [[ "$group" == "$name" ]]; then
                 echo "executing group $name"
+                if [[ "$group" == "dbio-only" ]]; then
+                    DO_DBIO_ONLY="yes"
+                fi
                 match=1
                 for group_dep in `echo ${grouplibs_deps[$bv_i]}`;
                 do
@@ -840,9 +821,11 @@ function run_build_visit()
                 cc) C_COMPILER="${arg}";;
                 cxx) CXX_COMPILER="${arg}";;
                 database-plugins) VISIT_SELECTED_DATABASE_PLUGINS="${arg}";;
+                fc) FC_COMPILER="${arg}"; DO_FORTRAN="yes";;
                 log-file) LOG_FILE="${arg}";;
                 makeflags) MAKE_OPT_FLAGS="${arg}";;
                 prefix) VISIT_INSTALL_PREFIX="${arg}";;
+                install-network) VISIT_INSTALL_NETWORK="${arg}";;
                 group) GROUP="${arg}";;
                 svn) SVNREVISION="${arg}";;
                 tarball) VISIT_FILE="${arg}";;
@@ -923,7 +906,7 @@ function run_build_visit()
             --installation-build-dir) next_arg="installation-build-dir";;
             --write-unified-file) next_arg="write-unified-file";;
             --parallel-build) DO_SUPER_BUILD="yes";;
-            --dry-run) VISIT_DRY_RUN=1;;
+            --dry-run) VISIT_DRY_RUN="yes";;
             --arch) next_arg="arch";;
             --build-mode) next_arg="build-mode";;
             --cflag) next_arg="append-cflags";;
@@ -933,28 +916,29 @@ function run_build_visit()
             --cc) next_arg="cc";;
             --cxx) next_arg="cxx";;
             --log-file) next_arg="log-file";;
-            --console) GRAPHICAL="no"; ON_GRAPHICAL="off";;
-            --gui) GRAPHICAL="yes"; ON_GRAPHICAL="on";;
             --database-plugins) next_arg="database-plugins";;
             --debug) C_OPT_FLAGS="${C_OPT_FLAGS} -g"; CXX_OPT_FLAGS="${CXX_OPT_FLAGS} -g"; VISIT_BUILD_MODE="Debug";;
             --bv-debug) set -vx;;
             --download-only) DOWNLOAD_ONLY="yes";;
             --engine-only) DO_ENGINE_ONLY="yes";;
             --flags-debug) C_OPT_FLAGS="${C_OPT_FLAGS} -g"; CXX_OPT_FLAGS="${CXX_OPT_FLAGS} -g"; VISIT_BUILD_MODE="Debug";;
-            --gdal) DO_GDAL="yes"; ON_GDAL="on";;
-            --fortran) DO_FORTRAN="yes"; ON_FORTRAN="on";;
-            --group) next_arg="group"; DO_GROUP="yes"; ON_GROUP="on";;
+            --gdal) DO_GDAL="yes";;
+            --fc) next_arg="fc";;
+            --fortran) DO_FORTRAN="yes";;
+            --group) next_arg="group"; DO_GROUP="yes";;
             -h|--help) next_action="help";;
-            --java) DO_JAVA="yes"; ON_JAVA="on";;
+            --install-network) next_arg="install-network";;
+            --java) DO_JAVA="yes";;
             --makeflags) next_arg="makeflags";;
-            --no-hostconf) DO_HOSTCONF="no"; ON_HOSTCONF="off";;
-            --no-boost) DO_BOOST="no"; ON_BOOST="off";;
-            --parallel) parallel="yes"; DO_ICET="yes"; ON_ICET="on"; ON_parallel="on";;
+            --no-hostconf) DO_HOSTCONF="no";;
+            --no-boost) DO_BOOST="no";;
+            --no-qt-silent) DO_QT_SILENT="no";;
+            --parallel) parallel="yes"; DO_ICET="yes";;
             --prefix) next_arg="prefix";;
             --print-vars) next_action="print-vars";;
             --server-components-only) DO_SERVER_COMPONENTS_ONLY="yes";;
-            --slivr) DO_SLIVR="yes"; ON_SLIVR="on";;
-            --paradis) DO_PARADIS="yes"; ON_PARADIS="on";;
+            --slivr) DO_SLIVR="yes";;
+            --paradis) DO_PARADIS="yes";;
             --static) DO_STATIC_BUILD="yes"
                       export USE_VISIBILITY_HIDDEN="no"
                       CXXFLAGS=$(echo $CXXFLAGS | sed "s/-fPIC//g")
@@ -967,12 +951,11 @@ function run_build_visit()
             --svn-anonymous) DO_SVN="yes"; DO_SVN_ANON="yes" ; export SVN_ROOT_PATH=$SVN_ANON_ROOT_PATH ;;
             --svn-revision) next_arg="svn"; DO_SVN="yes"; DO_REVISION="yes"; DO_SVN_ANON="yes" ; export SVN_ROOT_PATH=$SVN_ANON_ROOT_PATH ;;
             --tarball) next_arg="tarball"
-                       USE_VISIT_FILE="yes"
-                       ON_USE_VISIT_FILE="on";;
-            --thirdparty-path) next_arg="thirdparty-path"
-                               ON_THIRD_PARTY_PATH="on";;
+                       USE_VISIT_FILE="yes";;
+            --thirdparty-path) next_arg="thirdparty-path";;
             --version) next_arg="version";;
             --xdb) DO_XDB="yes";;
+            --console) ;;
             -4) deprecated="${deprecated} --hdf4";;
             -5) deprecated="${deprecated} --hdf5";;
             -c) deprecated="${deprecated} --cgns";;
@@ -1083,264 +1066,6 @@ function run_build_visit()
         warn "Fortran support for thirdparty libraries disabled."
     fi
 
-    # Show a splashscreen. This routine also determines if we have "dialog"
-    # or "whiptail", which we use to show dialogs. If we do not have either
-    # then proceed in non-graphical mode.
-    #
-
-    if [[ "$GRAPHICAL" == "yes" ]] ; then
-        DLG=$(which dialog)
-
-        # Guard against bad "which" implementations that return
-        # "no <exe> in path1 path2 ..." (these implementations also
-        # return 0 as the exit status).
-        if [[ "${DLG#no }" != "${DLG}" ]] ; then
-            DLG=""
-        fi
-        if [[ "$DLG" == "" ]] ; then
-            warn "Could not find 'dialog'; looking for 'whiptail'."
-            DLG=$(which whiptail)
-            if [[ "${DLG#no }" != "${DLG}" ]] ; then
-                DLG=""
-            fi
-            if [[ "$DLG" == "" ]] ; then
-                GRAPHICAL="no"
-                warn "'whiptail' not found."
-                warn ""
-                warn "Unable to find utility for graphical build..."
-                warn "Continuing in command line mode..."
-                warn ""
-                test -t 1
-                if test $? != 1 ; then
-                    warn "Please hit enter to continue."
-                    (read junkvar)
-                fi
-            else
-                warn "Some versions of 'whiptail' fail to display anything with --infobox."
-                warn "Continuing in command line mode..."
-            fi
-        fi
-    fi
-    if [[ "$GRAPHICAL" == "yes" ]] ; then
-        result=$($DLG --backtitle "$DLG_BACKTITLE" \
-                      --title "Build options" \
-                      --checklist \
-                      "Welcome to the VisIt $VISIT_VERSION build process.\n\n"\
-                      "This program will build VisIt and its required "\
-                      "3rd party sources, downloading any missing source packages "\
-                      "before building. The required and optional 3rd party libraries "\
-                      "are built and installed before VisIt is built, so please be patient. "\
-                      "Note that you can build a parallel version of VisIt by "\
-                      "specifying the location of your MPI installation when prompted.\n\n"\
-                      "Select the build options:" 0 0 0 \
-                      "Groups"    "select 3rd party and advanced build"  $ON_OPTIONAL\
-                      "Custom"    "select custom flags provided by each module"  $ON_OPTIONAL2\
-                      "SVN"        "get sources from SVN server"     $ON_SVN\
-                      "Tarball"    "specify VisIt tarball name"      $ON_USE_VISIT_FILE\
-                      "Parallel"   "specify parallel build flags"    $ON_parallel\
-                      "Java"       "enable java client library"      $ON_JAVA\
-                      "Fortran"    "enable fortran in third party libraries"  $ON_FORTRAN\
-                      "SLIVR"      "enable SLIVR volume rendering library"  $ON_SLIVR\
-                      "Paradis"    "enable paraDIS client library"   $ON_PARADIS\
-                      "EnvVars"    "specify build environment var values"   $ON_verify\
-                      "Advanced"   "display advanced options"        $ON_MORE  3>&1 1>&2 2>&3)
-        retval=$?
-
-        # Remove the extra quoting, new dialog has --single-quoted
-        choice="$(echo $result | sed 's/\"//g' )"
-
-        case $retval in
-            0)
-                DO_OPTIONAL="no"
-                DO_OPTIONAL2="no"
-                DO_SVN="no"
-                USE_VISIT_FILE="no"
-                parallel="no"
-                DO_JAVA="no"
-                DO_FORTRAN="no"
-                DO_SLIVR="no"
-                DO_PARADIS="no"
-                verify="no"
-                DO_MORE="no"
-                for OPTION in $choice
-                do
-                    case $OPTION in
-                        Groups)
-                            DO_OPTIONAL="yes";;
-                        Custom)
-                            DO_OPTIONAL2="yes";;
-                        SVN)
-                            DO_SVN="yes";DO_SVN_ANON="yes";export SVN_ROOT_PATH=$SVN_ANON_ROOT_PATH ;;
-                        Tarball)
-                            result=$($DLG --backtitle "$DLG_BACKTITLE" \
-                                          --nocancel --inputbox \
-                                          "Enter $OPTION value:" 0 $DLG_WIDTH_WIDE "$VISIT_FILE" 3>&1 1>&2 2>&3)
-                            VISIT_FILE="$(echo $result)"
-                            USE_VISIT_FILE="yes";;
-                        Parallel)
-                            parallel="yes"; DO_ICET="yes"; ON_ICET="on";;
-                        Java)
-                            DO_JAVA="yes";;
-                        Fortran)
-                            DO_FORTRAN="yes";;
-                        SLIVR)
-                            DO_SLIVR="yes";;
-                        Paradis)
-                            DO_PARADIS="yes";;
-                        EnvVars)
-                            verify="yes";;
-                        Advanced)
-                            DO_MORE="yes";;
-                    esac
-                done
-                ;;
-            1)
-                warn "Cancel pressed."
-                exit 1;;
-            255)
-                warn "ESC pressed.";;
-            *)
-                warn "Unexpected return code: $retval";;
-        esac
-    fi
-
-    if [[ "$DO_OPTIONAL" == "yes" && "$GRAPHICAL" == "yes" ]] ; then
-
-        local add_checklist_vars=""
-
-        for (( bv_i=0; bv_i < ${#grouplibs_name[*]}; ++bv_i ))
-        do
-            name="${grouplibs_name[$bv_i]}"
-            comment="${grouplibs_comment[$bv_i]}"
-            enabled="${grouplibs_enabled[$bv_i]}"
-            output_str="$name \"$comment\" 0 \"  Customize($name)\" \"Customize selection of $name\" 0"
-            add_checklist_vars="$add_checklist_vars ${output_str}"
-        done
-
-        #calling whiptail directly is having issues delimiting by space , so hacking around it
-        result=$(echo "$DLG --backtitle \"Group options\" --title \"Groups provided by build_visit\" --checklist \"select\" 0 0 0 $add_checklist_vars 3>&1 1>&2 2>&3 || echo \"Cancelled Operation\"" | awk '{system($0)}')
-
-        if [[ $result == "Cancelled Operation" ]]; then
-            warn "Operation was cancelled, exiting"
-            exit 1
-        fi
-
-        # Remove the extra quoting, new dialog has --single-quoted
-        choice="$(echo $result | sed 's/\"//g' )"
-        for OPTION in $choice
-        do
-            #if customize operation
-            if [[ "$OPTION" != Customize* ]]; then
-                #execute the entire group..
-                bv_enable_group "$OPTION"
-                continue
-            fi
-
-            #allow modification of predefined groups
-            add_checklist_vars=""
-
-            for (( bv_i=0; bv_i < ${#grouplibs_name[*]}; ++bv_i ))
-            do
-                name="${grouplibs_name[$bv_i]}"
-                #dialog and whiptail treat parantheses differently
-                if [[ "Customize($name)" == "$OPTION" || "Customize\\($name\\)" == "$OPTION" ]]; then
-                    echo "Customizing $name"
-                    comment="${grouplibs_comment[$bv_i]}"
-                    enabled="${grouplibs_enabled[$bv_i]}"
-
-                    for group_dep in `echo ${grouplibs_deps[$bv_i]}`
-                    do
-                        output_str="${group_dep} \"Enable/Disable $group_dep library\" 1"
-                        add_checklist_vars="$add_checklist_vars ${output_str}"
-                    done
-                    result=$(echo "$DLG --backtitle \"$comment\" \
-                                    --title \"Custom options for $name\" \
-                                    --checklist \"select\" 0 0 0 $add_checklist_vars \
-                                    3>&1 1>&2 2>&3 || echo \"Cancelled Operation\"" \
-                                    | awk '{system($0)}')
-
-                    if [[ $result == "Cancelled Operation" ]]; then
-                        echo "Operation was cancelled"
-                        exit 1
-                    fi
-                    choice_custom="$(echo $result | sed 's/\"//g' )"
-                    for OPTION_CUSTOM in $choice_custom
-                    do
-                        #initialize all the ones
-                        if [[ "$OPTION_CUSTOM" == no-* ]]; then
-                            OPTION_CUSTOM=${OPTION_CUSTOM/no-}
-                            #echo "disabling $OPTION_CUSTOM"
-                            initializeFunc="bv_${OPTION_CUSTOM}_disable"
-                            $initalizeFunc
-                        else
-                            #echo "enable $OPTION_CUSTOM"
-                            initializeFunc="bv_${OPTION_CUSTOM}_enable"
-                            $initializeFunc
-                        fi
-                    done
-                fi
-            done
-        done
-    fi
-
-    if [[ "$DO_OPTIONAL2" == "yes" && "$GRAPHICAL" == "yes" ]] ; then
-
-        local needsRerun=1
-
-        while [[ $needsRerun == 1 ]];
-        do
-            needsRerun=0
-            local add_checklist_vars=""
-            for (( bv_i=0; bv_i<${#extra_commandline_args[*]}; bv_i += 5 ))
-            do
-                local module_name=${extra_commandline_args[$bv_i]}
-                local command=${extra_commandline_args[$bv_i+1]}
-                #local args=${extra_commandline_args[$bv_i+2]}
-                local comment=${extra_commandline_args[$bv_i+3]}
-                output_str="\"$command\" \"$comment ($module_name)\" 0"
-                add_checklist_vars="$add_checklist_vars ${output_str}"
-            done
-
-            #calling whiptail directly is having issues delimiting by space , so hacking around it
-            result=$(echo "$DLG --backtitle \"Custom options\" --title \"d by build_visit\" --checklist \"select\" 0 0 0 $add_checklist_vars 3>&1 1>&2 2>&3 || echo \"Cancelled Operation\"" | awk '{system($0)}')
-
-            if [[ $result == "Cancelled Operation" ]]; then
-                warn "Operation was cancelled, skipping"
-                break
-            fi
-
-            # Remove the extra quoting, new dialog has --single-quoted
-            choice="$(echo $result | sed 's/\"//g' )"
-            for OPTION in $choice
-            do
-                for (( bv_i=0; bv_i<${#extra_commandline_args[*]}; bv_i += 5 ))
-                do
-                    local module_name=${extra_commandline_args[$bv_i]}
-                    local command=${extra_commandline_args[$bv_i+1]}
-                    local args=${extra_commandline_args[$bv_i+2]}
-                    local comment=${extra_commandline_args[$bv_i+3]}
-                    local fp=${extra_commandline_args[$bv_i+4]}
-                    if [[ "$command" == "$OPTION" ]]; then
-                        if [[ $args -ne 0 ]]; then
-                            result=$($DLG --backtitle "$DLG_BACKTITLE" \
-                                          --inputbox \
-                                          "Enter $OPTION value:" 0 $DLG_WIDTH_WIDE "" 3>&1 1>&2 2>&3)
-                            retval=$?
-                            if [[ $retval == 0 ]]; then
-                                echo "executing $command"
-                                $fp "$result"
-                            else
-                                needsRerun=1
-                            fi
-                        else
-                            $fp
-                        fi
-                    fi
-                done
-            done
-        done
-    fi
-
     # make all VisIt related builds in its own directory..
     if [[ $VISIT_INSTALLATION_BUILD_DIR != "" ]] ; then
         if [[ -d $VISIT_INSTALLATION_BUILD_DIR ]]; then
@@ -1354,14 +1079,6 @@ function run_build_visit()
             exit 0
         fi
         cd $VISIT_INSTALLATION_BUILD_DIR
-    fi
-
-    #
-    # See if the user needs to modify some variables
-    #
-    check_more_options
-    if [[ $? != 0 ]] ; then
-        error "Stopping build because of bad variable option setting error."
     fi
 
     #
@@ -1387,10 +1104,10 @@ function run_build_visit()
     info "enabling any dependent libraries"
     enable_dependent_libraries
 
-    ## At this point we are after the command line and the visual selection
-    #dry run, don't execute anything just run the enabled stuff..
-    #happens before any downloads have taken place..
-    if [[ $VISIT_DRY_RUN -eq 1 ]]; then
+    # At this point we are after the command line and the visual selection
+    # dry run, don't execute anything just run the enabled stuff..
+    # happens before any downloads have taken place..
+    if [[ $VISIT_DRY_RUN == "yes" ]]; then
         for (( bv_i=0; bv_i<${#reqlibs[*]}; ++bv_i ))
         do
             initializeFunc="bv_${reqlibs[$bv_i]}_dry_run"
@@ -1418,34 +1135,16 @@ function run_build_visit()
                           "Bailing out."
                 fi
             else
-                if [[ "$GRAPHICAL" == "yes" ]] ; then
-                    if [[ "$REDIRECT_ACTIVE" == "yes" ]] ; then
-                        $DLG --backtitle "$DLG_BACKTITLE" --yesno "The third party library location does not exist. Create it?" 0 0 1>&3
-                    else
-                        $DLG --backtitle "$DLG_BACKTITLE" --yesno "The third party library location does not exist. Create it?" 0 0
-                    fi
-                    if [[ $? == 1 ]] ; then
-                        error "The third party library location does not exist." \
-                              "Bailing out."
-                    else
-                        mkdir "$THIRD_PARTY_PATH"
-                        if [[ $? != 0 ]] ; then
-                            error "Unable to write files to the third party library location." \
-                                  "Bailing out."
-                        fi
-                    fi
+                info "The third party library location does not exist. Create it?"
+                read RESPONSE
+                if [[ "$RESPONSE" != "yes" ]] ; then
+                    error "The third party library location does not exist." \
+                          "Bailing out."
                 else
-                    info "The third party library location does not exist. Create it?"
-                    read RESPONSE
-                    if [[ "$RESPONSE" != "yes" ]] ; then
-                        error "The third party library location does not exist." \
+                    mkdir "$THIRD_PARTY_PATH"
+                    if [[ $? != 0 ]] ; then
+                        error "Unable to write files to the third party library location." \
                               "Bailing out."
-                    else
-                        mkdir "$THIRD_PARTY_PATH"
-                        if [[ $? != 0 ]] ; then
-                            error "Unable to write files to the third party library location." \
-                                  "Bailing out."
-                        fi
                     fi
                 fi
             fi
@@ -1458,12 +1157,17 @@ function run_build_visit()
     fi
 
     if [[ $VISITARCH == "" ]] ; then
-        export VISITARCH=${ARCH}_${C_COMPILER}
-        if [[ "$CXX_COMPILER" == "g++" ]] ; then
-            VERSION=$(g++ -v 2>&1 | grep "gcc version" | cut -d' ' -f3 | cut -d'.' -f1-2)
+        C_COMPILER_BASENAME=$(basename ${C_COMPILER})
+        CXX_COMPILER_BASENAME=$(basename ${CXX_COMPILER})
+        export VISITARCH=${ARCH}_${C_COMPILER_BASENAME}
+        if [[ "$CXX_COMPILER_BASENAME" == "g++" ]] ; then
+            VERSION=$(${CXX_COMPILER} -v 2>&1 | grep "gcc version" | cut -d' ' -f3 | cut -d'.' -f1-2)
             if [[ ${#VERSION} == 3 ]] ; then
                 VISITARCH=${VISITARCH}-${VERSION}
             fi
+        elif [[ "$CXX_COMPILER_BASENAME" == "icpc" ]] ; then
+            VERSION=$(${CXX_COMPILER} -v 2>&1 | cut -d' ' -f3)
+            VISITARCH=${VISITARCH}-${VERSION}
         fi
     fi
 
@@ -1478,22 +1182,34 @@ function run_build_visit()
         error "Stopping build because necessary parallel options are not set."
     fi
 
-    check_variables
-    if [[ $? != 0 ]] ; then
-        error "Stopping build because of bad variable option setting error."
-    fi
-
     if [[ "$DO_ICET" == "yes" && "$PREVENT_ICET" != "yes" ]] ; then
         DO_CMAKE="yes"
     fi
 
-    #initialize module variables, since all of VisIt's variables should be set by now..
+    # initialize module variables, since all of VisIt's variables should
+    # be set by now..
     initialize_module_variables
+
+    #
+    # Disable qt,qwt if it is not needed
+    #
+    if [[ "$DO_ENGINE_ONLY" == "yes" || "$DO_DBIO_ONLY" == "yes" || "$DO_SERVER_COMPONENTS_ONLY" == "yes" ]] ; then
+        if [[ "$DO_ENGINE_ONLY" == "yes" ]] ; then
+           info "disabling qt, qwt because --engine-only used"
+        elif [[ "$DO_DBIO_ONLY" == "yes" ]] ; then
+           info "disabling qt, qwt because --dbio-only used"
+        elif [[ "$DO_SERVER_COMPONENTS_ONLY" == "yes" ]] ; then
+           info "disabling qt, qwt because --server-components-only used"
+        fi
+        bv_qt_disable
+        bv_qwt_disable
+    fi
+
     #
     # Later we will build Qt.  We are going to bypass their licensing agreement,
     # so echo it here.
     #
-    if [[ "$USE_SYSTEM_QT" != "yes" && "$DO_QT" == "yes" && "$DO_SERVER_COMPONENTS_ONLY" == "no" ]]; then
+    if [[ "$USE_SYSTEM_QT" != "yes" && "$DO_QT" == "yes" ]]; then
         BYPASS_QT_LICENSE="no"
         check_if_installed "qt" $QT_VERSION
         if [[ $? == 0 ]] ; then

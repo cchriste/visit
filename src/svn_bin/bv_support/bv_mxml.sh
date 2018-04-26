@@ -1,19 +1,16 @@
 function bv_mxml_initialize
 {
     export DO_MXML="no"
-    export ON_MXML="off"
 }
 
 function bv_mxml_enable
 {
     DO_MXML="yes"
-    ON_MXML="on"
 }
 
 function bv_mxml_disable
 {
     DO_MXML="no"
-    ON_MXML="off"
 }
 
 function bv_mxml_depends_on
@@ -48,7 +45,7 @@ function bv_mxml_host_profile
 function bv_mxml_print_usage
 {
     #mxml does not have an option, it is only dependent on mxml.
-    printf "%-15s %s [%s]\n" "--mxml" "Build Mxml" "$DO_MXML"
+    printf "%-20s %s [%s]\n" "--mxml" "Build Mxml" "$DO_MXML"
 }
 
 function bv_mxml_ensure
@@ -235,9 +232,3 @@ function bv_mxml_build
     fi
 }
 
-function bv_mxml_graphical
-{
-    local graphical_out="MXML    $MXML_VERSION($MXML_FILE)     $ON_MXML"
-    #echo "$graphical_out"
-    echo ""
-}

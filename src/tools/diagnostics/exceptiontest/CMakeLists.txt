@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -52,7 +52,7 @@ ${LIBRARY_OUTPUT_DIRECTORY}
 )
 
 ADD_EXECUTABLE(exceptiontest exceptiontest.cpp)
-TARGET_LINK_LIBRARIES(exceptiontest visitcommon)
+TARGET_LINK_LIBRARIES(exceptiontest ${VISIT_EXE_LINKER_FLAGS} visitcommon)
 
 IF(VISIT_PARALLEL)
     ADD_PARALLEL_EXECUTABLE(exceptiontest_par exceptiontest.cpp)

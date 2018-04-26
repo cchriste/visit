@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -451,6 +451,8 @@ VisItInit::Initialize(int &argc, char *argv[], int r, int n, bool strip, bool si
     visitTimer->SetFilename(progname);
     if(enableTimings)
         visitTimer->Enable();
+
+    atexit(VisItInit::Finalize);
 
 #if !defined(_WIN32)
     std::set_new_handler(NewHandler);

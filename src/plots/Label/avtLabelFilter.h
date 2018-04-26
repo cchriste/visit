@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -66,6 +66,9 @@ class vtkDataSet;
 //    Added mayBeLogical, cellOrigin, nodeOrigin, to aid in calculating
 //    logical indices.
 //
+//    Alister Maguire, Mon Feb 26 09:28:05 PST 2018
+//    Added ModifyContract to turn on MIR if needed.  
+//
 // ****************************************************************************
 
 class avtLabelFilter : public avtDataTreeIterator
@@ -106,6 +109,7 @@ class avtLabelFilter : public avtDataTreeIterator
 
     virtual avtDataRepresentation *ExecuteData(avtDataRepresentation *);
     virtual void              UpdateDataObjectInfo(void);
+    virtual avtContract_p     ModifyContract(avtContract_p);
 };
 
 

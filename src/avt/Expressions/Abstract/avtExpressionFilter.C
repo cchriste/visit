@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -357,7 +357,7 @@ avtExpressionFilter::UpdateExtents(avtDataTree_p tree)
             compexts[d*2+1] = -DBL_MAX;
         }
 
-        double exts[6];
+        double exts[2];
         unsigned char *ghosts = NULL;
         if (isPoint)
         {
@@ -867,7 +867,7 @@ avtExpressionFilter::DetermineVariableType(std::string &varname)
     // Note: due to the way that the pipeline is constructed by the EEF, 
     // I'm not sure if this case will ever occur.
     //
-    Expression *exp = ParsingExprList::GetExpression(varname.c_str());
+    Expression const *exp = ParsingExprList::GetExpression(varname.c_str());
     if (exp != NULL)
         return ExprType_To_avtVarType(exp->GetType());
 

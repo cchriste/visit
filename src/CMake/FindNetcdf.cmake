@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -46,7 +46,13 @@ INCLUDE(${VISIT_SOURCE_DIR}/CMake/SetUpThirdParty.cmake)
 
 SET_UP_THIRD_PARTY(NETCDF lib include netcdf)
 
-SET (NETCDF_CXX_DIR ${NETCDF_DIR})
-
-SET_UP_THIRD_PARTY(NETCDF_CXX lib include netcdf_c++)
+if (WIN32)
+    if (MSVC_VERSION LESS "1910")
+      set(NETCDF_CXX_DIR ${NETCDF_DIR})
+      SET_UP_THIRD_PARTY(NETCDF_CXX lib include netcdf_c++)
+    endif()
+else()
+    set(NETCDF_CXX_DIR ${NETCDF_DIR})
+    SET_UP_THIRD_PARTY(NETCDF_CXX lib include netcdf_c++)
+endif()
 

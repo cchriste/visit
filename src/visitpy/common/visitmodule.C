@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -229,7 +229,7 @@
 # if defined(visitmodule_EXPORTS)
 #  define VISITMODULE_API __declspec(dllexport)
 # else
-#  define VISITMODULE_API 
+#  define VISITMODULE_API __declspec(dllimport)
 # endif
 #else
 # if __GNUC__ >= 4
@@ -474,11 +474,12 @@ static std::map<std::string, AnnotationObjectRef> localObjectMap;
 
 static bool                  suppressQueryOutputState = false;
 
-static enum QueryOutputReturnType {
+typedef enum QueryOutputReturnType {
     QueryString = 0,
     QueryValue,
     QueryObject
-} queryOutputReturnType = QueryString;
+};
+static QueryOutputReturnType queryOutputReturnType = QueryString;
 
 // pickle related
 bool      pickleReady=false;
@@ -9052,6 +9053,9 @@ visit_GetPickOutput(PyObject *self, PyObject *args)
 // Programmer: Kathleen Biagas 
 // Creation:   September 22, 2011
 //
+// Modifications:
+//  Matt Larsen Aug 21, 2017:
+//  adding the ability to get the output of a pick through a range of elements
 // ****************************************************************************
 
 STATIC PyObject *
@@ -9060,10 +9064,18 @@ visit_GetPickOutputObject(PyObject *self, PyObject *args)
     ENSURE_VIEWER_EXISTS();
     PickAttributes *pa = GetViewerState()->GetPickAttributes();
     std::string pickOut;
-    pa->CreateXMLString(pickOut);
-    XMLNode xml_node(pickOut);
-    MapNode node(xml_node);
-    return PyMapNode_Wrap(node);
+    if(pa->GetHasRangeOutput())
+    {
+        MapNode node = pa->GetRangeOutput();
+        return PyMapNode_Wrap(node);
+    }
+    else
+    {
+        pa->CreateXMLString(pickOut);
+        XMLNode xml_node(pickOut);
+        MapNode node(xml_node);
+        return PyMapNode_Wrap(node);
+    }
 }
 
 
@@ -13548,13 +13560,157 @@ visit_PickByZone(PyObject *self, PyObject *args, PyObject *kwargs)
             return NULL;
         }
     }
-    if (!pickParams.HasEntry("element") && !pickParams.HasEntry("pick_range"))
+    if (!pickParams.HasEntry("element") && 
+        !pickParams.HasEntry("pick_range") )
     {
-        VisItErrorFunc("PickByZone: requires \"element\" argument.");
+        VisItErrorFunc("PickByZone: requires \"element\" or \"pick_range\" argument.");
         return NULL;
     } 
     pickParams["query_name"] = std::string("Pick");
+    
     pickParams["pick_type"] = std::string("DomainZone");
+
+    ParseTimePickOptions(pickParams);
+
+    if (!suppressQueryOutputState)
+        ToggleSuppressQueryOutput_NoLogging(true);
+
+    MUTEX_LOCK();
+        GetViewerMethods()->Query(pickParams);
+    MUTEX_UNLOCK();
+    Synchronize();
+
+    if (!suppressQueryOutputState)
+        ToggleSuppressQueryOutput_NoLogging(false);
+
+    return visit_GetPickOutputObject(self, args);
+}
+
+
+// ****************************************************************************
+// Function: visit_PickByZoneLabel
+//
+// Purpose:
+//   Tells the viewer to do PickByZoneLabel.
+//
+// Notes:
+//
+// Programmer: Matt Larsen (Based on pick on PickByZone)
+// Creation:   April 12, 2017
+//
+// Modifications
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_PickByZoneLabel(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    bool parse_success = true;
+    MapNode pickParams;
+
+    // parse arguments.  First check if first arg (if present) is
+    // a python dictionary object
+    // If not, check for named args (kwargs).
+    if (PyTuple_Size(args) > 0)
+    {
+        parse_success = PyDict_To_MapNode(PyTuple_GetItem(args,0), pickParams); 
+        if (!parse_success)
+        {
+           VisItErrorFunc("PickByZoneLabel:  could not parse dictionary argument.");
+           return NULL;
+        }
+    }
+    else if (kwargs != NULL)
+    {
+        parse_success = PyDict_To_MapNode(kwargs, pickParams); 
+        if (!parse_success)
+        {
+            VisItErrorFunc("PickByZoneLabel:  could not parse keyword arguments.");
+            return NULL;
+        }
+    }
+    if ( !pickParams.HasEntry("element_label") )
+    {
+        VisItErrorFunc("PickByZoneLabel: requires \"element_name\" argument.");
+        return NULL;
+    } 
+    pickParams["query_name"] = std::string("Pick");
+    
+    pickParams["pick_type"] = std::string("ZoneLabel");
+    pickParams["element"] = 0;
+
+    ParseTimePickOptions(pickParams);
+
+    if (!suppressQueryOutputState)
+        ToggleSuppressQueryOutput_NoLogging(true);
+
+    MUTEX_LOCK();
+        GetViewerMethods()->Query(pickParams);
+    MUTEX_UNLOCK();
+    Synchronize();
+
+    if (!suppressQueryOutputState)
+        ToggleSuppressQueryOutput_NoLogging(false);
+
+    return visit_GetPickOutputObject(self, args);
+}
+
+// ****************************************************************************
+// Function: visit_PickByNodeLabel
+//
+// Purpose:
+//   Tells the viewer to do PickByNodeLabel.
+//
+// Notes:
+//
+// Programmer: Matt Larsen (Based on pick on PickByNode)
+// Creation:   April 12, 2017
+//
+// Modifications
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_PickByNodeLabel(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    bool parse_success = true;
+    MapNode pickParams;
+
+    // parse arguments.  First check if first arg (if present) is
+    // a python dictionary object
+    // If not, check for named args (kwargs).
+    if (PyTuple_Size(args) > 0)
+    {
+        parse_success = PyDict_To_MapNode(PyTuple_GetItem(args,0), pickParams); 
+        if (!parse_success)
+        {
+           VisItErrorFunc("PickByNodeLabel:  could not parse dictionary argument.");
+           return NULL;
+        }
+    }
+    else if (kwargs != NULL)
+    {
+        parse_success = PyDict_To_MapNode(kwargs, pickParams); 
+        if (!parse_success)
+        {
+            VisItErrorFunc("PickByNodeLabel:  could not parse keyword arguments.");
+            return NULL;
+        }
+    }
+    if ( !pickParams.HasEntry("element_label") )
+    {
+        VisItErrorFunc("PickByNodeLabel: requires \"element_name\" argument.");
+        return NULL;
+    } 
+    pickParams["query_name"] = std::string("Pick");
+    
+    pickParams["pick_type"] = std::string("NodeLabel");
+    pickParams["element"] = 0;
+
     ParseTimePickOptions(pickParams);
 
     if (!suppressQueryOutputState)
@@ -14588,30 +14744,37 @@ visit_CreateAnnotationObject(PyObject *self, PyObject *args)
     const char *mName = "visit_CreateAnnotationObject: ";
     ENSURE_VIEWER_EXISTS();
 
+    int createAsVisible = -1; // not specified
     const char *annotType = 0, *annotName = 0;
-    if (!PyArg_ParseTuple(args, "ss", &annotType, &annotName))
-    {
-        if (!PyArg_ParseTuple(args, "s", &annotType))
-            return NULL;
 
+    if      (PyArg_ParseTuple(args, "ssi", &annotType, &annotName, &createAsVisible))
+        ; // no-op
+    else if (PyArg_ParseTuple(args, "ss", &annotType, &annotName))
+        ; // no-op
+    else if (PyArg_ParseTuple(args, "si", &annotType, &createAsVisible))
         annotName = "";
-        PyErr_Clear();
-    }
+    else if (PyArg_ParseTuple(args, "s", &annotType))
+        annotName = "";
+    else
+        return NULL;
+    PyErr_Clear();
+    if (createAsVisible < 0)
+        createAsVisible = 1;
 
     // See if it is an annotation type that we know about
-    int annotTypeIndex;
+    int annotTypeAndFlags;
     if(strcmp(annotType, "TimeSlider") == 0)
-        annotTypeIndex = 2;
+        annotTypeAndFlags = 2;
     else if(strcmp(annotType, "Text2D") == 0)
-        annotTypeIndex = 0;
+        annotTypeAndFlags = 0;
     else if(strcmp(annotType, "Text3D") == 0)
-        annotTypeIndex = 1;
+        annotTypeAndFlags = 1;
     else if(strcmp(annotType, "Line2D") == 0)
-        annotTypeIndex = 3;
+        annotTypeAndFlags = 3;
     else if(strcmp(annotType, "Line3D") == 0)
-        annotTypeIndex = 4;
+        annotTypeAndFlags = 4;
     else if(strcmp(annotType, "Image") == 0)
-        annotTypeIndex = 8;
+        annotTypeAndFlags = 8;
     else if(strcmp(annotType, "LegendAttributes") == 0)
     {
         VisItErrorFunc("Legends are created by plots and the legend attributes "
@@ -14632,11 +14795,16 @@ visit_CreateAnnotationObject(PyObject *self, PyObject *args)
         return NULL;
     }
 
+    // To avoid protocol changes, we pass creation flag(s) in annotType
+    int const static CREATE_ANNOTATION_OBJECT_AS_NOT_VISIBLE = 0x00010000;
+    if (!createAsVisible)
+        annotTypeAndFlags |= CREATE_ANNOTATION_OBJECT_AS_NOT_VISIBLE;
+
     // Create the annotation.
     MUTEX_LOCK();
         debug1 << mName << "Telling the viewer to create a new " << annotType
                << " annotation object called \"" << annotName << "\"\n";
-        GetViewerMethods()->AddAnnotationObject(annotTypeIndex, annotName);
+        GetViewerMethods()->AddAnnotationObject(annotTypeAndFlags, annotName);
     MUTEX_UNLOCK();
     int errorFlag = Synchronize();
 
@@ -17363,6 +17531,8 @@ AddProxyMethods()
     AddMethod("Pick", visit_ZonePick, visit_ZonePick_doc);
     AddMethod("PickByNode", visit_PickByNode, visit_PickByNode_doc);
     AddMethod("PickByZone", visit_PickByZone, visit_PickByZone_doc);
+    AddMethod("PickByZoneLabel", visit_PickByZoneLabel, visit_PickByZoneLabel_doc);
+    AddMethod("PickByNodeLabel", visit_PickByNodeLabel, visit_PickByNodeLabel_doc);
     AddMethod("PickByGlobalNode", visit_PickByGlobalNode,
                                                    visit_PickByGlobalNode_doc);
     AddMethod("PickByGlobalZone", visit_PickByGlobalZone,
@@ -17383,7 +17553,7 @@ AddProxyMethods()
     AddMethod("RemoveLastOperator", visit_RemoveLastOperator,
                                                      visit_RemoveOperator_doc);
     AddMethod("RemoveOperator", visit_RemoveOperator,visit_RemoveOperator_doc);
-    AddMethod("RenamePickLabel", visit_RenamePickLabel, visit_RenamePickLabel_doc);
+    AddMethod("ReenamePickLabel", visit_RenamePickLabel, visit_RenamePickLabel_doc);
     AddMethod("ReOpenDatabase", visit_ReOpenDatabase,visit_ReOpenDatabase_doc);
     AddMethod("ReplaceDatabase", visit_ReplaceDatabase,
                                                     visit_ReplaceDatabase_doc);

@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -54,7 +54,7 @@ from threading import Event, Thread
 using_pyside = False
 
 try:
-    from PySide.QtGui import QApplication
+    from PySide2.QtWidgets import QApplication
     import pyside_hook
     import pyside_gui
     using_pyside = True

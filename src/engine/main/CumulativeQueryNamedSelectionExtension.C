@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -1548,6 +1548,9 @@ CumulativeQuery<CQCellIdentifier, CQSelection>::SelectAndHistogram(
                   c.variable = 0.; // we don't need the variable anymore
 
                   narrowedSelection[cellid] = c;
+
+                  debug5 << mName << "cell selected "
+                         << CellIdentifierFromID( cellid ) << std::endl;
                 }
                 else
                 {
@@ -1731,6 +1734,9 @@ CumulativeQuery<CQCellIdentifier, CQSelection>::SelectAndHistogram(
                 c.variable = 0.; // we don't need the variable anymore
 
                 narrowedSelection[cellid] = c;
+
+                debug5 << mName << "cell selected "
+                       << CellIdentifierFromID( cellid ) << std::endl;
             }
         }
     }
@@ -1895,6 +1901,9 @@ CumulativeQuery<CQCellIdentifier, CQSelection>::SelectAndHistogram(
                   c.variable = 0.; // we don't need the variable anymore
 
                   narrowedSelection[cellid] = c;
+
+                  debug5 << mName << "cell selected "
+                         << CellIdentifierFromID( cellid ) << std::endl;
                 }
                 else
                 {

@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -131,6 +131,7 @@ ${ALL_THIRDPARTY_IO_LIBRARY_DIR}
 
 ADD_EXECUTABLE(mdserver ${VISIT_APPLICATION_STYLE} ${MDSERVER_SOURCES} ${MDSERVER_STATIC_SOURCES} ${VISIT_MDSERVER_RESOURCE_FILE})
 TARGET_LINK_LIBRARIES(mdserver 
+    ${VISIT_EXE_LINKER_FLAGS}
     ${mdserver_MDatabase}
     ${mdserver_IDatabase}
     mdserverrpc 
@@ -149,6 +150,10 @@ TARGET_LINK_LIBRARIES(mdserver
     ${CMAKE_THREAD_LIBS} 
     ${DL_LIB}
 )
+
+if(WIN32 AND MSVC)
+    set_target_properties(mdserver PROPERTIES LINK_FLAGS "/STACK:4000000")
+endif()
 
 # If we're building statically then the mdserver can't be linked until the plugin
 # sources are built

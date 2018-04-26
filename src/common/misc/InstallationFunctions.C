@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -64,6 +64,8 @@
 // Static vars.
 //
 static bool isDevelopmentVersion = false;
+static int pid = -1;
+static std::string pidStr = "-1";
 
 // ****************************************************************************
 // Method: GetDefaultConfigFile
@@ -1361,5 +1363,39 @@ GetVisItLibraryDirectory(const char *version)
 #endif
     std::string libdir = varchdir + VISIT_SLASH_CHAR + "lib";
     return libdir;
+}
+
+// ****************************************************************************
+// Method: GetVisItPIDString
+//
+// Purpose:
+//   Gets VisIt's process Id as a string.
+//
+// Returns:    The process Id string.
+//
+// Programmer: Kevin Griffin
+// Creation:   March 6, 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+std::string
+GetVisItPIDString()
+{
+    if(pid == -1)
+    {
+#if defined(_WIN32)
+        pid = static_cast<int>(GetCurrentProcessId());
+#else
+        pid = static_cast<int>(getpid());
+#endif
+        char buffer[50];
+        SNPRINTF(buffer, 50, "%d", pid);
+        
+        pidStr = std::string(buffer);
+    }
+    
+    return pidStr;
 }
 

@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -282,7 +282,7 @@ avtExpressionEvaluatorFilter::VerifyVariableTypes(void)
     {
         const std::string &varname = atts.GetVariableName(i);
         avtVarType vt = atts.GetVariableType(varname.c_str());
-        Expression *exp = ParsingExprList::GetExpression(varname.c_str());
+        Expression const *exp = ParsingExprList::GetExpression(varname.c_str());
         if (exp == NULL)
             continue;
         Expression::ExprType et = exp->GetType();
@@ -498,7 +498,7 @@ avtExpressionEvaluatorFilter::ModifyContract(avtContract_p spec)
         }
 
         // Check if this is an expression, a real variable, or a data binning.
-        Expression *exp = ParsingExprList::GetExpression(var);
+        Expression const *exp = ParsingExprList::GetExpression(var);
         avtDataBinning *db = NULL;
         if (getDataBinningCallback != NULL)
             db = getDataBinningCallback(getDataBinningCallbackArgs, var.c_str());

@@ -16,7 +16,7 @@
 #include <map>
 #include <vector>
 
-#define __CLASS__ "VsStructuredMesh::"
+#define __CLASS__ "VsVariableWithMesh::"
 
 
 VsVariableWithMesh::VsVariableWithMesh(VsDataset* data):
@@ -60,6 +60,30 @@ bool VsVariableWithMesh::isCompMinor() const {
 bool VsVariableWithMesh::isCompMajor() const {
   return ((indexOrder == VsSchema::compMajorCKey) ||
       (indexOrder == VsSchema::compMajorFKey));
+}
+
+std::string VsVariableWithMesh::getAxisLabel(size_t axis) const {
+//  return this->axisLabels[axis];
+  if (axisLabels.size() > axis) {
+    return axisLabels[axis];
+  }
+
+  std::string answer = "";
+  if (axisLabels.empty()) {
+    switch (axis) {
+      case 0: answer = "x"; break;
+      case 1: answer = "y"; break;
+      case 2: answer = "z"; break;
+      default:
+        VsLog::warningLog()
+            << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
+            << "Requested axis  (" <<axis <<") number must be 0, 1, or 2."
+            << std::endl;
+        break;
+    }
+  }
+
+  return answer;
 }
 
 std::string VsVariableWithMesh::getFullTransformedName() const {
@@ -136,16 +160,16 @@ std::vector<int> VsVariableWithMesh::getDims() const
   return dataset->getDims();
 }
 
-void VsVariableWithMesh::getCellDims(std::vector<int>& dims) const
-{
-  dims = dataset->getDims();
-}
-
 void VsVariableWithMesh::getNodeDims(std::vector<int>& dims) const
 {
   dims.resize(1);
 
-  dims[0] = (int)getNumPoints();
+  dims[0] = (int) getNumPoints();
+}
+
+void VsVariableWithMesh::getCellDims(std::vector<int>& dims) const
+{
+  getNodeDims( dims );
 }
 
 size_t VsVariableWithMesh::getNumPoints() const
@@ -154,6 +178,11 @@ size_t VsVariableWithMesh::getNumPoints() const
     return dataset->getDims()[0];
   else
     return dataset->getDims()[1];
+}
+
+size_t VsVariableWithMesh::getNumCells() const
+{
+  return getNumPoints();
 }
 
 // Get hdf5 type
@@ -190,6 +219,7 @@ VsAttribute* VsVariableWithMesh::getAttribute(const std::string& name) const {
   return dataset->getAttribute(name);
 }
 
+/*
 std::string VsVariableWithMesh::getStringAttribute(const std::string& name) const {
 
   std::string result("");
@@ -200,6 +230,17 @@ std::string VsVariableWithMesh::getStringAttribute(const std::string& name) cons
 
   return result;
 }
+*/
+
+void VsVariableWithMesh::getStringAttribute(std::string attName, std::string* value) const {
+  VsAttribute* att = getAttribute(attName);
+  if (att) {
+    att->getStringValue(value);
+  } else {
+    value->clear();
+  }
+}
+
 //retrieve a particular spatial dimension index from the list
 //returns -1 on failure
 int VsVariableWithMesh::getSpatialDim(size_t index) const {
@@ -230,33 +271,7 @@ bool VsVariableWithMesh::initialize() {
   VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
                     << " entering." << std::endl;
 
-  //We have two ways of specifying information for varWithMesh:
-  // 1. VsSpatialIndices indicates which columns contain spatial data
-  // (synergia style)
-  // 2. Spatial information is in the first "vsNumSpatialDims" columns
-  // (regular style)
-  //we start with synergia style, and drop through to regular style on
-  //any errors
-  bool numDimsSet = false;
-  
-  VsAttribute* spatialIndicesAtt = getAttribute(VsSchema::spatialIndicesAtt);
-  if (spatialIndicesAtt) {
-    VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
-                      << "found spatialIndices, trying synergia style"
-                      << std::endl;
-
-    std::vector<int> in;
-    size_t err = spatialIndicesAtt->getIntVectorValue(&in);
-    if (!err) {
-      numDimsSet = true;
-      this->spatialIndices = in;
-      VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
-                      << "Saved attribute in vm" << std::endl;
-    }
-  }
-
-  //NOTE: We load indexOrder regardless of whether we're in synergia
-  //style or not
+  // Get the index order.
   VsAttribute* indexOrderAtt = getAttribute(VsSchema::indexOrderAtt);
   if (indexOrderAtt) {
     VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
@@ -270,11 +285,39 @@ bool VsVariableWithMesh::initialize() {
     }
   }
       
-  //we tried and failed to load spatialIndices synergia style so we
-  //drop back into the default - get the number of spatial dimensions
-  //We then construct a spatialIndices array containing [0, 1, ...,
-  //numSpatialDims - 1] So for a 3-d mesh we have [0, 1, 2]
-  if (!numDimsSet) {
+  // There are two ways of specifying information for varWithMesh:
+
+  // 1. VsSpatialIndices indicates which columns contain spatial data
+  // (synergia style)
+
+  // 2. Spatial information is in the first "vsNumSpatialDims" columns
+  // (regular style)
+
+  // Start with synergia style, and drop through to regular style on
+  // any errors
+
+  spatialIndices.clear();
+  
+  VsAttribute* spatialIndicesAtt = getAttribute(VsSchema::spatialIndicesAtt);
+  if (spatialIndicesAtt) {
+    VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
+                      << "found spatialIndices, trying synergia style"
+                      << std::endl;
+
+    std::vector<int> in;
+    size_t err = spatialIndicesAtt->getIntVectorValue(&in);
+    if (!err) {
+      spatialIndices = in;
+      VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
+                      << "Saved attribute in vm" << std::endl;
+    }
+  }
+
+  // Tried and failed to load spatialIndices synergia style so drop
+  // back into the default - get the number of spatial dimensions,
+  // then construct a spatialIndices array containing [0, 1, ...,
+  // numSpatialDims - 1] So for a 3-d mesh we have [0, 1, 2]
+  if (this->spatialIndices.empty()) {
       VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
                         << "did not find spatialIndices, trying regular style."
                         << std::endl;
@@ -294,6 +337,7 @@ bool VsVariableWithMesh::initialize() {
 
       numDimsAtt = getAttribute(VsSchema::numSpatialDimsAtt_deprecated);
     }
+
     if (numDimsAtt) {
       std::vector<int> in;
       int err = numDimsAtt->getIntVectorValue(&in);
@@ -305,15 +349,15 @@ bool VsVariableWithMesh::initialize() {
 
         return false;
       }
-      int numSpatialDims = in[0];
       
-      //we construct a vector containing the proper spatialIndices
-      this->spatialIndices.resize(numSpatialDims);
-      for (int i = 0; i < numSpatialDims; i++) {
-        this->spatialIndices[i] = i;
+      // Construct a vector containing the proper spatialIndices
+      int numSpatialDims = in[0];
+      spatialIndices.resize(numSpatialDims);
+
+      for (int i = 0; i < numSpatialDims; ++i) {
+        spatialIndices[i] = i;
       }
         
-      numDimsSet = true;
       VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
                       << "numSpatialDims = " << this->getNumSpatialDims() << "."
                         << std::endl;
@@ -325,13 +369,33 @@ bool VsVariableWithMesh::initialize() {
   }
   
   // Check that all set as needed
-  if (!numDimsSet) {
+  if (spatialIndices.empty()) {
     VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
                       << "Unable to determine spatial dimensions for var "
                       << getFullName() << std::endl;
     return false;
   }
 
+  int numComps = getNumComps();
+
+  if (numComps <= 0) {
+    VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
+                      << "Invalid number of components ("
+                      << numComps << ")." << std::endl;
+    return false;
+  }
+
+  for( int i=0; i<spatialIndices.size(); ++i )
+  {
+    if (numComps <= spatialIndices[i]) {
+      VsLog::debugLog() << __CLASS__ << __FUNCTION__ << "  " << __LINE__ << "  "
+                        << "The spatial index, " << spatialIndices[i] 
+                        << "is greater than the number of components ("
+                        << numComps << ")." << std::endl;
+      return false;
+    }
+  }
+  
   //Get vsTimeGroup (optional attribute)
   VsAttribute* timeGroupAtt = dataset->getAttribute(VsSchema::timeGroupAtt);
   if (timeGroupAtt) {
@@ -349,13 +413,23 @@ bool VsVariableWithMesh::initialize() {
 
     tokenize(names, ',', this->labelNames);
   }
-  
+ 
+  //Get user-specified labels of axis
+  VsAttribute* axisLabelsAtt = dataset->getAttribute(VsSchema::axisLabelsAtt);
+  if (axisLabelsAtt) {
+    std::string axlabels;
+    axisLabelsAtt->getStringValue(&axlabels);
+
+    tokenize(axlabels, ',', this->axisLabels);
+  }
+  else {
+    tokenize("x,y,z", ',', this->axisLabels);
+  }
   return true;
 }
 
 // Get user-specified component names
 std::string VsVariableWithMesh::getLabel (size_t i) const {
-//  if ((i >= 0) && (i < labelNames.size()) && !labelNames[i].empty()) {
   if ((i < labelNames.size()) && !labelNames[i].empty()) {
     return makeCanonicalName(getPath(), labelNames[i]);
   } 
@@ -383,12 +457,12 @@ size_t VsVariableWithMesh::getNumComps() const {
     return 0;
   }
 
-  size_t lastDim = 0;
+  size_t numComps = 0;
   if (isCompMinor())
-    lastDim = dims[dims.size()-1];
-  else lastDim = dims[0];
+    numComps = dims[dims.size()-1];
+  else numComps = dims[0];
   
-  return lastDim;
+  return numComps;
 }
 
 void VsVariableWithMesh::createComponents() {

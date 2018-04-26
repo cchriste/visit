@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -45,7 +45,7 @@
 //
 // Functions exposed to the VisIt module.
 //
-#define SEEDMEATTRIBUTES_NMETH 50
+#define SEEDMEATTRIBUTES_NMETH 62
 void VISITPY_API           PySeedMeAttributes_StartUp(SeedMeAttributes *subj, void *data);
 void VISITPY_API           PySeedMeAttributes_CloseDown();
 VISITPY_API PyMethodDef *  PySeedMeAttributes_GetMethodTable(int *nMethods);

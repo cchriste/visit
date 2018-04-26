@@ -1,7 +1,6 @@
 function bv_silo_initialize
 {
     export DO_SILO="no"
-    export ON_SILO="off"
     export DO_SILEX="no"
     add_extra_commandline_args "silo" "silex" 0 "Enable silex when building Silo"
 }
@@ -9,13 +8,11 @@ function bv_silo_initialize
 function bv_silo_enable
 {
     DO_SILO="yes"
-    ON_SILO="on"
 }
 
 function bv_silo_disable
 {
     DO_SILO="no"
-    ON_SILO="off"
 }
 
 function bv_silo_silex
@@ -65,14 +62,8 @@ function bv_silo_print
 
 function bv_silo_print_usage
 {
-    printf "%-15s %s [%s]\n" "--silo" "Build Silo support" "$DO_SILO"
-    printf "%-15s %s [%s]\n" "--silex" "Enable silex when building Silo" "$DO_SILEX"
-}
-
-function bv_silo_graphical
-{
-    local graphical_out="Silo     $SILO_VERSION($SILO_FILE)      $ON_SILO"
-    echo "$graphical_out"
+    printf "%-20s %s [%s]\n" "--silo" "Build Silo support" "$DO_SILO"
+    printf "%-20s %s [%s]\n" "--silex" "Enable silex when building Silo" "$DO_SILEX"
 }
 
 function bv_silo_host_profile
@@ -183,7 +174,7 @@ function build_silo
     if [[ "$DO_STATIC_BUILD" == "yes" ]] ; then
         WITHSHAREDARG="--disable-shared"
     fi
-    if [[ "$DO_SILEX" == "no" || "$DO_QT" != "yes" || "$DO_STATIC_BUILD" == "yes" || "$IS_QT5" == "yes" ]] ; then
+    if [[ "$DO_SILEX" == "no" || "$DO_QT" != "yes" || "$DO_STATIC_BUILD" == "yes" || "$IS_QT4" == "no" ]] ; then
         WITHSILOQTARG='--disable-silex'
     else
         export SILOQTDIR="$QT_INSTALL_DIR" #"${VISITDIR}/qt/${QT_VERSION}/${VISITARCH}"

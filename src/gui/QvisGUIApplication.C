@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -57,13 +57,7 @@
 #include <QStyle>
 #include <QStyleFactory>
 #include <QTranslator>
-
-#if defined(Q_WS_MACX) || defined(Q_OS_MAC)
-// On MacOS X, we manage the printer options window instead of letting
-// Qt do it when we use the Mac or Aqua style.
-#include <Carbon/Carbon.h>
-#include <QStyle>
-#endif
+#include <QList>
 
 #include <QMenuBar>
 #include <QTimer>
@@ -177,7 +171,13 @@
 #include <AccessViewerSession.h>
 
 #if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h> // for LoadLibrary
+#include <TlHelp32.h> // for Tool help
+#else
+#include <unistd.h>
 #endif
 
 #include <snprintf.h>
@@ -673,7 +673,7 @@ QvisGUIApplication::QvisGUIApplication(int &argc, char **argv, ViewerProxy *prox
     ConfigManager(), GUIBase(), windowNames(), message(), plotWindows(),
     operatorWindows(), otherWindows(), foregroundColor(), backgroundColor(),
     applicationStyle(), applicationLocale("default"), loadFile(), sessionFile(), 
-    sessionDir(), movieArguments()
+    sessionDir(), movieArguments(), recoveryFiles()
 {
     completeInit = visitTimer->StartTimer();
     int total = visitTimer->StartTimer();
@@ -756,6 +756,8 @@ QvisGUIApplication::QvisGUIApplication(int &argc, char **argv, ViewerProxy *prox
     fileServer = new FileServerList;
     fileServer->SetProfiles(GetViewerState()->GetHostProfileList());
     embeddedGUI = false;
+    
+    visitPIDStr = GetVisItPIDString();
 
     // Process any GUI arguments that should not be passed on to other programs.
     // This also has the effect of setting color/style attributes. This must
@@ -2090,10 +2092,7 @@ QvisGUIApplication::Quit()
         }
     }
 
-    // Remove the gui's crash recovery file if present. Don't remove the 
-    // viewer's crash recovery file though since that's what we check for
-    // in determining whether we have a crash recovery file and it makes
-    // sense for the viewer to remove its file.
+    // Remove the viewer and gui's crash recovery file if present.
     RemoveCrashRecoveryFile(false);
 
     // Save default restore session file.
@@ -6460,11 +6459,18 @@ QvisGUIApplication::ReadFromViewer(int)
     {
         debug1 << "Reading from the viewer's socket is currently not allowed!"
                << endl;
+
 #if defined(_WIN32)
+        // This no longer seems necessary, at least with QT 5.
+        // Removing it for Qt5-enabled fixes problem running VisIt
+        // on newer Windows OS (8, 10) and also running on Windows VM.
+        // Leaving code in place for older qt, just in case.
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
         // If we ignore the socket read on Windows, we don't tend to keep
         // getting the message so call this function again though the event
         // loop using a timer.
         QTimer::singleShot(10, this, SLOT(DelayedReadFromViewer()));
+#endif
 #endif
     }
 }
@@ -6896,220 +6902,73 @@ QvisGUIApplication::SaveWindow()
 //   I renamed this method to PrintWindow and I made all platforms print if
 //   the print dialog is accepted.
 //
+//   Kevin Griffin, Tue Sep 19 16:48:21 PDT 2017
+//   Removed the OS X specific coding since the PMSessionPrintDialog method 
+//   has been deprecated and removed and the QPrinter object is now adequate
+//   for printing on OS X.
+//
 // ****************************************************************************
     
 void
 QvisGUIApplication::PrintWindow()
 {
     PrinterAttributes *p = GetViewerState()->GetPrinterAttributes();
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-#if (defined(Q_WS_MACX) || defined(Q_OS_MAC)) && !defined(VISIT_MAC_NO_CARBON)
+    // Each time through, clear out the printer's save to filename.
+    bool setupPrinter = true;
+    p->SetOutputToFile(false);
+    p->SetOutputToFileName("");
+    
     //
-    // If we're on MacOS X and the Mac application style is being used, manage
-    // the printer setup ourselves since the QPrinter object does not return
-    // enough information when it uses the native MacOS X printer dialog. Here
-    // we use the native MacOS X printer dialog but we get what we need out
-    // of it.
+    // If we've never set up the printer options, set them up now using
+    // Qt's printer object and printer dialog.
     //
-    if(qApp->style()->inherits("QMacStyle"))
+    if(printer == 0)
     {
-        PMPageFormat pformat;
-        PMPrintSettings psettings;
-        PMPrintSession psession;
-        int nObjectsToFree = 0;
-        bool okayToPrint = true;
-    
-        TRY
-        {
-            if(PMCreateSession(&psession) != kPMNoError)
-            {
-                EXCEPTION0(VisItException);
-            }
-            nObjectsToFree = 1;
+        // Create a new printer object.
+        printer = new QPrinter;
         
-            if(PMCreatePrintSettings(&psettings) != kPMNoError)
-            {
-                EXCEPTION0(VisItException);
-            }
-            nObjectsToFree = 2;
-            if(PMSessionDefaultPrintSettings(psession, psettings) != kPMNoError)
-            {
-                EXCEPTION0(VisItException);
-            }
-        
-            if(PMCreatePageFormat(&pformat) != kPMNoError)
-            {
-                EXCEPTION0(VisItException);
-            }
-            nObjectsToFree = 3;
-            if(PMSessionDefaultPageFormat(psession, pformat) != kPMNoError)
-            {
-                EXCEPTION0(VisItException);
-            }
-    
-            //
-            // Show the MacOS X printer window and allow the user to select
-            // the printer to use when printing images in VisIt.
-            //
-            Boolean accepted = false;
-            if(PMSessionPrintDialog(psession, psettings, pformat, &accepted) == kPMNoError &&
-               accepted == true)
-            {       
-                // Get the name of the printer to use for printing the image.
-                CFArrayRef printerList = NULL;
-                CFIndex currentIndex;
-                PMPrinter currentPrinter;
-                if(PMSessionCreatePrinterList(psession, &printerList, &currentIndex,
-                   &currentPrinter) == kPMNoError)
-                {
-                    if(printerList != NULL)
-                    {
-                        const void *pData = CFArrayGetValueAtIndex(printerList,
-                            currentIndex);
-                        if(pData != NULL)
-                        {
-                            CFStringRef pName = (CFStringRef)pData;
-                            char buf[1000]; buf[0] = '\0';
-                            CFStringGetCString(pName, buf, 1000,
-                                kCFStringEncodingMacRoman);
-                            p->SetPrinterName(buf);
-                        }
-                        else
-                        {
-                            debug4 << "Could not find printer name" << endl;
-                            CFRelease(printerList);
-                            EXCEPTION0(VisItException);
-                        }
-                    
-                        // Free the printerList
-                        CFRelease(printerList);
-                    }
-                    else
-                    {
-                        debug4 << "Could not return the list of printer names"
-                               << endl;
-                        EXCEPTION0(VisItException);
-                    }
-                }
-
-                // Get the options from the psettings object.
-                PMOrientation orient;
-                PMGetOrientation(pformat, &orient);
-                p->SetPortrait(orient == kPMPortrait || orient == kPMReversePortrait);
-        
-                // Set the number of copies
-                UInt32 ncopies = 1;
-                PMGetCopies(psettings, &ncopies);
-                p->SetNumCopies(int(ncopies));
-     
-                // Set some of the last properties
-                p->SetOutputToFile(false);
-                p->SetOutputToFileName("");
-                p->SetPrintColor(true);
-                p->SetCreator(GetViewerProxy()->GetLocalUserName());
-
-                // Tell the viewer what the properties are.
-                if(printerObserver != 0)             
-                    printerObserver->SetUpdate(false);
-                p->Notify();
-            }
-            else
-                debug4 << "User cancelled the printer options window." << endl;
-        }
-        CATCH(VisItException)
+        // If the printer attributes have no printer name then set the
+        // printer object's name into the printer attributes.
+        p->SetCreator("VisIt");
+        if(p->GetPrinterName() == "")
         {
-            Error(tr("VisIt encountered an error while setting up printer options."));
-            okayToPrint = false;
-        }
-        ENDTRY
-    
-        //
-        // Free the PM objects that we created.
-        //
-        switch(nObjectsToFree)
-        {
-        case 3:
-            PMRelease(pformat);
-            // Fall through
-        case 2:
-            PMRelease(psettings);
-            // Fall through
-        case 1:
-            PMRelease(psession);       
-        }
-    
-        //
-        // Tell the viewer to print the image because the MacOS X printer
-        // dialog has the word "Print" to click when you're done setting
-        // options. This says to me that MacOS X applications expect to
-        // print once the options are set.
-        //
-        if(okayToPrint)
-            GetViewerMethods()->PrintWindow();
-    }
-    else
-    {
-#endif
-        // Each time through, clear out the printer's save to filename.
-        bool setupPrinter = true;
-        p->SetOutputToFile(false);
-        p->SetOutputToFileName("");
-
-        //
-        // If we've never set up the printer options, set them up now using
-        // Qt's printer object and printer dialog.
-        //
-        if(printer == 0)
-        {
-            // Create a new printer object.
-            printer = new QPrinter;
-
-            // If the printer attributes have no printer name then set the
-            // printer object's name into the printer attributes.
-            p->SetCreator("VisIt");
-            if(p->GetPrinterName() == "")
-            {
-                p->SetPrinterName(printer->printerName().toStdString());
-                p->Notify();
-            }
-
-            // Create an observer for the printer attributes that will copy
-            // their values into the printer object when there are changes.
-            printerObserver = new ObserverToCallback(p,
-                UpdatePrinterAttributes, (void *)printer);
-
-            // Indicate that we need to set up the printer.
-            setupPrinter = true;
-        }
-
-        // Store the printer attributes into the printer object.
-        if(setupPrinter)
-            PrinterAttributesToQPrinter(p, printer);
-
-        // Execute the printer dialog
-        QPrintDialog printDialog(printer, mainWin);
-        if(printDialog.exec() == QDialog::Accepted)
-        {
-            //
-            // Send all of the Qt printer options to the viewer
-            //
-            QPrinterToPrinterAttributes(printer, p);
-            p->SetCreator("VisIt");
-            printerObserver->SetUpdate(false);
+            p->SetPrinterName(printer->printerName().toStdString());
             p->Notify();
-
-            //
-            // Tell the viewer to print the image. All print dialogs I've seen
-            // for Qt 4 have "Print" as the button that accepts the Print dialog.
-            // This says to me that applications expect to print once the options
-            // are set.
-            //
-            GetViewerMethods()->PrintWindow();
         }
-#if (defined(Q_WS_MACX) || defined(Q_OS_MAC)) && !defined(VISIT_MAC_NO_CARBON)
+        
+        // Create an observer for the printer attributes that will copy
+        // their values into the printer object when there are changes.
+        printerObserver = new ObserverToCallback(p,
+                                                 UpdatePrinterAttributes, (void *)printer);
+        
+        // Indicate that we need to set up the printer.
+        setupPrinter = true;
     }
-#endif
-#endif
+    
+    // Store the printer attributes into the printer object.
+    if(setupPrinter)
+        PrinterAttributesToQPrinter(p, printer);
+    
+    // Execute the printer dialog
+    QPrintDialog printDialog(printer, mainWin);
+    if(printDialog.exec() == QDialog::Accepted)
+    {
+        //
+        // Send all of the Qt printer options to the viewer
+        //
+        QPrinterToPrinterAttributes(printer, p);
+        p->SetCreator("VisIt");
+        printerObserver->SetUpdate(false);
+        p->Notify();
+        
+        //
+        // Tell the viewer to print the image. All print dialogs I've seen
+        // for Qt 4 have "Print" as the button that accepts the Print dialog.
+        // This says to me that applications expect to print once the options
+        // are set.
+        //
+        GetViewerMethods()->PrintWindow();
+    }
 }
 
 // ****************************************************************************
@@ -7187,6 +7046,9 @@ QPrinterToPrinterAttributes(QPrinter *printer, PrinterAttributes *p)
 //   Brad Whitlock, Mon May 24 13:42:17 PDT 2010
 //   Only allow valid printer names.
 //
+//   Kathleen Biagas, Tues Sep 12 10:27:13 MST 2017 
+//   Add less expensive call to availablePrinterNames for Qt version >= 5.3.
+//
 // ****************************************************************************
 
 static void
@@ -7194,6 +7056,7 @@ PrinterAttributesToQPrinter(PrinterAttributes *p, QPrinter *printer)
 {
     // Only set the printer name if it is a valid name.
     QString printerName(p->GetPrinterName().c_str());
+#if QT_VERSION < QT_VERSION_CHECK(5, 3, 0)
     QList<QPrinterInfo> availablePrinters(QPrinterInfo::availablePrinters());
     for(int i = 0; i < availablePrinters.size(); ++i)
     {
@@ -7203,6 +7066,18 @@ PrinterAttributesToQPrinter(PrinterAttributes *p, QPrinter *printer)
             break;
         }
     }
+#else
+    // less expensive call introduced in Qt 5.3
+    QStringList availablePrinters(QPrinterInfo::availablePrinterNames());
+    for(int i = 0; i < availablePrinters.size(); ++i)
+    {
+        if(availablePrinters[i] == printerName)
+        {
+            printer->setPrinterName(printerName);
+            break;
+        }
+    }
+#endif
 
     printer->setPrintProgram(p->GetPrintProgram().c_str());
     printer->setCreator(p->GetCreator().c_str());
@@ -8814,6 +8689,9 @@ QvisGUIApplication::InterpreterSync()
 // Modifications:
 //   Kathleen Bonnell, Fri Jun 18 15:15:11 MST 2010 
 //   Windows sessions now use '.session' extinsion.
+//
+//   Kevin Griffin, Mon Mar 12 14:18:57 PDT 2018
+//   Added VisIt PID to the crash recovery file name.
 //   
 // ****************************************************************************
 
@@ -8821,9 +8699,108 @@ QString
 QvisGUIApplication::CrashRecoveryFile() const
 {
     QString s(GetUserVisItDirectory().c_str());
-    s += "crash_recovery";
+    s += "crash_recovery.";
+    s += visitPIDStr.c_str();
     s += ".session";
     return s;
+}
+
+// ****************************************************************************
+// Method: QvisGUIApplication::GetCrashFilePIDs
+//
+// Purpose:
+//   Parses all PIDs embedded in the saved crash file names.
+//
+// Arguments:
+//   fileList:  List of crash recovery files.
+//   outPIDS:   The output vector storing the all the parsed PIDs
+//
+// Programmer: Kevin Griffin
+// Creation:   Mon Mar 12 14:18:57 PDT 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+void
+QvisGUIApplication::GetCrashFilePIDs(const QFileInfoList &fileList, intVector &outPIDs)
+{
+    for(int i=0; i<fileList.size(); i++)
+    {
+        QString fn = fileList.at(i).fileName();
+        QStringList tokens = fn.split(".", QString::SkipEmptyParts);
+        
+        if(tokens.size() > 2) {
+            bool ok;
+            int pid = tokens[1].toInt(&ok, 10);
+            
+            if(ok)
+            {
+                outPIDs.push_back(pid);
+            }
+        }
+    }
+}
+
+// ****************************************************************************
+// Method: QvisGUIApplication::GetSystemPIDS
+//
+// Purpose:
+//   Get the PIDs of the currently running processes.
+//
+// Arguments:
+//   outPIDS:   The output vector storing the all the parsed PIDs
+//
+// Programmer: Kevin Griffin
+// Creation:   Mon Mar 12 14:18:57 PDT 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+void
+QvisGUIApplication::GetSystemPIDs(std::vector<int> &outPIDs)
+{
+#if !defined(Q_OS_WIN)
+    bool ok;
+    char buf[2048];
+    
+    FILE *f = popen("ps -A", "r");
+    
+    while(fgets(buf, 2048, f) != NULL)
+    {
+        QString pidStr(buf);
+        QStringList tokens = pidStr.split(QRegExp("\\s+"), QString::SkipEmptyParts); // whitespace character
+        
+        int pid = tokens[0].toInt(&ok, 10);
+        
+        if(ok)
+        {
+            outPIDs.push_back(pid);
+        }
+    }
+    
+    pclose(f);
+#else
+    HANDLE hProcessSnap;
+    PROCESSENTRY32 pe32;
+
+    hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+    if(hProcessSnap != INVALID_HANDLE_VALUE)
+    {
+        pe32.dwSize = sizeof(PROCESSENTRY32);
+
+        while(Process32Next(hProcessSnap, &pe32))
+        {
+            int pid = static_cast<int>(pe32.th32ProcessID);
+            outPIDs.push_back(pid);
+        }
+    }
+
+    CloseHandle(hProcessSnap);
+
+#endif
 }
 
 // ****************************************************************************
@@ -8838,40 +8815,147 @@ QvisGUIApplication::CrashRecoveryFile() const
 // Modifications:
 //   Brad Whitlock, Tue Apr  8 16:29:55 PDT 2008
 //   Support for internationalization.
+//
+//   Kevin Griffin, Mon Mar 12 14:18:57 PDT 2018
+//   Move the dialog prompt to a new method and now supporting multiple
+//   crash recovery files.
 //   
 // ****************************************************************************
 
 void
 QvisGUIApplication::RestoreCrashRecoveryFile()
 {
-    QString filename(CrashRecoveryFile());
-    QFile cr(filename);
-    if(cr.exists())
+    // Get list of crash recovery files
+    QDir dir(GetUserVisItDirectory().c_str());
+    dir.setFilter(QDir::Files);
+    
+    QStringList nameFilters;
+    nameFilters << "crash_recovery.*.session";
+    dir.setNameFilters(nameFilters);
+    
+    QFileInfoList crashFiles = dir.entryInfoList();
+    
+    if(crashFiles.size() > 0)
     {
+        // Crash file PIDs
+        intVector crashFilePIDs;
+        GetCrashFilePIDs(crashFiles, crashFilePIDs);
+
+        // System PIDs
+        intVector systemPIDs;
+        GetSystemPIDs(systemPIDs);
+        
+        // Exclude crash files of any currently running VisIt processes
+        for(int i=0; i<crashFilePIDs.size(); i++)
+        {
+            int crashFilePID = crashFilePIDs[i];
+            bool addFile = true;
+            
+            for(int j=0; j<systemPIDs.size(); j++)
+            {
+                if(crashFilePID == systemPIDs[j])
+                {
+                    addFile = false;
+                    break;
+                }
+            }
+            
+            if(addFile)
+            {
+                recoveryFiles.append(crashFiles[i]);
+            }
+        }
+        
+        if(recoveryFiles.size() > 0)
+        {
+            ShowCrashRecoveryDialog(recoveryFiles);
+        }
+    }
+}
+
+// ****************************************************************************
+// Method: QvisGUIApplication::ShowCrashRecoveryDialog
+//
+// Purpose:
+//   Shows the crash recovery dialog and potentially the file open dialog if
+//   there are more than one crash recovery file to choose from.
+//
+// Arguments:
+//   fileInfoList : List of crash recovery files.
+//
+// Programmer: Kevin Griffin
+// Creation:   Mon Mar 12 14:18:57 PDT 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+void
+QvisGUIApplication::ShowCrashRecoveryDialog(const QFileInfoList &fileInfoList)
+{
+    if(fileInfoList.size() == 1)
+    {
+        QString filename(fileInfoList.at(0).absoluteFilePath());
         int btn = QMessageBox::question(0, tr("Crash recovery"),
-            tr("VisIt found a crash recovery session file. Would you like to "
-               "restore it to return to the last saved state?"), QMessageBox::Yes,
-            QMessageBox::No);
+                                        tr("VisIt found a crash recovery session file. Would you like to "
+                                           "restore it to return to the last saved state?"),
+                                        QMessageBox::Yes,
+                                        QMessageBox::No);
         if(btn == QMessageBox::Yes)
         {
-            stringVector files;
-            std::string host;
-            debug1 << "Restoring a crash recovery file: "
-                   << filename.toStdString() << endl;
-            RestoreSessionFile(filename, files, host);
-
-            sessionFile = QString(""); // Make sure the session file name is
-            // null as it was used for the recovery which forces a
-            // Save Session As to occur if the user does a Save Session
+            PerformRestoreSessionFile(filename);
         }
-
-        // Remove the crash recovery file since we've consumed it. Note that
-        // we don't remove it when the GUI exits because we let the viewer
-        // do that since it's more crash prone. That way, if the viewer does
-        // not exit cleanly, we encounter the crash file when we run the gui
-        // the next time,
-        Synchronize(REMOVE_CRASH_RECOVERY_TAG);
     }
+    else
+    {
+        QString msg = QString("VisIt found %1 crash recovery session files. Would you like to select one to "
+                              "restore and return to the last saved state?").arg(fileInfoList.size());
+        int btn = QMessageBox::question(0, tr("Crash recovery"),
+                                        tr(msg.toStdString().c_str()),
+                                        QMessageBox::Yes,
+                                        QMessageBox::No);
+        if(btn == QMessageBox::Yes)
+        {
+            QString filename = QFileDialog::getOpenFileName(0, tr("Select Crash Recovery File"),
+                                                            GetUserVisItDirectory().c_str(),
+                                                            tr("Session files (*.session)"));
+            if(filename != NULL)
+            {
+                PerformRestoreSessionFile(filename);
+            }
+        }
+    }
+    
+    Synchronize(REMOVE_CRASH_RECOVERY_TAG);
+}
+
+// ****************************************************************************
+// Method: QvisGUIApplication::PerformRestoreSessionFile
+//
+// Purpose:
+//   Restore the crash recovery file.
+//
+// Arguments:
+//   filename : The crash recovery file name
+//
+// Programmer: Kevin Griffin
+// Creation:   Mon Mar 12 14:18:57 PDT 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+void
+QvisGUIApplication::PerformRestoreSessionFile(const QString &filename)
+{
+    stringVector files;
+    std::string host;
+    debug1 << "Restoring a crash recovery file: " << filename.toStdString() << endl;
+    RestoreSessionFile(filename, files, host);
+    
+    sessionFile = QString(""); // Make sure the session file name is
+    // null as it was used for the recovery which forces a
+    // Save Session As to occur if the user does a Save Session
 }
 
 // ****************************************************************************
@@ -8892,25 +8976,68 @@ QvisGUIApplication::RestoreCrashRecoveryFile()
 // ****************************************************************************
 
 void
-QvisGUIApplication::RemoveCrashRecoveryFile(bool removeViewerFile) const
+QvisGUIApplication::RemoveCrashRecoveryFile(bool removeOldRecoveryFiles) const
 {
-    if(removeViewerFile)
+    QFile cr(CrashRecoveryFile());
+    
+    if(cr.exists())
     {
-        QFile cr(CrashRecoveryFile());
-        if(cr.exists())
-        {
-            debug1 << "Removing crash recovery file: "
-                   << cr.fileName().toStdString() << endl;
-            cr.remove();
-        }
+        debug1 << "Removing crash recovery file: " << cr.fileName().toStdString() << endl;
+        cr.remove();
     }
-
+    
     QFile gcr(CrashRecoveryFile() + ".gui");
+    
     if(gcr.exists())
     {
-        debug1 << "Removing crash recovery gui file: "
-               << gcr.fileName().toStdString() << endl;
+        debug1 << "Removing crash recovery gui file: " << gcr.fileName().toStdString() << endl;
         gcr.remove();
+    }
+    
+    // Remove any old recovery files
+    if(removeOldRecoveryFiles)
+    {
+        RemoveCrashRecoveryFileList();
+    }
+}
+
+// ****************************************************************************
+// Method: QvisGUIApplication::RemoveCrashRecoveryFileList
+//
+// Purpose:
+//   Remove the list of crash recovery files.
+//
+// Arguments:
+//   fileInfoList : The list of crash recovery files
+//
+// Programmer: Kevin Griffin
+// Creation:   Mon Mar 12 14:18:57 PDT 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+void
+QvisGUIApplication::RemoveCrashRecoveryFileList() const
+{
+    for(int i=0; i<recoveryFiles.size(); i++)
+    {
+        QString absFilePath = recoveryFiles[i].absoluteFilePath();
+        QFile cr(absFilePath);
+        
+        if(cr.exists())
+        {
+            debug1 << "Removing crash recovery file: " << cr.fileName().toStdString() << endl;
+            cr.remove();
+        }
+        
+        QFile gcr(absFilePath + ".gui");
+        
+        if(gcr.exists())
+        {
+            debug1 << "Removing crash recovery gui file: " << gcr.fileName().toStdString() << endl;
+            gcr.remove();
+        }
     }
 }
 
@@ -8962,7 +9089,7 @@ QvisGUIApplication::redoPick()
 }
 
 // ****************************************************************************
-// Method: QvisGUIApplication::SaveCrashRecoveryFile
+// Method: QvisGUIApplication::restorePickAttributesAfterRepick
 //
 // Purpose: 
 //   Trigger restoring the pick attributes after a repick.

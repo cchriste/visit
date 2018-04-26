@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -227,6 +227,18 @@
 //    Eric Brugger, Wed Mar 22 14:44:13 PDT 2017
 //    Changed the date on the splash screen to April 2017.
 //
+//    Eric Brugger, Thu Jun  8 15:15:03 PDT 2017
+//    Changed the date on the splash screen to June 2017.
+//
+//    Eric Brugger, Thu Aug 31 16:28:56 PDT 2017
+//    Changed the date on the splash screen to September 2017.
+//
+//    Eric Brugger, Fri Sep 22 12:49:25 PDT 2017
+//    Changed the date on the splash screen to October 2017.
+//
+//    Eric Brugger, Mon Mar 19 14:38:44 PDT 2018
+//    Changed the date on the splash screen to March 2018.
+//
 // ****************************************************************************
 
 SplashScreen::SplashScreen(bool cyclePictures) : QFrame(0, Qt::SplashScreen)
@@ -347,9 +359,9 @@ SplashScreen::SplashScreen(bool cyclePictures) : QFrame(0, Qt::SplashScreen)
            << tr("October")
            << tr("November")
            << tr("December");
-    int currentMonth = 4;
+    int currentMonth = 3;
     lLayout->addWidget(new QLabel(versionText, this));
-    lLayout->addWidget(new QLabel(months[currentMonth-1] + " 2017", this));
+    lLayout->addWidget(new QLabel(months[currentMonth-1] + " 2018", this));
 
     copyrightButton = 0;
     contributorButton = 0;

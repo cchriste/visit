@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -155,6 +155,25 @@ bool
 avtDataObjectSink::UpdateInput(avtContract_p spec)
 {
     return GetInput()->Update(spec);
+}
+
+
+// ****************************************************************************
+//  Method: avtDataObjectSink::ResetAllExtents
+//
+//  Purpose:
+//      Resets the extents.
+//
+//  Programmer: Kathleen Biagas
+//  Creation:   June 5, 2017
+//
+// ****************************************************************************
+void
+avtDataObjectSink::ResetAllExtents()
+{
+    avtDataObject_p input = GetInput();
+    if (*input != NULL)
+        input->ResetAllExtents(); 
 }
 
 

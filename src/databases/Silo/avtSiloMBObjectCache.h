@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -81,6 +81,7 @@ public:
     virtual     ~avtSiloMBNameGenerator();
     std::string  Name(int idx) const;
     int          NumberOfBlocks() const { return nblocks;}
+    bool         IsExplicit() const { return namesLst!=0; }
 
 private:
       int             nblocks;
@@ -126,6 +127,8 @@ public:
                                 { return nameGen->NumberOfBlocks();}
     std::string             GenerateName(int idx) const
                                 { return nameGen->Name(idx);}
+    bool                    IsExplicit() const
+                                { return nameGen->IsExplicit(); }
 private:
     avtSiloMBNameGenerator *nameGen;
 };

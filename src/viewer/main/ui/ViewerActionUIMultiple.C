@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -36,10 +36,11 @@
 *
 *****************************************************************************/
 
-#include <ViewerActionUIMultiple.h>
-#include <ViewerActionManager.h>
-#include <ViewerWindow.h>
 #include <ViewerActionLogic.h>
+#include <ViewerActionManager.h>
+#include <ViewerActionUIMultiple.h>
+#include <ViewerPlotList.h>
+#include <ViewerWindow.h>
 #include <QAction>
 #include <QIcon>
 #include <QMenu>
@@ -281,6 +282,11 @@ ViewerActionUIMultiple::Update()
     {
         actionMenu->setEnabled(enabledChildCount>0);
     }
+
+    // Summarily enable the Add plot menu whenever database is open
+    bool dbIsOpen = (GetLogic()->GetWindow()->GetPlotList()->GetHostDatabaseName().length() > 0);
+    if (dbIsOpen && menuText == "Add plot")
+        actionMenu->setEnabled(true);
 
     action->blockSignals(false);
 }

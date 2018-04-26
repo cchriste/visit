@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -34,6 +34,10 @@
 # OUT OF THE  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 # DAMAGE.
 #
+# Modifications:
+#   Kevin Griffin, Thu Jan  4 12:45:28 PST 2018
+#   Changed the linked directory lib/qwt.framework/Headers to the actual path
+#   it was linked to. This fixes the make install symlink error. 
 #*****************************************************************************
 
 IF (NOT (EXISTS "${VISIT_QWT_DIR}"))
@@ -50,7 +54,7 @@ ELSEIF (APPLE)
     SET_UP_THIRD_PARTY(QWT lib include qwt)
     SET(QWT_LIBRARY ${QWT_LIB})
   ELSE(VISIT_STATIC)
-    SET_UP_THIRD_PARTY(QWT lib lib/qwt.framework/Headers qwt)
+          SET_UP_THIRD_PARTY(QWT lib lib/qwt.framework/Versions/Current/Headers qwt)
     SET(QWT_LIBRARY ${QWT_LIBRARY_DIR}/${QWT_LIB}/qwt)
   ENDIF(VISIT_STATIC)
 ELSE (WIN32)

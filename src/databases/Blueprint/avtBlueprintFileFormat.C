@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -77,6 +77,13 @@
 #include "mfem.hpp"
 
 
+#ifdef PARALLEL
+#include <mpi.h>
+#include <avtParallel.h>
+#include "conduit_relay_mpi.hpp"
+#endif
+
+
 //-----------------------------------------------------------------------------
 // bp visit plugin includes
 //-----------------------------------------------------------------------------
@@ -104,11 +111,11 @@ blueprint_plugin_print_msg(const std::string &msg,
     //std::cout << "Line:"    << line << std::endl;
     //std::cout << "Message:" << msg  << std::endl;
 
-    // debug5 << "File:"    << file << std::endl;
-    // debug5 << "Line:"    << line << std::endl;
-    // debug5 << "Message:" << msg  << std::endl;
+    debug5 << "File:"    << file << std::endl;
+    debug5 << "Line:"    << line << std::endl;
+    debug5 << "Message:" << msg  << std::endl;
 
-    std::cout << msg << std::endl;
+    // std::cout << msg << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -128,6 +135,13 @@ blueprint_plugin_warning_handler(const std::string &msg,
                                  int line)
 {
     blueprint_plugin_print_msg(msg,file,line);
+    
+    std::ostringstream oss;
+    oss << "File:"    << file
+        << "Line:"    << line
+        << "Message:" << msg  << std::endl;
+    
+    EXCEPTION1(ImproperUseException, oss.str().c_str());
 }
 
 //-----------------------------------------------------------------------------
@@ -138,6 +152,7 @@ blueprint_plugin_error_handler(const std::string &msg,
 {
     // TODO, plumb to visit exception
     blueprint_plugin_print_msg(msg,file,line);
+    
 }
 
 // ****************************************************************************
@@ -179,7 +194,7 @@ avtBlueprintFileFormat::avtBlueprintFileFormat(const char *filename)
     m_tree_cache = new avtBlueprintTreeCache();
     
     // in pop db metadata, visit swallows up any exceptions we throw in 
-    // conduit, which this it quite hard to debug issues 
+    // conduit, which makes it quite hard to debug issues 
     // so we can use the following to re-wire conduit's handler to a 
     // simple function
 
@@ -318,7 +333,7 @@ avtBlueprintFileFormat::ReadBlueprintMesh(int domain,
             BP_PLUGIN_INFO("boundary topology path " << bnd_topo_path);
             m_tree_cache->FetchBlueprintTree(domain,
                                              bnd_topo_path,
-                                             out["boundary"]);
+                                             out["topologies"][bndry_topo_name]);
         }
         else
         {
@@ -347,10 +362,7 @@ avtBlueprintFileFormat::ReadBlueprintMesh(int domain,
         BP_PLUGIN_INFO("grid function path " << gf_path);
         m_tree_cache->FetchBlueprintTree(domain,
                                          gf_path,
-                                         out["grid_function"]);
-        // make sure our mesh still conforms to the blueprint, which 
-        // expects the grid function to be a valid field.
-        out["fields"][gf_name].set_external(out["grid_function"]);
+                                         out["fields"][gf_name]);
     }
     
     // to construct an mfem mesh object, 
@@ -401,7 +413,7 @@ avtBlueprintFileFormat::ReadBlueprintMesh(int domain,
             // load the data for the mesh att tree
             m_tree_cache->FetchBlueprintTree(domain,
                                              mesh_att_path,
-                                             out["mesh_attribute"]);
+                                             out["fields/mesh_attribute"]);
         }
 
         if(!bndry_att_path.empty())
@@ -409,7 +421,7 @@ avtBlueprintFileFormat::ReadBlueprintMesh(int domain,
             // load the data for the bndry att tree
             m_tree_cache->FetchBlueprintTree(domain,
                                              bndry_att_path,
-                                             out["boundary_attribute"]);
+                                             out["fields/boundary_attribute"]);
         }
     }
 
@@ -493,9 +505,9 @@ avtBlueprintFileFormat::ReadBlueprintField(int domain,
 // helper method used to add the meta data for a blueprint mesh.
 // ****************************************************************************
 void
-AddBlueprintMeshAndFieldMetadata(avtDatabaseMetaData *md,
-                                 string const &mesh_name, 
-                                 const Node &n_mesh_info)
+avtBlueprintFileFormat::AddBlueprintMeshAndFieldMetadata(avtDatabaseMetaData *md,
+                                                         string const &mesh_name, 
+                                                         const Node &n_mesh_info)
 {
 
 
@@ -612,6 +624,12 @@ AddBlueprintMeshAndFieldMetadata(avtDatabaseMetaData *md,
             md->Add(new avtScalarMetaData(mesh_topo_name + "/element_coloring",
                                           mesh_topo_name,
                                           AVT_ZONECENT));
+
+            m_mfem_mesh_map[mesh_topo_name] = true;
+        }
+        else
+        {
+            m_mfem_mesh_map[mesh_topo_name] = false;
         }
     }
     
@@ -620,6 +638,9 @@ AddBlueprintMeshAndFieldMetadata(avtDatabaseMetaData *md,
     //
     // Now, handle any fields defined for this mesh
     //
+    
+
+    
     if(n_mesh_info.has_child("fields"))
     { 
 
@@ -653,6 +674,13 @@ AddBlueprintMeshAndFieldMetadata(avtDatabaseMetaData *md,
             {
                 cent = AVT_ZONECENT;
             }
+            else if(n_field.has_child("basis"))
+            {
+                // if any of the fields are mfem grid funcs, we may have to 
+                // treat the mesh as an mfem mesh, even if it lacks a basis func
+                
+                m_mfem_mesh_map[var_topo_name] = true;
+            }
 
             if (ncomps == 1)
                 md->Add(new avtScalarMetaData(varname_wmesh, var_mesh_name, cent));
@@ -676,6 +704,138 @@ AddBlueprintMeshAndFieldMetadata(avtDatabaseMetaData *md,
 
 
 // ****************************************************************************
+//  Method: avtBlueprintFileFormat::DetectRootProtocol
+//
+//  Purpose: check the root protocol
+//
+//  Programmer: cyrush
+//  Creation:   Fri Dec  8 14:55:23 PST 2017
+//
+// ****************************************************************************
+void
+avtBlueprintFileFormat::ReadRootFile()
+{
+        //
+        // Read root file using conduit::relay
+        //
+ 
+        string root_fname = GetFilename();
+ 
+        BP_PLUGIN_INFO("Opening root file " << root_fname);
+
+        int error = 0;
+
+        // assume hdf5, but check for json file
+        std::string root_protocol = "hdf5";
+        std::string error_msg = "";
+
+// only check on proc-0
+#ifdef PARALLEL
+        if (PAR_Rank() == 0)
+#endif
+        {
+        
+            char buff[5] = {0,0,0,0,0};
+            
+            // heuristic, if json, we expect to see "{" in the first 5 chars of the file.
+            ifstream ifs;
+            ifs.open(root_fname.c_str());
+            if(!ifs.is_open())
+            {
+               error =1;
+            }
+            ifs.read((char *)buff,5);
+            ifs.close();
+            
+            std::string test_str(buff);
+
+            if(test_str.find("{") != std::string::npos)
+            {
+               root_protocol = "json";
+            }
+
+            // fast fail check for if this is a valid blueprint root file
+            // (if this path doesn't exist, relay will throw an exception)
+
+            if(root_protocol.find("hdf5") != std::string::npos)
+            {
+               try
+               {
+                  Node n_read_check;
+                  relay::io::load(root_fname + ":file_pattern",
+                                  root_protocol,
+                                  n_read_check);
+               }
+               catch(conduit::Error &e)
+               {
+                   error_msg = e.message();
+                   error = 1;
+               }
+            }
+        }
+
+// check for error reading root file
+#ifdef PARALLEL
+        Node n_in, n_out;
+        n_in.set(error);
+        conduit::relay::mpi::sum_all_reduce(n_in,
+                                            n_out,
+                                            VISIT_MPI_COMM);
+
+        error = n_out.to_int();
+#endif
+       if(error != 0)
+       {
+           BP_PLUGIN_ERROR("Error reading root file: " 
+                            << root_fname);
+       }
+
+#ifdef PARALLEL
+        if (PAR_Rank() == 0)
+        {
+            relay::io::load(root_fname, root_protocol, m_root_node);
+        }
+     
+        conduit::relay::mpi::broadcast_using_schema(m_root_node,
+                                                    0,
+                                                    VISIT_MPI_COMM);
+#else
+        relay::io::load(root_fname, root_protocol, m_root_node);
+#endif
+
+        if(!m_root_node.has_child("file_pattern"))
+        {
+            BP_PLUGIN_ERROR("Root file missing 'file_pattern'");
+        }
+        
+        if(!m_root_node.has_child("blueprint_index"))
+        {
+            BP_PLUGIN_ERROR("Root file missing 'blueprint_index'");
+        }
+        
+        NodeConstIterator itr = m_root_node["blueprint_index"].children();
+        Node n_verify_info;
+        bool index_ok = true;
+        
+        while(itr.has_next())
+        {
+            const Node &curr = itr.next();
+            if( !blueprint::mesh::index::verify(curr,
+                                                n_verify_info[itr.name()]))
+            {
+                index_ok = false;
+            }
+        }
+        
+        if(!index_ok)
+        {
+            BP_PLUGIN_ERROR("Mesh index verify failed\n" 
+                            << n_verify_info.to_json());
+        }
+        
+}
+
+// ****************************************************************************
 //  Method: avtBlueprintFileFormat::PopulateDatabaseMetaData
 //
 //  Purpose:
@@ -695,35 +855,14 @@ avtBlueprintFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md)
     
     int t_pop_md = visitTimer->StartTimer();
     
+    // clear any mfem mesh mappings
+    m_mfem_mesh_map.clear();
+    
     try
     {
-        //
-        // Read root file using conduit::relay's hdf5 support
-        //
-
-        //
-        // We can employ libmagic here to detect root file type to
-        // determine proper protocol to use
-        //
-
-        //
-        // If data producers use H5Fset_userblock(512), that'll give us 512 bytes
-        // of space at beginning of file to capture a simple bootstrap for protocol
-        //
-    
-        string root_fname = GetFilename();
-        std::string root_file(root_fname);
-        BP_PLUGIN_INFO("Opening root file " << root_fname);
+        ReadRootFile();
         
-        // fast fail check for if this is a valid hdf5 blueprint root file
-        // (if this path doesn't exist, relay will throw an exception)
-        Node n_read_check;
-        relay::io::load(root_file + ":file_pattern", "hdf5",n_read_check);
- 
-        // TODO: in parallel only 1 processor should read and then broadcast 
-    
-        relay::io::load(root_file, "hdf5",m_root_node);
-    
+        //std::cout << "Root file contents" << endl << m_root_node.to_json() << std::endl;
         BP_PLUGIN_INFO("Root file contents" << endl << m_root_node.to_json());
     
         m_protocol = "hdf5";
@@ -747,6 +886,7 @@ avtBlueprintFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md)
         // the root file 
         if(file_pattern[0] !=  VISIT_SLASH_STRING[0])
         {
+            string root_fname = GetFilename();
             string root_dir = FileFunctions::Dirname(root_fname);
             file_pattern  = root_dir + string(VISIT_SLASH_STRING) + file_pattern;
         }
@@ -874,11 +1014,18 @@ avtBlueprintFileFormat::GetMesh(int domain, const char *abs_meshname)
     if(!blueprint::mesh::verify(data, verify_info))
     { 
         BP_PLUGIN_INFO("blueprint::mesh::verify failed for mesh "
-                       << abs_meshname << " [domain " << domain << "]"
+                       << abs_meshname << " [domain " << domain << "]" << endl
                        << "Verify Info " << endl
                        << verify_info.to_json() << endl
                        << "Data Schema " << endl
                        << data.schema().to_json());
+       
+        BP_PLUGIN_INFO("warning: "
+                       "avtBlueprintFileFormat::GetMesh returning NULL "
+                       << abs_meshname 
+                       << " [domain " << domain << "]"
+                       << " will be missing" << endl);
+        // TODO: Should we throw an error instead of blanking the domain?
         return NULL;
     }
 
@@ -887,8 +1034,23 @@ avtBlueprintFileFormat::GetMesh(int domain, const char *abs_meshname)
     // prepare result vtk dataset
     vtkDataSet *res = NULL;
 
+    string mesh_name;
+    string mesh_topo_name;
+    split_mesh_and_topo(std::string(abs_meshname),
+                        mesh_name,
+                        mesh_topo_name);
+                        
+    BP_PLUGIN_INFO("mesh name and topology name: " 
+                    << mesh_name << " " << mesh_topo_name);
+
+
+    // TODO: CYRUS keep track of what meshes are mfem in another way
+    // we may have a mesh topo with no gf, but it has
+    // a field that is an mfem field, for that we need to create
+    // the mfem mesh
+
     // check for the mfem case
-    if( data.has_child("grid_function") )
+    if( data["topologies"][mesh_topo_name].has_child("grid_function") )
     {
         // use mfem to refine and create a vtk dataset
         mfem::Mesh *mesh = avtBlueprintDataAdaptor::MFEM::MeshToMFEM(data);
@@ -964,14 +1126,18 @@ avtBlueprintFileFormat::GetVar(int domain, const char *abs_varname)
         // create an mfem mesh 
         mfem::Mesh *mesh = avtBlueprintDataAdaptor::MFEM::MeshToMFEM(n_mesh);
         // refine the coloring to a vtk data array
-        res =  avtBlueprintDataAdaptor::MFEM::RefineElementColoringToVTK(mesh, m_selected_lod+1);
-        
+        res = avtBlueprintDataAdaptor::MFEM::RefineElementColoringToVTK(mesh, 
+                                                                        domain,
+                                                                        m_selected_lod+1);
         // clean up the mfem mesh 
         delete mesh;
+        
+        // return the coloring result
+        return res;
     }
     
-    //TODO: do we need to check for special case for mfem var mesh attribute?
-
+    // else, normal field case
+    
     Node n_field;
     ReadBlueprintField(domain,abs_varname_str,n_field);
     

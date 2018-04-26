@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -295,6 +295,20 @@ static bool EndsWith(const char *s, const char *suffix)
  *   visit's components.  Use double-quotes when re-surrounding instead of
  *   single.
  *
+ *   Kathleen Biagas, Mon Jul 17 15:11:09 MST 2017
+ *   Ensure '-dv' isn't added multiple times to the command line.
+ *   Change placement of ';' when creating the engineArgs string for
+ *   the command line.
+ *
+ *   Kathleen Biagas, Fri Sep 7 09:34:27 MST 2017
+ *   Support MSMPI version 8 which creates an MSMPI_BIN env var, and include/
+ *   libs are in a completely different location, so don't assume mpiexec
+ *   can be found from MSMPI_INC.
+ *
+ *   Kathleen Biagas, Tue Nov 21 13:43:42 MST 2017
+ *   Display message box if attempting to use parallel engine but mpiexec
+ *   not found.
+ *
  *****************************************************************************/
 
 int
@@ -503,6 +517,10 @@ VisItLauncherMain(int argc, char *argv[])
             debugLaunch = true;
             componentArgs.push_back("-debuglaunch");
         }
+        else if(ARG("-dv"))
+        {
+            continue;
+        }
         else if(ARG("-apitrace"))
         {
             apitrace_component = string(argv[i+1]);
@@ -548,6 +566,68 @@ VisItLauncherMain(int argc, char *argv[])
 
     if(component == "engine")
         component = parallel ? "engine_par" : "engine_ser";
+
+    string mpipath;
+    if (component == "engine_par")
+    {
+        mpipath = WinGetEnv("VISIT_MPIEXEC");
+        // first look for an EnvVar set by the installer
+        if (mpipath.empty())
+        {
+            // Check for EnvVar set by MSMPI 8.1 redist installer
+            mpipath = WinGetEnv("MSMPI_BIN");
+            if (!mpipath.empty())
+            {
+                // add the executable
+                mpipath += "\\mpiexec.exe";
+            }
+        }
+        if (mpipath.empty())
+        {
+            // Check for EnvVar set by MSMPI R2 redist installer
+            mpipath = WinGetEnv("MSMPI_INC");
+            if (!mpipath.empty())
+            {
+                mpipath += "\\..\\Bin\\mpiexec.exe";
+                // found the include path, point to Bin
+                // however, this env var is also set by MSMPI 8.1 SDK,
+                // so actually should check that executable exists
+                if (!PathFileExists(mpipath.c_str()))
+                {
+                    mpipath.clear();
+                }
+            }
+        }
+        if (mpipath.empty())
+        {
+            // Check for EnvVar set by HPC SDK installer
+            mpipath = WinGetEnv("CCP_SDK");
+            if (!mpipath.empty())
+            {
+                // found the base path, point to Bin
+                mpipath += "\\Bin\\mpiexec.exe";
+                // check that mpiexec exists
+                if (!PathFileExists(mpipath.c_str()))
+                {
+                    mpipath.clear();
+                }
+            }
+        }
+        if (mpipath.empty() || !PathFileExists(mpipath.c_str()))
+        {
+            string msg("Could not find path to \"mpiexec\".\nIf it is installed on your system, please set an environment variable 'VISIT_MPIEXEC' that points to its location. VisIt will launch a serial engine for this session.");
+#ifdef VISIT_WINDOWS_APPLICATION
+            MessageBox(NULL,
+                       (LPCSTR)msg.c_str(),
+                       (LPCSTR)"Missing mpiexec",
+                       MB_ICONEXCLAMATION | MB_OK);
+#else
+            cerr << msg << endl;
+#endif
+            parallel = false;
+            component = "engine_ser";
+        }
+    }
 
     if (parallel && !noloopback)
     {
@@ -610,41 +690,12 @@ VisItLauncherMain(int argc, char *argv[])
 
     if (component == "engine_par")
     {
-        // first look for an EnvVar set by the installer
-        string mpipath = WinGetEnv("VISIT_MPIEXEC");
-        if (mpipath.empty())
-        {
-            // Check for EnvVar set by MSMPI R2 redist installer
-            mpipath = WinGetEnv("MSMPI_INC");
-            if (!mpipath.empty())
-            {
-                // found the include path, point to Bin
-                mpipath += "\\..\\Bin\\mpiexec.exe";
-            }
-        }
-        if (mpipath.empty())
-        {
-            // Check for EnvVar set by HPC SDK installer
-            mpipath = WinGetEnv("CCP_SDK");
-            if (!mpipath.empty())
-            {
-                // found the base path, point to Bin
-                mpipath += "\\Bin\\mpiexec.exe";
-            }
-        }
-        if (mpipath.empty())
-        {
-            cerr << "Could not find path to \"mpiexec\"" << endl;
-            cerr << "If it is installed on your system, please set "
-                 << "an environment variable 'VISIT_MPIEXEC' that points"
-                 << "to its location." << endl;
-            return -1;
-        }
-
+        // we've already determined the path to mpiexec, if it wasn't
+        // found, we've switched to a serial engine.
         char *shortmpipath = (char*)malloc(512);
         GetShortPathName(mpipath.c_str(), shortmpipath, 512);
 
-        // mpi exec, with shortpath 
+        // mpi exec, with shortpath
         command.push_back(shortmpipath);
         free(shortmpipath);
         // mpi exec args, 
@@ -703,8 +754,9 @@ VisItLauncherMain(int argc, char *argv[])
         string eArgs;
         for (size_t i = 0; i < engineArgs.size(); ++i)
         {
-            eArgs.append(";");
             eArgs.append(engineArgs[i]);
+            if (i < engineArgs.size()-1)
+                eArgs.append(";");
         }
         command.push_back(eArgs);
     }
@@ -955,7 +1007,11 @@ ReadKey(const char *key, char **keyval)
  *
  *   Kathleen Biagas, Fri Jan 6 18:30:12 MST 2017
  *   Allow user to specify their own HOME via VISITUSERHOME env var.
- * 
+ *
+ *   Kathleen Biagas, Tue Nov 21 13:43:42 MST 2017
+ *   Display message box if VISITSSH set, but does not point
+ *   to valid executable.
+ *
  *****************************************************************************/
 
 std::string 
@@ -1228,17 +1284,62 @@ GetVisItEnvironment(stringVector &env, bool useShortFileName, bool addPluginVars
      */
     { 
         char *ssh = NULL, *sshargs = NULL;
-        int haveSSH = 0, haveSSHARGS = 0, freeSSH = 0, freeSSHARGS = 0;
-        
-        if((ssh = getenv("VISITSSH")) == NULL)
+        bool needVISITSSH = false;
+        bool haveSSH = false, haveSSHARGS = false, freeSSH = false, freeSSHARGS = false;
+        string errmsg;
+
+        ssh = getenv("VISITSSH");
+
+        if (ssh != NULL)
+        {
+            if (!PathFileExists(ssh))
+            {
+                needVISITSSH = true;
+                ssh = NULL;
+                errmsg = string("VISITSSH env var does not point to an executable.\n");
+            }
+        }
+        else
+        {
+            needVISITSSH = true;
+        }
+        if (ssh == NULL)
         {
             haveSSH = ReadKey("SSH", &ssh);
             if(haveSSH)
             {
-                sprintf(tmp, "VISITSSH=%s", ssh);
-                env.push_back(tmp);
+                if (PathFileExists(ssh))
+                {
+                    sprintf(tmp, "VISITSSH=%s", ssh);
+                    env.push_back(tmp);
+                    errmsg.clear(); 
+                }
+                else
+                {
+                    haveSSH = false;
+                    errmsg += "SSH registry key does not point to an executable.\n";
+                }
             }
             free(ssh);
+        }
+        if (needVISITSSH && !haveSSH)
+        {
+            string qpath(visitpath);
+            qpath+=string("\\qtssh.exe");
+            sprintf(tmp, "VISITSSH=%s", qpath.c_str());
+            env.push_back(tmp);
+            if (!errmsg.empty())
+            {
+                errmsg += "Using VisIt's qtssh.";
+#ifdef VISIT_WINDOWS_APPLICATION
+                MessageBox(NULL, 
+                           (LPCSTR)errmsg.c_str(), 
+                           "", 
+                           MB_ICONEXCLAMATION | MB_OK);
+#else
+                cerr << errmsg << endl;
+#endif
+            }
         }
 
         /*

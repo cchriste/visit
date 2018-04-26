@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -47,6 +47,7 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QButtonGroup>
+#include <QCloseEvent>
 #include <QRadioButton>
 #include <QTabWidget>
 #include <QTextBrowser>
@@ -57,12 +58,6 @@
 #include <QTextStream>
 #include <QComboBox>
 
-#include <QvisColorTableButton.h>
-#include <QvisOpacitySlider.h>
-#include <QvisColorButton.h>
-#include <QvisLineStyleWidget.h>
-#include <QvisLineWidthWidget.h>
-#include <QvisVariableButton.h>
 #include <InstallationFunctions.h>
 
 #include <QFileDialog>
@@ -554,6 +549,13 @@ QvisSeedMeWindow::CreateDownloadTab()
     return w;
 }
 
+// ****************************************************************************
+//  Modifications:
+//    Kathleen Biagas, Mon Aug 14 10:43:08 MST 2017
+//    Added clearTabsOnClose.
+//
+// ****************************************************************************
+
 QWidget *
 QvisSeedMeWindow::CreateSettingsTab()
 {
@@ -587,6 +589,11 @@ QvisSeedMeWindow::CreateSettingsTab()
     mainLayout->addWidget(label, 3,0);
     mainLayout->addWidget(button, 3,1);
 
+    clearTabsOnClose = new QCheckBox(tr("Clear all tabs on close"),w);
+    connect(clearTabsOnClose, SIGNAL(toggled(bool)),
+            this, SLOT(clearTabsOnCloseChanged(bool)));
+    mainLayout->addWidget(clearTabsOnClose, 4,0);
+
     return w;
 }
 
@@ -596,10 +603,66 @@ void QvisSeedMeWindow::directoryChanged(const QString & path)
     helpLabelWarning->setVisible(!(checkFile.exists() && checkFile.isFile()));
 }
 
+// ****************************************************************************
+//  Method: QvisSeedMeWindow::hide
+//
+//  Purpose:
+//    Override default method so that forms may be cleared.
+//
+//    Programmer: Kathleen Biagas
+//    Creation:   August 14, 2017
+//
+//  Modifications:
+//
+// ****************************************************************************
+
+void
+QvisSeedMeWindow::hide()
+{
+    if (clearTabsOnClose->isChecked())
+    {
+        for (int i = 0; i < tabs->count(); ++i)
+            this->ResetForm2(tabs->currentIndex());
+        this->ClearLog();
+    }
+    QvisPostableWindow::hide();
+}
+
+// ****************************************************************************
+//  Method: QvisSeedMeWindow::closeEvent
+//
+//  Purpose:
+//    Override default method so that forms may be cleared.
+//
+//    Programmer: Kathleen Biagas
+//    Creation:   August 14, 2017
+//
+//  Modifications:
+//
+// ****************************************************************************
+
+void 
+QvisSeedMeWindow::closeEvent(QCloseEvent *event)
+{
+    if (clearTabsOnClose->isChecked())
+    {
+        for (int i = 0; i < tabs->count(); ++i)
+            this->ResetForm2(tabs->currentIndex());
+        this->ClearLog();
+    }
+    event->accept();
+}
+
 void
 QvisSeedMeWindow::ResetForm()
 {
-    switch(tabs->currentIndex())
+    this->ResetForm2(tabs->currentIndex());
+}
+
+void
+QvisSeedMeWindow::ResetForm2(int index)
+{
+    switch(index)
     {
       case 0: // QuickUpload
       {
@@ -667,6 +730,8 @@ QvisSeedMeWindow::ClearLog()
 // Creation:   omitted
 //
 // Modifications:
+//    Kathleen Biagas, Mon Aug 14 10:43:08 MST 2017
+//    Added clearTabsOnClose.
 //   
 // ****************************************************************************
 
@@ -798,6 +863,11 @@ QvisSeedMeWindow::UpdateWindow(bool doAll)
           case SeedMeAttributes::ID_quickFrameRate:
             quickFrameRate->setText(IntToQString(atts->GetQuickFrameRate()));
             break;
+          case SeedMeAttributes::ID_clearAllTabsOnClose:
+            clearTabsOnClose->blockSignals(true);
+            clearTabsOnClose->setChecked(atts->GetClearAllTabsOnClose());
+            clearTabsOnClose->blockSignals(false);
+            break;
         }
     }
 }
@@ -885,7 +955,14 @@ QvisSeedMeWindow::GetCurrentValues(int which_widget)
     if(which_widget == SeedMeAttributes::ID_frameRate || doAll)
     {
         int val;
-        atts->SetFrameRate(val);
+        if(LineEditGetInt(frameRate, val))
+            atts->SetFrameRate(val);
+        else
+        {
+            ResettingError(tr("frame rate"),
+                IntToQString(atts->GetFrameRate()));
+            atts->SetFrameRate(atts->GetFrameRate());
+        }
     }
 
     // Do queryColID
@@ -1525,4 +1602,11 @@ QvisSeedMeWindow::quickDownloadTypeChanged(int val)
         SetUpdate(false);
         Apply();
     }
+}
+
+void
+QvisSeedMeWindow::clearTabsOnCloseChanged(bool val)
+{
+    atts->SetClearAllTabsOnClose(val);
+    atts->Notify();
 }

@@ -1,19 +1,16 @@
 function bv_fastquery_initialize
 {
     export DO_FASTQUERY="no"
-    export ON_FASTQUERY="off"
 }
 
 function bv_fastquery_enable
 {
     DO_FASTQUERY="yes"
-    ON_FASTQUERY="on"
 }
 
 function bv_fastquery_disable
 {
     DO_FASTQUERY="no"
-    ON_FASTQUERY="off"
 }
 
 function bv_fastquery_depends_on
@@ -39,7 +36,7 @@ function bv_fastquery_depends_on
 
 function bv_fastquery_info
 {
-    export FASTQUERY_VERSION=${FASTQUERY_VERSION:-"0.8.4.3"}
+    export FASTQUERY_VERSION=${FASTQUERY_VERSION:-"0.8.4.10"}
     export FASTQUERY_FILE=${FASTQUERY_FILE:-"fastquery-${FASTQUERY_VERSION}.tar.gz"}
     # Note: last 3-digit field in URL changes with version.
     export FASTQUERY_URL=${FASTQUERY_URL:-"https://code.lbl.gov/frs/download.php/file/428"}
@@ -57,14 +54,8 @@ function bv_fastquery_print
 
 function bv_fastquery_print_usage
 {
-    printf "\t\t%15s\n" "NOTE: FastQuery not available for download from web" 
-    printf "%-15s %s [%s]\n" "--fastquery" "Build FastQuery" "$DO_FASTQUERY"
-}
-
-function bv_fastquery_graphical
-{
-    local graphical_out="FastQuery  $FASTQUERY_VERSION($FASTQUERY_FILE)   $ON_FASTQUERY"
-    echo $graphical_out
+    printf "%-20s %s [%s]\n" "--fastquery" "Build FastQuery" "$DO_FASTQUERY"
+    printf "%-20s %s\n" "" "NOTE: FastQuery not available for download from web" 
 }
 
 function bv_fastquery_host_profile

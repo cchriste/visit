@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * All rights reserved.
 *
@@ -177,7 +177,8 @@ QvisParallelCoordinatesPlotWindow::CreateWindowContents()
 
     // axes new/del/up/down buttons
     axisNewButton = new QvisVariableButton(false, true, true,
-                                           QvisVariableButton::Scalars,
+                                           QvisVariableButton::Scalars|
+                                           QvisVariableButton::Curves,
                                            axisGroup);
     axisNewButton->setText(tr("Add axis"));
     axisNewButton->setChangeTextOnVariableChange(false);

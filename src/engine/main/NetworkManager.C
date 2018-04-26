@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -4731,7 +4731,7 @@ NetworkManager::ExportSingleDatabase(int id, const ExportDBAttributes &atts)
     {
         std::string plotName(networkCache[id]->GetPlot()->GetName());
         int time = networkCache[id]->GetTime();
-        ref_ptr<avtDatabase> db = networkCache[id]->GetNetDB()->GetDatabase();
+        ref_ptr<avtDatabase> db = networkCache[id]->GetNetDB()->GetDB();
 
         // Set the contract to use for the export. Give the plot a chance to
         // enhance the contract as would be the case in a normal execute.
@@ -4942,6 +4942,11 @@ NetworkManager::CloneNetwork(const int id)
 //    Use the expression node without assuming where it exists in the working
 //    net node list.
 //
+//    Kathleen Biagas, Fri May 26 12:35:43 PDT 2017
+//    Default useActualData to true, retrieve the value from QueryInputParams
+//    if available.  Use it as a value to help determine where input is
+//    gathered from.
+//
 // ****************************************************************************
 
 void
@@ -4954,25 +4959,28 @@ NetworkManager::AddQueryOverTimeFilter(QueryOverTimeAttributes *qA,
         EXCEPTION1(ImproperUseException, error);
     }
 
+    bool useActualData = true;
+    if (qA->GetQueryAtts().GetQueryInputParams().HasNumericEntry("use_actual_data"))
+    {
+        useActualData = qA->GetQueryAtts().GetQueryInputParams().GetEntry("use_actual_data")->ToBool();
+    }
+
     //
     // Determine which input the filter should use.
     //
     avtDataObject_p input;
-    if (qA->GetQueryAtts().GetName() == "Locate and Pick Zone" ||
-        qA->GetQueryAtts().GetName() == "Locate and Pick Node" )
+    if (useActualData ||
+        qA->GetQueryAtts().GetName() == "Locate and Pick Zone" ||
+        qA->GetQueryAtts().GetName() == "Locate and Pick Node")
     {
         input = networkCache[clonedFromId]->GetPlot()->
                 GetIntermediateDataObject();
-    }
-    else if (qA->GetQueryAtts().GetDataType() == QueryAttributes::OriginalData)
-    {
-        input = workingNet->GetExpressionNode()->GetOutput();
     }
     else
     {
-        input = networkCache[clonedFromId]->GetPlot()->
-                GetIntermediateDataObject();
+        input = workingNet->GetExpressionNode()->GetOutput();
     }
+
     qA->GetQueryAtts().SetPipeIndex(networkCache[clonedFromId]->
         GetContract()->GetPipelineIndex());
 

@@ -1,7 +1,6 @@
 function bv_vtk_initialize
 {
     export DO_VTK="yes"
-    export ON_VTK="on"
     export FORCE_VTK="no"
     export USE_SYSTEM_VTK="no"
     add_extra_commandline_args "vtk" "system-vtk" 0 "Using system VTK (exp)"
@@ -11,14 +10,12 @@ function bv_vtk_initialize
 function bv_vtk_enable
 {
     DO_VTK="yes"
-    ON_VTK="on"
     FORCE_VTK="yes"
 }
 
 function bv_vtk_disable
 {
     DO_VTK="no"
-    ON_VTK="off"
     FORCE_VTK="no"
 }
 
@@ -95,9 +92,9 @@ function bv_vtk_print
 
 function bv_vtk_print_usage
 {
-    printf "%-15s %s [%s]\n" "--vtk" "Build VTK" "built by default unless --no-thirdparty flag is used"
-    printf "%-15s %s [%s]\n" "--system-vtk" "Use the system installed VTK"
-    printf "%-15s %s [%s]\n" "--alt-vtk-dir" "Use VTK from an alternative directory"
+    printf "%-20s %s\n" "--vtk" "Build VTK" 
+    printf "%-20s %s [%s]\n" "--system-vtk" "Use the system installed VTK"
+    printf "%-20s %s [%s]\n" "--alt-vtk-dir" "Use VTK from an alternative directory"
 }
 
 function bv_vtk_host_profile
@@ -447,7 +444,7 @@ diff -c CMake/vtkCompilerExtras.cmake.orig CMake/vtkCompilerExtras.cmake
       OUTPUT_VARIABLE _gcc_version_info
       ERROR_VARIABLE _gcc_version_info)
 
-!   string (REGEX MATCH "[3456]\\.[0-9]\\.[0-9]"
+!   string (REGEX MATCH "[34567]\\.[0-9]\\.[0-9]"
       _gcc_version "${_gcc_version_info}")
     if(NOT _gcc_version)
       string (REGEX REPLACE ".*\\(GCC\\).* ([34]\\.[0-9]) .*" "\\1.0"
@@ -479,7 +476,7 @@ diff -c CMake/GenerateExportHeader.cmake.orig CMake/GenerateExportHeader.cmake
       execute_process(COMMAND ${CMAKE_C_COMPILER} --version
         OUTPUT_VARIABLE _gcc_version_info
         ERROR_VARIABLE _gcc_version_info)
-!     string(REGEX MATCH "[3456]\\.[0-9]\\.[0-9]"
+!     string(REGEX MATCH "[34567]\\.[0-9]\\.[0-9]"
         _gcc_version "${_gcc_version_info}")
       # gcc on mac just reports: "gcc (GCC) 3.3 20030304 ..." without the
       # patch level, handle this here:
@@ -702,6 +699,15 @@ function build_vtk
                 echo "Xcode 7 on MacOS 10.10 detected: Enabling CMake workaround"
                 vopts="${vopts} -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=\"\" -DCMAKE_OSX_SYSROOT:STRING=/"
             fi
+        elif test "${MACOSX_DEPLOYMENT_TARGET}" = "10.12"; then
+            # If building on 10.12 (Sierra) check if we are building with Xcode 9 ...
+            XCODE_VER=$(xcodebuild -version | head -n 1 | awk '{print $2}')
+            if test ${XCODE_VER%.*} == 9; then
+                # Workaround for Xcode 9 not having a 10.12 SDK: Prevent CMake from linking to 10.13 SDK
+                # by using Frameworks installed in root directory.
+                echo "Xcode 9 on MacOS 10.12 detected: Enabling CMake workaround"
+                vopts="${vopts} -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=\"\" -DCMAKE_OSX_SYSROOT:STRING=/"
+            fi
         fi
     fi
 
@@ -742,7 +748,7 @@ function build_vtk
             if [[ "$DO_SERVER_COMPONENTS_ONLY" != "yes" ]]; then
                 vopts="${vopts} -DModule_vtkGUISupportQtOpenGL:BOOL=true"
                 vopts="${vopts} -DQT_QMAKE_EXECUTABLE:FILEPATH=${QT_BIN_DIR}/qmake"
-                if [[ ${IS_QT5} == "yes" ]]; then
+                if [[ ${IS_QT4} == "no" ]]; then
                     vopts="${vopts} -DVTK_QT_VERSION=5"
                     vopts="${vopts} -DCMAKE_PREFIX_PATH=${QT_INSTALL_DIR}/lib/cmake"
                 fi
@@ -778,6 +784,29 @@ function build_vtk
         vopts="${vopts} -DR_LIBRARY_BASE:PATH=${R_INSTALL_DIR}/lib/R/lib/libR.${SO_EXT}"
         vopts="${vopts} -DR_LIBRARY_LAPACK:PATH=${R_INSTALL_DIR}/lib/R/lib/libRlapack.${SO_EXT}"
         vopts="${vopts} -DR_LIBRARY_BLAS:PATH=${R_INSTALL_DIR}/lib/R/lib/libRblas.${SO_EXT}"
+    fi
+
+    # Use our Mesa or OpenSWR as GL? We want to do this if we're doing a server or engine only
+    # build and we're building statiically and we requested mesa or openswr.
+    if [[ "$DO_STATIC_BUILD" == "yes" ]] ; then
+        if [[ "$DO_SERVER_COMPONENTS_ONLY" == "yes" || "$DO_ENGINE_ONLY" == "yes" ]] ; then
+            if [[ "$DO_MESA" == "yes" ]] ; then
+                vopts="${vopts} -DVTK_USE_X:BOOL=OFF -DVTK_OPENGL_HAS_OSMESA:BOOL=ON"
+                vopts="${vopts} -DOPENGL_INCLUDE_DIR:PATH=${MESA_INCLUDE_DIR}"
+                vopts="${vopts} -DOPENGL_gl_LIBRARY:PATH=\"${MESA_LIB};${LLVM_LIB}\""
+                vopts="${vopts} -DOPENGL_glu_LIBRARY:PATH=${GLU_LIB}"
+                vopts="${vopts} -DOSMESA_LIBRARY:FILEPATH=\"${MESA_LIB};${LLVM_LIB}\""
+                vopts="${vopts} -DOSMESA_INCLUDE_DIR:PATH=${MESA_INCLUDE_DIR}"
+            fi
+            if [[ "$DO_OPENSWR" == "yes" ]] ; then
+                vopts="${vopts} -DVTK_USE_X:BOOL=OFF -DVTK_OPENGL_HAS_OSMESA:BOOL=ON"
+                vopts="${vopts} -DOPENGL_INCLUDE_DIR:PATH=${OPENSWR_INCLUDE_DIR}"
+                vopts="${vopts} -DOPENGL_gl_LIBRARY:PATH=\"${OPENSWR_LIB};${LLVM_LIB}\""
+                vopts="${vopts} -DOPENGL_glu_LIBRARY:PATH=${GLU_LIB}"
+                vopts="${vopts} -DOSMESA_LIBRARY:FILEPATH=\"${OPENSWR_LIB};${LLVM_LIB}\""
+                vopts="${vopts} -DOSMESA_INCLUDE_DIR:PATH=${OPENSWR_INCLUDE_DIR}"
+            fi
+        fi
     fi
 
     CMAKE_BIN="${CMAKE_INSTALL}/cmake"

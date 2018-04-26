@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -44,6 +44,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+struct dirent;
+
 // ****************************************************************************
 //   Modifications:
 //    Kathleen Biagas, Fri Jun 26 12:10:08 PDT 2015
@@ -54,6 +56,11 @@
 //    Use _stat64 for VisItStat_t and __int64 for VisItOff_t if running a
 //    64 bit version on windows.
 //
+//    Mark C. Miller, Thu Mar 15 14:18:43 PDT 2018
+//    Added FileType enum and GetFileType methods.
+//
+//    Mark C. Miller, Fri Mar 23 12:10:59 PDT 2018
+//    Added LINK to FileTypes.
 // ****************************************************************************
 
 namespace FileFunctions
@@ -76,6 +83,9 @@ typedef void (ProcessDirectoryCallback)(void *, const std::string &, bool,
   #ifndef S_ISDIR
     #define S_ISDIR(m) (((m) &S_IFMT) == S_IFDIR)
   #endif
+  #ifndef S_ISREG
+    #define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+  #endif
 #else
   #if SIZEOF_OFF64_T > 4
     typedef struct stat64 VisItStat_t;
@@ -92,6 +102,17 @@ typedef enum
     PERMISSION_RESULT_NONREADABLE,
     PERMISSION_RESULT_NOFILE
 } PermissionsResult;
+
+typedef enum
+{
+    FILE_TYPE_REG,
+    FILE_TYPE_DIR,
+    FILE_TYPE_LINK,
+    FILE_TYPE_OTHER,
+    FILE_TYPE_NOT_KNOWN
+} FileType;
+
+VisItStat_t* const FILE_TYPE_DONT_STAT = ((VisItStat_t*)0x1);
 
 PermissionsResult MISC_API CheckPermissions(const std::string &filename);
 
@@ -128,6 +149,10 @@ std::string MISC_API  ComposeDatabaseName(const std::string &host,
                                           const std::string &db);
 
 void MISC_API  FileMatchesPatternCB(void *, const std::string &, bool, bool, long);
+FileType MISC_API GetFileType(char const *filename, struct dirent const *dent = 0,
+         VisItStat_t *statbuf = 0);
+FileType MISC_API GetFileType(std::string const &filename, struct dirent const *dent = 0,
+         VisItStat_t *statbuf = 0);
 };
 
 #endif

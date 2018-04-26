@@ -1,24 +1,25 @@
 function bv_openssl_initialize
 {
     export DO_OPENSSL="no"
-    export ON_OPENSSL="off"
 }
 
 function bv_openssl_enable
 {
     DO_OPENSSL="yes"
-    ON_OPENSSL="on"
 }
 
 function bv_openssl_disable
 {
     DO_OPENSSL="no"
-    ON_OPENSSL="off"
 }
 
 function bv_openssl_depends_on
 {
     local depends_on=""
+
+    if [[ "$DO_ZLIB" == "yes" ]] ; then
+        depends_on="$depends_on zlib"
+    fi
 
     echo $depends_on
 }
@@ -40,13 +41,7 @@ function bv_openssl_print
 
 function bv_openssl_print_usage
 {
-    printf "%-15s %s [%s]\n" "--openssl" "Build openssl support" "$DO_OPENSSL"
-}
-
-function bv_openssl_graphical
-{
-    local graphical_out="openssl     $OPENSSL_VERSION($OPENSSL_FILE)      $ON_OPENSSL"
-    echo "$graphical_out"
+    printf "%-20s %s [%s]\n" "--openssl" "Build openssl support" "$DO_OPENSSL"
 }
 
 function bv_openssl_host_profile
@@ -102,14 +97,27 @@ function build_openssl
     # Call configure
     #
     info "Configuring openssl . . ."
-    info env CXX="$CXX_COMPILER" CXXFLAGS="$CXXFLAGS $CXX_OPT_FLAGS" KERNEL_BITS=64 ./config \
+
+    WITH_ZLIB_LIB=""
+    WITH_ZLIB_INCLUDE=""
+
+    if [[ "$DO_ZLIB" == "yes" ]]; then
+        WITH_ZLIB_LIB="--with-zlib-lib=$VISITDIR/zlib/$ZLIB_VERSION/$VISITARCH/lib"
+        WITH_ZLIB_INCLUDE="--with-zlib-include=$VISITDIR/zlib/$ZLIB_VERSION/$VISITARCH/include"
+    fi
+
+    info env CC="$C_COMPILER $CFLAGS $C_OPT_FLAGS" KERNEL_BITS=64 ./config \
+            $WITH_ZLIB_LIB $WITH_ZLIB_INCLUDE \
             --prefix="$VISITDIR/openssl/$OPENSSL_VERSION/$VISITARCH/" \
             --openssldir="$VISITDIR/openssl/$OPENSSL_VERSION/$VISITARCH/etc/openssl" 
-    env CXX="$CXX_COMPILER" CXXFLAGS="\"$CXXFLAGS $CXX_OPT_FLAGS\"" KERNEL_BITS=64 ./config --prefix="$VISITDIR/openssl/$OPENSSL_VERSION/$VISITARCH/"  --openssldir="$VISITDIR/openssl/$OPENSSL_VERSION/$VISITARCH/etc/openssl" 
+    env CC="$C_COMPILER $CFLAGS $C_OPT_FLAGS" KERNEL_BITS=64 ./config \
+            $WITH_ZLIB_LIB $WITH_ZLIB_INCLUDE \
+            --prefix="$VISITDIR/openssl/$OPENSSL_VERSION/$VISITARCH/" \
+            --openssldir="$VISITDIR/openssl/$OPENSSL_VERSION/$VISITARCH/etc/openssl" 
+
     #
     # Build openssl
     #
-
     info "Building openssl . . . (~2 minutes)"
     $MAKE $MAKE_OPT_FLAGS
     if [[ $? != 0 ]] ; then

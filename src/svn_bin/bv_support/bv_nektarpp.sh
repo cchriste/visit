@@ -1,7 +1,6 @@
 function bv_nektarpp_initialize
 {
     export DO_NEKTAR_PLUS_PLUS="no"
-    export ON_NEKTAR_PLUS_PLUS="off"
     export USE_SYSTEM_NEKTAR_PLUS_PLUS="no"
     add_extra_commandline_args "nektarpp" "alt-nektarpp-dir" 1 "Use alternative directory for nektar++"
 }
@@ -9,13 +8,11 @@ function bv_nektarpp_initialize
 function bv_nektarpp_enable
 {
     DO_NEKTAR_PLUS_PLUS="yes"
-    ON_NEKTAR_PLUS_PLUS="on"
 }
 
 function bv_nektarpp_disable
 {
     DO_NEKTAR_PLUS_PLUS="no"
-    ON_NEKTAR_PLUS_PLUS="off"
 }
 
 function bv_nektarpp_alt_nektarpp_dir
@@ -27,13 +24,13 @@ function bv_nektarpp_alt_nektarpp_dir
 
 function bv_nektarpp_depends_on
 {
-    depends_on="cmake boost zlib"
-
     if [[ "$USE_SYSTEM_NEKTAR_PLUS_PLUS" == "yes" ]]; then
         echo ""
     else
+	depends_on="cmake boost"
+
         if [[ "$DO_ZLIB" == "yes" ]] ; then
-            depends_on="$depends_on zlib"    
+            depends_on="$depends_on zlib"
         fi
 
         echo $depends_on
@@ -49,11 +46,11 @@ function bv_nektarpp_initialize_vars
 
 function bv_nektarpp_info
 {
-    export NEKTAR_PLUS_PLUS_VERSION=${NEKTAR_PLUS_PLUS_VERSION:-"4.1.0"}
-    export NEKTAR_PLUS_PLUS_FILE=${NEKTAR_PLUS_PLUS_FILE:-"nektar++-${NEKTAR_PLUS_PLUS_VERSION}.tar.gz"}
-    export NEKTAR_PLUS_PLUS_COMPATIBILITY_VERSION=${NEKTAR_PLUS_PLUS_COMPATIBILITY_VERSION:-"1.8"}
+    export NEKTAR_PLUS_PLUS_VERSION=${NEKTAR_PLUS_PLUS_VERSION:-"4.4.0"}
+    export NEKTAR_PLUS_PLUS_FILE=${NEKTAR_PLUS_PLUS_FILE:-"nektar-${NEKTAR_PLUS_PLUS_VERSION}.tar.gz"}
+    export NEKTAR_PLUS_PLUS_COMPATIBILITY_VERSION=${NEKTAR_PLUS_PLUS_COMPATIBILITY_VERSION:-"4.4"}
     export NEKTAR_PLUS_PLUS_BUILD_DIR=${NEKTAR_PLUS_PLUS_BUILD_DIR:-"nektar++-${NEKTAR_PLUS_PLUS_VERSION}"}
-    export NEKTAR_PLUS_PLUS_URL=${NEKTAR_PLUS_PLUS_URL:-"http://www.nektar.info/downloads/nektar++-${NEKTAR_PLUS_PLUS_VERSION}/src"}
+    export NEKTAR_PLUS_PLUS_URL=${NEKTAR_PLUS_PLUS_URL:-"https://www.nektar.info/wp-content/uploads/2017/03/"}
     export NEKTAR_PLUS_PLUS_MD5_CHECKSUM=""
     export NEKTAR_PLUS_PLUS_SHA256_CHECKSUM=""
 }
@@ -68,14 +65,8 @@ function bv_nektarpp_print
 
 function bv_nektarpp_print_usage
 {
-    printf "%-15s %s [%s]\n" "--nektarpp" "Build Nektar++" "${DO_NEKTAR_PLUS_PLUS}"
-    printf "%-15s %s [%s]\n" "--alt-nektarpp-dir" "Use Nektar++ from an alternative directory"
-}
-
-function bv_nektarpp_graphical
-{
-    local graphical_out="NEKTAR_PLUS_PLUS     $NEKTAR_PLUS_PLUS_VERSION($NEKTAR_PLUS_PLUS_FILE)      $ON_NEKTAR_PLUS_PLUS"
-    echo $graphical_out
+    printf "%-20s %s [%s]\n" "--nektarpp" "Build Nektar++" "${DO_NEKTAR_PLUS_PLUS}"
+    printf "%-20s %s [%s]\n" "--alt-nektarpp-dir" "Use Nektar++ from an alternative directory"
 }
 
 function bv_nektarpp_host_profile
@@ -133,14 +124,125 @@ function bv_nektarpp_dry_run
     fi
 }
 
+function apply_nektarpp_4_4_patch
+{
+    info "Patching Nektar++ 4.4"
+    patch -p0 << \EOF
+diff -rcN nektar++-4.4.0/library/LibUtilities/Communication/CommDataType_orig.h nektar++-4.4.0/library/LibUtilities/Communication/CommDataType.h
+*** nektar++-4.4.0/library/LibUtilities/Communication/CommDataType_orig.h	2017-03-06 11:04:22.000000000 -0700
+--- nektar++-4.4.0/library/LibUtilities/Communication/CommDataType.h	2017-09-05 14:22:16.000000000 -0600
+***************
+*** 56,73 ****
+  {
+  namespace LibUtilities
+  {
+! enum CommDataType
+! {
+!     MPI_INT,
+!     MPI_UNSIGNED,
+!     MPI_LONG,
+!     MPI_UNSIGNED_LONG,
+!     MPI_LONG_LONG,
+!     MPI_UNSIGNED_LONG_LONG,
+!     MPI_FLOAT,
+!     MPI_DOUBLE,
+!     MPI_LONG_DOUBLE
+! };
+  }
+  }
+  #endif
+--- 56,99 ----
+  {
+  namespace LibUtilities
+  {
+! typedef int CommDataType;
+! 
+! #ifndef MPI_INT
+!     #define MPI_INT            ((CommDataType)0x4c000405)
+! #endif
+! 
+! #ifndef MPI_UNSIGNED
+!     #define MPI_UNSIGNED       ((CommDataType)0x4c000406)
+! #endif
+! 
+! #ifndef MPI_LONG
+!     #define MPI_LONG           ((CommDataType)0x4c000807)
+! #endif
+! 
+! #ifndef MPI_UNSIGNED_LONG
+!     #define MPI_UNSIGNED_LONG  ((CommDataType)0x4c000808)
+! #endif
+! 
+! #ifndef MPI_LONG_LONG
+!     #define MPI_LONG_LONG      ((CommDataType)0x4c000809)
+! #endif
+! 
+! #ifndef MPI_UNSIGNED_LONG_LONG
+!     #define MPI_UNSIGNED_LONG_LONG ((CommDataType)0x4c000819)
+! #endif
+! 
+! #ifndef MPI_FLOAT
+!     #define MPI_FLOAT          ((CommDataType)0x4c00040a)
+! #endif
+! 
+! #ifndef MPI_DOUBLE
+!     #define MPI_DOUBLE         ((CommDataType)0x4c00080b)
+! #endif
+! 
+! #ifndef MPI_LONG_DOUBLE
+!     #define MPI_LONG_DOUBLE    ((CommDataType)0x4c00100c)
+! #endif
+! 
+  }
+  }
+  #endif
+EOF
+}
+
+function apply_nektarpp_4_4_OSX_patch
+{
+    info "Patching Nektar++ 4.4 for OS X"
+    patch -p0 << \EOF
+diff -rcN nektar++-4.4.0/CMakeLists_orig.txt  nektar++-4.4.0/CMakeLists.txt 
+*** nektar++-4.4.0/CMakeLists_orig.txt	2017-03-06 11:04:22.000000000 -0700
+--- nektar++-4.4.0/CMakeLists.txt	2017-09-05 14:47:37.000000000 -0600
+***************
+*** 326,333 ****
+  
+  # Build active components
+  IF (NEKTAR_BUILD_LIBRARY)
+!     SET(NEKTAR++_LIBRARIES SolverUtils LibUtilities StdRegions SpatialDomains LocalRegions
+!         MultiRegions Collections GlobalMapping FieldUtils NekMeshUtils)
+      INCLUDE_DIRECTORIES(library)
+      ADD_SUBDIRECTORY(library)
+      INSTALL(EXPORT Nektar++Libraries DESTINATION ${LIB_DIR}/cmake COMPONENT dev)
+--- 326,333 ----
+  
+  # Build active components
+  IF (NEKTAR_BUILD_LIBRARY)
+!     SET(NEKTAR++_LIBRARIES LibUtilities StdRegions SpatialDomains LocalRegions
+!         MultiRegions Collections GlobalMapping FieldUtils)
+      INCLUDE_DIRECTORIES(library)
+      ADD_SUBDIRECTORY(library)
+      INSTALL(EXPORT Nektar++Libraries DESTINATION ${LIB_DIR}/cmake COMPONENT dev)
+EOF
+}
+
 function apply_nektarpp_patch
 {
-    #    if [[ "${NEKTAR_PLUS_PLUS_VERSION}" == 4.0.0 ]] ; then
-    #        apply_nektarpp_zlib_patch
-    #        if [[ $? != 0 ]]; then
-    #           return 1
-    #        fi
-    #    fi
+    if [[ "${NEKTAR_PLUS_PLUS_VERSION}" == 4.4.0 ]] ; then
+        apply_nektarpp_4_4_patch
+        if [[ $? != 0 ]]; then
+           return 1
+        fi
+
+#        if [[ "$OPSYS" == "Darwin" ]]; then
+            apply_nektarpp_4_4_OSX_patch
+            if [[ $? != 0 ]]; then
+		return 1
+            fi
+#	fi	
+    fi
 
     return 0
 }
@@ -178,9 +280,6 @@ function build_nektarpp
     fi
 
     #
-    cd $NEKTAR_PLUS_PLUS_BUILD_DIR || error "Can't cd to Nektar++ build dir." $NEKTAR_PLUS_PLUS_BUILD_DIR 
-
-    #
     # Apply patches
     #
     info "Patching Nektar++ . . ."
@@ -197,6 +296,9 @@ function build_nektarpp
         fi
     fi
  
+    #
+    cd $NEKTAR_PLUS_PLUS_BUILD_DIR || error "Can't cd to Nektar++ build dir." $NEKTAR_PLUS_PLUS_BUILD_DIR 
+
     #
     # Configure Nektar++
     #
@@ -229,7 +331,7 @@ function build_nektarpp
 #        ntopts="${ntopts} -DCMAKE_INSTALL_NAME_DIR:PATH=${nektar_plus_plus_inst_path}/lib"
 #    fi
 
-    if test "x${DO_BOOST}" = "xyes"; then
+    if [[ "$DO_BOOST" == "yes" ]] ; then
         info "boost requested.  Configuring NEKTAR++ with boost support."
         ntopts="${ntopts} -DBOOST_ROOT:PATH=${VISITDIR}/boost/${BOOST_VERSION}/${VISITARCH}"
 
@@ -240,8 +342,7 @@ function build_nektarpp
         fi
     fi
 
-
-    if test "x${DO_ZLIB}" = "xyes"; then
+    if [[ "$DO_ZLIB" == "yes" ]] ; then
         info "zlib requested.  Configuring NEKTAR++ with zlib support."
         ntopts="${ntopts} -DZLIB_ROOT:PATH=${VISITDIR}/zlib/${ZLIB_VERSION}/${VISITARCH}"
 
@@ -252,7 +353,7 @@ function build_nektarpp
         fi
     fi
 
-#    if test "x${DO_MPICH}" = "xyes"; then
+#    if test "${DO_MPICH}" = "yes"; then
 #        info "mpich requested.  Configuring NEKTAR++ with mpich support."
 #        ntopts="${ntopts} -DMPI_ROOT:PATH=${VISITDIR}/mpich/${MPICH_VERSION}/${VISITARCH}"
 
@@ -263,8 +364,7 @@ function build_nektarpp
 #        fi
 #    fi
 
-
-#        if test "x${DO_VTK}" = "xyes"; then
+#        if test "${DO_VTK}" = "yes"; then
 #            info "vtk requested.  Configuring NEKTAR++ with vtk support."
 #            ntopts="${ntopts} -DNEKTAR_USE_VTK=ON -DVTK_DIR:PATH=${VISITDIR}/${VTK_INSTALL_DIR}/${VTK_VERSION}/${VISITARCH}/lib/cmake/vtk-${VTK_SHORT_VERSION}"
 

@@ -1,6 +1,6 @@
 #*****************************************************************************
 #
-# Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+# Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 # Produced at the Lawrence Livermore National Laboratory
 # LLNL-CODE-442911
 # All rights reserved.
@@ -61,7 +61,7 @@ except:
 
 
 try:
-    import PySide.QtCore
+    import PySide2.QtCore
     __pyside_imported = True
 except:
     __pyside_imported = False

@@ -1,19 +1,16 @@
 function bv_tcmalloc_initialize
 {
     export DO_TCMALLOC="no"
-    export ON_TCMALLOC="off"
 }
 
 function bv_tcmalloc_enable
 {
     DO_TCMALLOC="yes"
-    ON_TCMALLOC="on"
 }
 
 function bv_tcmalloc_disable
 {
     DO_TCMALLOC="no"
-    ON_TCMALLOC="off"
 }
 
 function bv_tcmalloc_depends_on
@@ -41,13 +38,7 @@ function bv_tcmalloc_print
 
 function bv_tcmalloc_print_usage
 {
-    printf "%-15s %s [%s]\n" "--tcmalloc" "Build tcmalloc from Google's perftools" "$DO_TCMALLOC"  
-}
-
-function bv_tcmalloc_graphical
-{
-    local graphical_out="TCMALLOC    $TCMALLOC_VERSION($TCMALLOC_FILE)     $ON_TCMALLOC"
-    echo "$graphical_out"
+    printf "%-20s %s [%s]\n" "--tcmalloc" "Build tcmalloc from Google's perftools" "$DO_TCMALLOC"  
 }
 
 function bv_tcmalloc_host_profile

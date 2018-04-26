@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -162,7 +162,11 @@ class VISWINDOW_API VisWinAxes3D : public VisWinColleague
                                   const VisWinTextAttributes &zAxis);
 
     void                      Set3DAxisScalingFactors(bool scale,
-                                                       const double s[3]);
+                                                      const double s[3]);
+
+    bool                      GetBoundsOverridden() const;
+    void                      GetOverrideBounds( double *bounds ) const;
+
   protected:
     void UpdateTitleTextAttributes(double fr, double fg, double fb);
     void UpdateLabelTextAttributes(double fr, double fg, double fb);
@@ -200,8 +204,4 @@ class VISWINDOW_API VisWinAxes3D : public VisWinColleague
     void                      RemoveAxes3DFromWindow(void);
     bool                      ShouldAddAxes3D(void);
 };
-
-
 #endif
-
-

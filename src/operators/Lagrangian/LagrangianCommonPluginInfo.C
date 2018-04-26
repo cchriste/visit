@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -111,7 +111,7 @@ LagrangianCommonPluginInfo::CopyAttributes(AttributeSubject *to,
 // ****************************************************************************
 
 ExpressionList * 
-LagrangianCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md)
+LagrangianCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md) const
 {
     int i;
     char name[1024], defn[1024];
@@ -120,6 +120,8 @@ LagrangianCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md)
     for (i = 0 ; i < numVectors ; i++)
     {
         const avtVectorMetaData *mmd = md->GetVector(i);
+        if (mmd->hideFromGUI || !mmd->validVariable)
+            continue;
         {
             Expression e2;
             sprintf(name, "operators/Lagrangian/%s", mmd->name.c_str());
@@ -139,7 +141,7 @@ LagrangianCommonPluginInfo::GetCreatedExpressions(const avtDatabaseMetaData *md)
         if (e.GetType() == Expression::VectorMeshVar)
         {
             {
-                if (e.GetFromOperator())
+                if (e.GetFromOperator() || e.GetAutoExpression())
                     continue; // weird ordering behavior otherwise
                 Expression e2;
                 sprintf(name, "operators/Lagrangian/%s", e.GetName().c_str());
