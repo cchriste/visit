@@ -291,7 +291,7 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   
   PIDX_set_point(local_offset, box.p1[0], box.p1[1], box.p1[2]);
   PIDX_set_point(local_size, (box.p2[0]-box.p1[0]+1), (box.p2[1]-box.p1[1]+1),(box.p2[2]-box.p1[2]+1));
-
+  
   // local_size[3] = 1;
   // local_size[4] = 1;
   // local_offset[3] = 0;
@@ -300,6 +300,7 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
 
   sprintf(debug_str,"%d: local box %lld %lld %lld size %lld %lld %lld time %d\n", rank, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2], timestate);
   debug5 << debug_str;
+  cout << debug_str;
 
   delete [] debug_str;
   

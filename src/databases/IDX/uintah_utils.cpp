@@ -4,7 +4,7 @@
 
 using namespace VisitIDXIO;
 
-bool uintah_debug_input = false;
+bool uintah_debug_input = true;
 
 void ups_parse_vector(vtkXMLDataElement *el, double* vec, int dim){
   std::string el_str(el->GetCharacterData());
@@ -186,6 +186,11 @@ void compute_anchor(vtkXMLDataElement *level, double* anchor){
   }
 }
 
+struct uintah_box{
+  int low[3];
+  int high[3];
+  int eCells[6];
+};
 
 void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, int dim, bool use_extracells){
   
@@ -200,6 +205,8 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
   
   if(uintah_debug_input)
       std::cout << "Found " << nboxes << " boxes" << std::endl;
+
+  std::vector<uintah_box> input_boxes;
 
   int last_log = 0;
   for(int i=0; i < nboxes; i++){
@@ -236,10 +243,8 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
 
     Point3d p1phy(0,0,0), p2phy(0,0,0);
 
-    int low[3];
-    int high[3];
+    uintah_box box;
   
-    int eCells[6];
     int resdata[3];
     double phy2log[3];
     
@@ -255,7 +260,7 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
       std::getline(ssSpace, espace, ',');
       std::getline(ress, res, ',');
       
-      eCells[k] = cint(espace);
+      box.eCells[k] = cint(espace);
       resdata[k] = cint(res);
       
       p1phy[k] = cfloat(p1s);
@@ -264,34 +269,90 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
       phy2log[k] = (p2phy[k]-p1phy[k])/(resdata[k]);
  
       if(nboxes == 1){ // single box case
-        low[k] = 0;
-        high[k] = low[k] + resdata[k];
+        box.low[k] = 0;
+        box.high[k] = box.low[k] + resdata[k];
       }
       else{ // multibox case (all inside the same domain)
-        low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k] + eCells[k];
-        high[k] = low[k] + resdata[k];
+        box.low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k];// + eCells[k];
+        // if(k==0 && low[k]>0)
+        //   low[k] += 1;
+        box.high[k] = box.low[k] + resdata[k];
       }
 
       if(p1log_el != NULL)
-        ups_parse_vector(p1log_el, low, dim);
+        ups_parse_vector(p1log_el, box.low, dim);
       if(p2log_el != NULL)
-        ups_parse_vector(p2log_el, high, dim);
+        ups_parse_vector(p2log_el, box.high, dim);
 
       level_info.spacing[k] = phy2log[k];
 
+      // Impose Simmetric extracells! We ll fix them later
+      box.eCells[3] = box.eCells[0];
+      box.eCells[4] = box.eCells[1];
+      box.eCells[5] = box.eCells[2];
     }
     
+    input_boxes.push_back(box);
+  }
+
+  // check intersecting boxes and fix extra cells
+
+  for(int i=0; i<input_boxes.size(); i++){
+      int* low  = input_boxes[i].low;
+      int* high = input_boxes[i].high;
+      int* eCells = input_boxes[i].eCells;
+
+    for(int j=0; j<input_boxes.size() && i!=j; j++){
+        int* tlow    = input_boxes[j].low;
+        int* thigh   = input_boxes[j].high;
+        int* teCells = input_boxes[j].eCells;
+
+        bool over[3];  
+              
+        int neig_low[3];
+        int neig_high[3];
+
+        int inter_low[3];
+        int inter_high[3];
+        bool box_intersect = intersect(over,low,high,tlow,thigh, inter_low,inter_high);
+
+        for(int d=0; d < 3; d++){
+          if(box_intersect && over[d]){
+            if(uintah_debug_input)
+              printf("INTERSECT %d & %d dir %d low %d high %d\n", i, j, d, inter_low[d], inter_high[d]);
+
+            if(inter_low[d] == low[d]){
+              int gap = inter_high[d]-low[d];
+              low[d]    = inter_high[d];
+              high[d]   = high[d]+gap;
+              eCells[d] = 0;  // removing extracell only on one of the boxes, because they could be overlapping only partially
+              //teCells[d+3] = 0;
+            }
+            else if(inter_low[d] == tlow[d]){
+              int gap = inter_high[d]-low[d];
+              tlow[d] = inter_high[d];
+              thigh[d]   = thigh[d]+gap;
+              //teCells[d] = 0;
+              eCells[d+3] = 0;
+            }
+          }
+      }
+    }
+  }
+
+  for(int i=0; i<input_boxes.size(); i++){
+    int* low  = input_boxes[i].low;
+    int* high = input_boxes[i].high;
+    int* eCells = input_boxes[i].eCells;
+
     PatchInfo box;
-    // Note: Simmetric extracells !!!! Not always true
-    eCells[3] = eCells[0];
-    eCells[4] = eCells[1];
-    eCells[5] = eCells[2];
+    
     box.setBounds(low,high,eCells,"CC");
 
     level_info.patchInfo.push_back(box);
 
     if(uintah_debug_input){
-      std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
+      //std::cout <<"Read box phy: p1 " << p1phy << " p2 "<< p2phy << std::endl;
       std::cout << level_info.patchInfo.back().toString();
       //std::cout <<"     box log: p1 " << p1log << " p2 "<< p2log << std::endl;
     }
@@ -299,7 +360,6 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
     if(uintah_debug_input){
       printf("anchor point %f %f %f\n",level_info.anchor[0],level_info.anchor[1],level_info.anchor[2]);
       printf("cell spacing %f %f %f\n",level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
- 
     }
   }
 

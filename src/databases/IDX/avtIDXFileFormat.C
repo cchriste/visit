@@ -178,15 +178,17 @@ void avtIDXFileFormat::domainDecomposition(){
     int block_dim[3] = {box_dim[0]/block_decomp[0],box_dim[1]/block_decomp[1],box_dim[2]/block_decomp[2]};
 
     //printf("block dim [%d %d %d]\n", block_dim[0],block_dim[1],block_dim[2]);
+    printf("box low [%d %d %d] [%d %d %d]\n", box_low[0],box_low[1],box_low[2],box_high[0],box_high[1],box_high[2]);
     for(int nb=0; nb<c; nb++){
 
       int bid[3] = {nb % block_decomp[0], (nb / block_decomp[0]) % block_decomp[1], nb / (block_decomp[0] * block_decomp[1])};
-      int curr_p1[3] = { box_low[0]+(bid[0]*block_dim[0]),box_low[1]+(bid[1]*block_dim[1]),box_low[2]+(bid[2]*block_dim[2])};
+      int curr_p1[3] = {box_low[0]+(bid[0]*block_dim[0]),box_low[1]+(bid[1]*block_dim[1]),box_low[2]+(bid[2]*block_dim[2])};
       int curr_p2[3] = {curr_p1[0]+block_dim[0], curr_p1[1]+block_dim[1], curr_p1[2]+block_dim[2]};
 
       for(int d=0; d <3; d++){
         //curr_p1[d] = curr_p1[d] > 0 ? curr_p1[d]-1 : curr_p1[d];
-        curr_p2[d] = (curr_p2[d] < global_size[d]-1) ? curr_p2[d]+1 : global_size[d]-1;
+        //curr_p2[d] = (curr_p2[d] < global_size[d]-1) ? curr_p2[d]+1 : global_size[d]-1;
+        curr_p2[d] = (curr_p2[d] < global_size[d]-1) ? curr_p2[d] : global_size[d];
       }
 
       PatchInfo newbox;
@@ -310,14 +312,14 @@ void avtIDXFileFormat::domainDecomposition(){
 
   level_info.patchInfo.swap(newboxes);
 
-  /*if(rank == 0){ 
+  if(rank == 0){ 
   std::cout<< "Total number of boxes/domains: " << level_info.patchInfo.size() << std::endl<< std::flush;
   std::cout << "----------Boxes----------" << std::endl<< std::flush;
     for(int i=0; i< level_info.patchInfo.size(); i++){
       std::cout << i << " = "<<level_info.patchInfo[i].toString();
     }
     std::cout << "-------------------------" << std::endl<< std::flush;
-    }*/
+    }
 
   if(level_info.patchInfo.size() % nprocs != 0){
     fprintf(stderr,"ERROR: wrong domain decomposition, patches %d procs %d\n", level_info.patchInfo.size(), nprocs);
@@ -387,6 +389,7 @@ void avtIDXFileFormat::createBoxes(){
 
     // Note: parse ups after timeste.xml so it will use the anchor
     */
+    printf("USING EXTRA CELLS %d\n", use_extracells);
     parse_ups(parser, input_patches, dim, use_extracells);
    
   }
@@ -834,6 +837,9 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     debug4 << "global low " << low[0] << ","<< low[1]<<","<< low[2] <<std::endl;
     debug4 << "global high " << high[0] << ","<< high[1]<<","<< high[2] <<std::endl;
 
+    cout << "global low " << low[0] << ","<< low[1]<<","<< low[2] <<std::endl;
+    cout << "global high " << high[0] << ","<< high[1]<<","<< high[2] <<std::endl;
+
     //this can be done once for everything because the spatial range is the same for all meshes
     double box_min[3] = { input_patches.anchor[0] + low[0] * input_patches.spacing[0],
       input_patches.anchor[1] + low[1] * input_patches.spacing[1],
@@ -942,36 +948,6 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
     fprintf(stderr,"pidx boundary mesh not registered\n");
 
 
-}
-
-bool overlap(const int& a,const int& b,const int& p,const int& q)
-{return ((a)<=(q) && (b)>=(p));}
-
-bool intersect(bool* over, int* a_low, int* a_high,int* b_low, int* b_high, int* inter_low, int* inter_high){
-   
-  int min_dist=999999999; 
-  int d_min =-1;
-  int overlap_size =1;
-  for(int i=0;i<3;i++){
-    inter_low[i]=std::max(a_low[i],b_low[i]);
-    inter_high[i]=std::min(a_high[i],b_high[i]);
-    int size= (inter_high[i]-inter_low[i]);
-    if(size<min_dist){
-      d_min=i;
-      min_dist=size;
-    }
-   
-    overlap_size*=size;
-  }    
-
-  for(int i=0;i<3;i++)
-    if(i==d_min)
-      over[i]=true;
-    else 
-      over[i]=false; 
-
-  //printf("direction overlap %d\n", d_min);
-  return overlap_size>0; 
 }
 
 void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timestate){
@@ -1092,15 +1068,8 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
 
     for(int k=0; k<3; k++){
-      int offset = 2; // always one for non-node-centered
-      // if (high[k] == ghigh[k]) 
-      //   offset = 0;
-      // if(k==0){
-      //   offset = 2;
-      //   // if(high[k] == ghigh[k]) 
-      //   //   offset = 0;
-      // }
-
+      int offset = 1; 
+      
       my_dims[k] = high[k]-low[k]+offset; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
 
       // if(use_extracells && uintah_metadata)
@@ -1108,10 +1077,12 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     }
 
     debug5 << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
+    cout << rank << ": dims " << my_dims[0] << " " << my_dims[1] << " " << my_dims[2] << std::endl;
     rgrid->SetDimensions(my_dims);
 
-    // printf("global %d %d %d - %d %d %d local %d %d %d - %d %d %d\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],low[0],low[1],low[2],high[0],high[1],high[2]);
+    printf("global %d %d %d - %d %d %d local[%d] %d %d %d - %d %d %d\n",glow[0],glow[1],glow[2],ghigh[0],ghigh[1],ghigh[2],domain,low[0],low[1],low[2],high[0],high[1],high[2]);
     // printf("cellspacing %f %f %f\n", level_info.spacing[0],level_info.spacing[1],level_info.spacing[2]);
+    //printf("anchor %f %f %f\n", input_patches.anchor[0],input_patches.anchor[1],input_patches.anchor[2]);
 
     for (int c=0; c<3; c++) {
       vtkFloatArray *coords = vtkFloatArray::New(); 
@@ -1127,6 +1098,8 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
        if (sfc_offset[c]) 
        {
+        printf("FACE CENTER %d!!!\n", c);
+#if 0
          if (i==0)
             if (low[c]==glow[c]) // patch is on low boundary
               face_offset += 0.0;
@@ -1149,6 +1122,56 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
             if (high[c]==ghigh[c])
               face_offset += -1.0;
           }
+#else
+
+          if (i==0)
+          {
+            // No neighbor, so the patch is on low boundary
+            if (low[c] == 0)
+              face_offset = 0.0;
+            // Patch boundary is internal to the domain
+            else
+              face_offset = -0.5;
+          }
+          else if (i == my_dims[c]-1)
+          {
+            // No neighbor, so the patch is on high boundary
+            if (high[c] == ghigh[c])
+            {
+              // Periodic means one less value in the face-centered direction
+              // if (levelInfo.periodic[c])
+              //   face_offset = 0.0;
+              // else
+                face_offset = -1;
+            }
+            // Patch boundary is internal to the domain
+            else
+              face_offset = -0.5;
+          }
+          else
+            face_offset = -0.5;
+        }
+        else{
+          // if(c==0)
+          //   face_offset += -1.0;
+          // else if(c==1)
+          //   face_offset += -1.0;
+
+          // if(i==0){
+          //   if(low[c]==glow[c])
+          //     face_offset = -1.0;
+          // }
+          // else if (i==my_dims[c]-1){
+          //   if (high[c]==ghigh[c])
+          //     face_offset = -1.0;
+          // }
+          // else
+          //   face_offset += -1.0;//*use_extracells;
+          // if(c==2)
+          //   face_offset = -1.0;
+
+        }
+#endif
 
           array[i] = input_patches.anchor[c] + (i + low[c] + face_offset) * input_patches.spacing[c];
 
@@ -1169,7 +1192,6 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
         coords->Delete();
       }
-
 
 #if 1
     size_t nCells = rgrid->GetNumberOfCells();
@@ -1206,61 +1228,78 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
       level_info.patchInfo[b].getBounds(tlow,thigh,meshname,use_extracells);
 
       int count_ghost = 0;
+      bool over[3];  
+            
+      int neig_low[3]={0,0,0};
+      int neig_high[3]={0,0,0};
 
-	  bool over[3];  
-	          
-          int neig_low[3];
-          int neig_high[3];
+      int inter_low[3];
+      int inter_high[3];
+      bool box_intersect = intersect(over, low,high,tlow,thigh, inter_low,inter_high);
 
-          int inter_low[3];
-          int inter_high[3];
-          bool box_intersect = intersect(over, low,high,tlow,thigh, inter_low,inter_high);
+      for(int d=0; d < 3; d++){
+        int maxv=inter_low[d];
+        int minv=inter_high[d];
 
-          for(int d=0; d < 3; d++){
-            int maxv=inter_low[d];
-            int minv=inter_high[d];
-   
-            if(box_intersect && over[d]){
-	      
-              if(d==0){
-                if(low[d] < tlow[d]){
-		  neig_low[d] = maxv+1+use_extracells;
-		  neig_high[d] = minv;
-	        }
-	        else{
-		  neig_low[d] = maxv;
-		  neig_high[d] = minv-1-use_extracells;
-		}
-              }
-	      else{
-		if(low[d] < tlow[d]){
-                  neig_low[d] = maxv+2+use_extracells;
-                  neig_high[d] = minv;
-                }
-                else{
-
-                  neig_low[d] = maxv;
-                  neig_high[d] = minv-1-use_extracells;
-		}
-              }
-      /*
-	      if(minv == ghigh[d])
-		neig_high[d] = minv;
-
-	      if(maxv == glow[d])
-		neig_low[d] = maxv;
-	      */
+        if(box_intersect && over[d]){
+          if(d==0){
+            if(low[d] < tlow[d]){
+              
+              neig_low[d] = maxv+1;
+              neig_high[d] = minv;
+              printf("< low[%d] = %d high[d] = %d\n", d,neig_low[d], neig_high[d]);
             }
-	    else{
-	      neig_high[d] = minv;
-	      neig_low[d] = maxv;
+            else{
+              
+               neig_low[d] = maxv;
+               neig_high[d] = minv;
+               printf("> low[%d] = %d high[d] = %d\n", d,neig_low[d], neig_high[d]);
+            }
+          }
+          else{
+            if(low[d] < tlow[d]){
+              neig_low[d] = maxv+1;
+              neig_high[d] = minv;
+            }
+            else{
+              neig_low[d] = maxv;
+              neig_high[d] = minv-1;
             }
           }
 
-	  // printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
-      for(int k=neig_low[2]; k <= neig_high[2]; k++)
-        for(int j=neig_low[1]; j <= neig_high[1]; j++)
-          for(int i=neig_low[0]; i <= neig_high[0]; i++){
+         /* 
+          if(d==0){
+            if(low[d] < tlow[d]){
+              neig_low[d] = maxv+1;//+use_extracells;
+              neig_high[d] = minv;
+	          }
+  	        else{
+  		        neig_low[d] = maxv;
+  		        neig_high[d] = minv-1;//-use_extracells;
+  		      }
+          }
+          else{
+  		      if(low[d] < tlow[d]){
+              neig_low[d] = maxv+2;//+use_extracells;
+              neig_high[d] = minv;
+            }
+            else{
+               neig_low[d] = maxv;
+               neig_high[d] = minv-1;//-use_extracells;
+            }
+          }
+          */
+      }
+	    else{
+	      neig_high[d] = minv;
+	      neig_low[d] = maxv;
+      }
+    }
+
+	   printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
+      for(int k=neig_low[2]; k < neig_high[2]; k++)
+        for(int j=neig_low[1]; j < neig_high[1]; j++)
+          for(int i=neig_low[0]; i < neig_high[0]; i++){
 
             int ii = i - low[0];
             int jj = j - low[1];
@@ -1275,6 +1314,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
       //printf("%d found %d ghosts %d\n", domain, count_ghost, ghost);
 	//}
+    printf("cells %d blanks size %d\n", nCells, dim_block[0]*dim_block[1]*dim_block[2]);
 
   for (int i = 0; i < nCells; i++) {
     if (!blanks[i]){
@@ -1344,10 +1384,11 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 
   debug5 << "read data " << level_info.patchInfo[domain].toString();
   for(int k=0; k<3; k++){
-//      if(uintah_metadata && use_extracells){
-// low[k]++;
-// //high[k]++;
-//      }
+    if(uintah_metadata && use_extracells){
+      low[k]++;
+      //high[k] ++;
+    }
+
     my_box.p1[k] = low[k];
     my_box.p2[k] = high[k];
   }
@@ -1393,7 +1434,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 // printf("is vector? %d\n", isVector);
 
   if(isVector)
-    ncomponents = 3; // Visit wants 3 components vectors
+    ncomponents = 3; // Visit wants always 3 components vectors
 
   long long ntotal = ntuples * ncomponents;
 
