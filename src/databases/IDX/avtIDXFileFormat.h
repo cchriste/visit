@@ -133,6 +133,9 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     std::map<std::string, void_ref_ptr> mesh_boundaries;
     std::map<std::string, void_ref_ptr> mesh_domains;
 
+    std::string grid_type;
+    std::string mesh_name;
+
     LevelInfo level_info;
 
     LevelInfo input_patches;

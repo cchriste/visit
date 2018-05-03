@@ -4,7 +4,7 @@
 
 using namespace VisitIDXIO;
 
-bool uintah_debug_input = true;
+bool uintah_debug_input = false;
 
 void ups_parse_vector(vtkXMLDataElement *el, double* vec, int dim){
   std::string el_str(el->GetCharacterData());
@@ -192,7 +192,7 @@ struct uintah_box{
   int eCells[6];
 };
 
-void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, int dim, bool use_extracells){
+void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, int dim, bool use_extracells, const std::string grid_type){
   
   vtkXMLDataElement *root = parser->GetRootElement();
   vtkXMLDataElement *level = NULL;
@@ -335,6 +335,7 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
               //teCells[d] = 0;
               eCells[d+3] = 0;
             }
+
           }
       }
     }
@@ -347,7 +348,7 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
 
     PatchInfo box;
     
-    box.setBounds(low,high,eCells,"CC");
+    box.setBounds(low,high,eCells, grid_type);
 
     level_info.patchInfo.push_back(box);
 
