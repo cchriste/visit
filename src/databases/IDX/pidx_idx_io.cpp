@@ -141,7 +141,7 @@ bool PIDXIO::openDataset(const String filename){
   
   for(int i=0; i < dims; i++){
     logic_box.p1[i] = 0;
-    logic_box.p2[i] = global_size[i];//-1;
+    logic_box.p2[i] = (double)global_size[i];
   }
   
   if (rank == 0) debug5 << "PIDX dims "<<global_size[0]<<" "<<global_size[1]<<" "<<global_size[2]<<std::endl;
@@ -300,7 +300,6 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
 
   sprintf(debug_str,"%d: local box %lld %lld %lld size %lld %lld %lld time %d\n", rank, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2], timestate);
   debug5 << debug_str;
-  cout << debug_str;
 
   delete [] debug_str;
   

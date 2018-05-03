@@ -399,16 +399,21 @@ void avtIDXFileFormat::createBoxes(){
     int high[3];
     int eCells[6] = {0,0,0,0,0,0};
     use_extracells = false;
+    grid_type = "CC";
+    mesh_name = "CC_Mesh";
 
-    low[0] = log_box.p1[0];
-    low[1] = log_box.p1[1];
-    low[2] = log_box.p1[2];
-    high[0] = log_box.p2[0]-1;
-    high[1] = log_box.p2[1]-1;
-    high[2] = log_box.p2[2]-1;
+    debug1 << "Disabling extra cells (no Uintah)" << std::endl;
+ 
+    low[0] = (int)log_box.p1[0];
+    low[1] = (int)log_box.p1[1];
+    low[2] = (int)log_box.p1[2];
+    high[0] = (int)log_box.p2[0]-1;
+    high[1] = (int)log_box.p2[1]-1;
+    high[2] = (int)log_box.p2[2]-1;
 
     PatchInfo box;
     box.setBounds(low,high,eCells,grid_type);
+    input_patches.patchInfo.clear();
     input_patches.patchInfo.push_back(box);
 
     for(int k=0; k<3; k++){
@@ -1077,6 +1082,9 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
     for(int k=0; k<3; k++){
       int offset = 1 + sfc_offset[k]; 
+
+      if(!uintah_metadata)
+        offset = 0;
       
       my_dims[k] = high[k]-low[k]+offset; // for NON-nodeCentered no +1 ??(patch end is on high boundary)
 
@@ -1104,31 +1112,6 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
        if (sfc_offset[c]) 
        {
-#if 0
-         if (i==0)
-            if (low[c]==glow[c]) // patch is on low boundary
-              face_offset += 0.0;
-            else
-              face_offset += -0.5;       // patch boundary is internal to the domain
-            else if (i==my_dims[c]-1)
-            if (high[c]==ghigh[c]-1) // patch is on high boundary (added -1)
-            //if (levelInfo.periodic[c])  // periodic means one less value in the face-centered direction
-            //  face_offset += 0.0;
-                  //else
-             face_offset += -1;
-            else                        // patch boundary is internal to the domain
-              face_offset += -0.5;
-            else
-             face_offset += -0.5;
-         }
-         else{
-
-           if (i==my_dims[c]-1)
-            if (high[c]==ghigh[c])
-              face_offset += -1.0;
-          }
-#else
-
           if (i==0)
           {
             // No neighbor, so the patch is on low boundary
@@ -1145,25 +1128,11 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
           else if (i == my_dims[c]-1)
           {
             face_offset = -1.0;
-
-            // // No neighbor, so the patch is on high boundary
-            // if (high[c]==ghigh[c])
-            // {
-            //   // Periodic means one less value in the face-centered direction
-            //   // if (levelInfo.periodic[c])
-            //   //   face_offset = 0.0;
-            //   // else
-            //     face_offset = -1.0;
-            // }
-            // // Patch boundary is internal to the domain
-            // else
-            //   face_offset = -1.0;//0.5;
           }
           else
             face_offset = -0.5;
 
         }
-#endif
 
           array[i] = input_patches.anchor[c] + (i + low[c] + face_offset) * input_patches.spacing[c];
 
@@ -1355,6 +1324,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 #endif
 
   debug5 << rank << ": end mesh" << std::endl;
+
   return rgrid;
 
 }
@@ -1387,11 +1357,15 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
 
   debug5 << "read data " << level_info.patchInfo[domain].toString();
   for(int k=0; k<3; k++){
-    if(uintah_metadata && use_extracells){
-      low[k]++;
-    }
+    if(uintah_metadata){
+      if(use_extracells) // cause uintah low starts from -1
+        low[k]++;
 
-    high[k] += sfc_offset[k];
+      high[k] += sfc_offset[k];
+    }
+    else{
+      high[k] -= 2;
+    }
 
     my_box.p1[k] = low[k];
     my_box.p2[k] = high[k];
