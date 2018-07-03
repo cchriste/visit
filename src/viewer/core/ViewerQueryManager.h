@@ -254,6 +254,13 @@ typedef struct {
 //    Brad Whitlock, Thu Sep 11 23:16:44 PDT 2014
 //    Moved some client state objects out.
 //
+//    Alister Maguire, Tue Oct  3 11:27:21 PDT 2017
+//    Added overrideTimeStep for pick ranges that include
+//    a pick time curve. 
+//
+//    Alister Maguire, Wed May 23 09:46:54 PDT 2018
+//    Added RetrieveTimeSteps to simplify and reduce repetition. 
+//
 // ****************************************************************************
     
 class VIEWERCORE_API ViewerQueryManager : public ViewerBase
@@ -353,6 +360,12 @@ class VIEWERCORE_API ViewerQueryManager : public ViewerBase
     int             VerifyQueryVariables(const std::string &qName, 
                                          const std::vector<int> &varTypes);
 
+    bool            RetrieveTimeSteps(int    &startT, 
+                                      int    &endT, 
+                                      int    &stride,
+                                      int     nStates,
+                                      MapNode timeParams);
+
     bool            ComputePick(PICK_POINT_INFO *pd, const int dom = -1,
                                 const int el = -1);
     void            PickThroughTime(PICK_POINT_INFO *pd, 
@@ -381,7 +394,6 @@ class VIEWERCORE_API ViewerQueryManager : public ViewerBase
                             const std::vector<std::string> &,
                             QueryAttributes &); 
 
-
     bool            initialPick;
     bool            preparingPick;
     bool            handlingCache;
@@ -400,6 +412,7 @@ class VIEWERCORE_API ViewerQueryManager : public ViewerBase
 
     bool                  suppressQueryOutput; 
     bool                  activePlotsChanged; 
+    bool                  overrideTimeStep;
 
     std::string           floatFormat;
 

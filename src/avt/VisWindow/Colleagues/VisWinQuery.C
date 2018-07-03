@@ -435,6 +435,14 @@ VisWinQuery::QueryIsValid(const VisualCueInfo *vqPoint, const VisualCueInfo *vqL
 //    Matt Larsen, Tue Jul 19 12:00:12 PDT 2016
 //    Added line extracting from visual q for pick highlights.
 //
+//    Alister Maguire, Tue Sep 26 10:22:55 PDT 2017
+//    Now passing in a highlight color to the pick actor's 
+//    AddLine method. 
+//
+//    Matt Larsen, Mon Jan 22 11:11:11 PST 2018
+//    Correcting error where zone pick highlighing information
+//    leaked over to the next node pick
+//
 // ****************************************************************************
 
 void 
@@ -459,8 +467,8 @@ VisWinQuery::Pick(const VisualCueInfo *vq)
         pp->SetAttachmentPoint(pt[0], pt[1], distance);
     }
 
-    pp->UseGlyph(vq->GetGlyphType() != "");
-    
+    bool useGlyph = vq->GetGlyphType() != "";
+    pp->UseGlyph(useGlyph);
     pp->SetDesignator(vq->GetLabel());
 
     double fg[3];
@@ -474,7 +482,7 @@ VisWinQuery::Pick(const VisualCueInfo *vq)
     if(numPoints > 1 && (numPoints % 2 == 0))
         linesExist = true;
     const int numLines = numPoints / 2;
-    if(linesExist)
+    if(linesExist && !useGlyph)
     {  
         for(int i = 0; i < numLines; ++i)
         {
@@ -482,7 +490,7 @@ VisWinQuery::Pick(const VisualCueInfo *vq)
             // First point is the attactment
             vq->GetPointD(i*2+1, p1);
             vq->GetPointD(i*2+2, p2);
-            pp->AddLine(p1, p2);
+            pp->AddLine(p1, p2, vq->GetHighlightColor());
         }
     }
     //
@@ -580,6 +588,66 @@ VisWinQuery::ClearPickPoints(int which)
 }
 
 
+// ****************************************************************************
+//  Method: VisWinQuery::RemovePicks
+//
+//  Purpose:
+//    Clears a list of picks from the renderer and returns
+//    the pick designators that were removed. 
+//
+//  Programmer: Alister Maguire
+//  Creation:   Mon Oct 16 15:32:59 PDT 2017
+//
+//  Modifications:
+//
+// ****************************************************************************
+std::string
+VisWinQuery::RemovePicks(std::vector< std::string > pickList)
+{
+    if (pickPoints.empty())
+    {
+        return "";
+    }
+
+    std::vector< std::string > removedPicks;
+    std::vector< std::string >::iterator pListIt;
+    for (pListIt = pickList.begin(); pListIt != pickList.end(); ++pListIt)
+    {
+        std::vector< PickEntry >::iterator pointsIt = pickPoints.begin();
+        while (pointsIt != pickPoints.end())
+        {
+            if (pointsIt->pickActor->GetDesignator() == *pListIt)
+            {
+                removedPicks.push_back(*pListIt);
+                pointsIt->pickActor->Remove();
+                pointsIt = pickPoints.erase(pointsIt);
+                break;
+            }
+            else
+            {
+                ++pointsIt;
+            }
+        }
+    } 
+
+    if (!removedPicks.empty())
+    {
+        std::vector< std::string >::iterator remIt;
+        remIt = removedPicks.begin();
+        std::string remPickStr = *remIt;
+        ++remIt;
+        for (; remIt != removedPicks.end(); ++remIt)
+        {
+            remPickStr  += ", ";
+            remPickStr  += *remIt;
+        }
+
+        return remPickStr;
+    }
+    
+    return "";
+}
+
 
 // ****************************************************************************
 //  Method: VisWinQuery::Lineout
@@ -668,7 +736,6 @@ VisWinQuery::Lineout(const VisualCueInfo *vq)
 
     lo->SetShowLabels(vq->GetShowLabel());
     lo->SetLineWidth(vq->GetLineWidth());
-    lo->SetLineStyle(vq->GetLineStyle());
 
     if (mediator.GetFullFrameMode())
     {
@@ -791,7 +858,6 @@ VisWinQuery::UpdateQuery(const std::string &id, const VisualCueInfo *vq)
             it->lineActor->SetPoint2(pt2[0], pt2[1], pt2[2] + z_proj);
 
             it->lineActor->SetLineWidth(vq->GetLineWidth());
-            it->lineActor->SetLineStyle(vq->GetLineStyle());
  
             double c[4];
             vq->GetColor().GetRgba(c);

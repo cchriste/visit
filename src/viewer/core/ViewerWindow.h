@@ -47,6 +47,7 @@
 #include <avtActor.h>
 #include <avtDataset.h>
 #include <avtImage.h>
+#include <avtImageType.h>
 #include <avtTypes.h>
 #include <avtView2D.h>
 #include <avtView3D.h>
@@ -485,6 +486,12 @@ class ViewerPlotList;
 //    Burlen Loring, Sun Sep  6 14:58:03 PDT 2015
 //    Changed the return type of GetNumberOfCells to long long
 //
+//    Brad Whitlock, Wed Sep 20 17:46:39 PDT 2017
+//    I added 2 arguments to ScreenCapture.
+//
+//    Alister Maguire, Mon Oct 16 15:41:23 PDT 2017
+//    Added RemovePicks.
+//
 // ****************************************************************************
 
 class VIEWERCORE_API ViewerWindow : public ViewerBase
@@ -498,6 +505,7 @@ public:
     int  GetWindowId() const;
 
     void SetVisWindow(VisWindow *);
+    VisWindow *GetVisWindow();
     void SetActionManager(ViewerActionManager *);
 
     void CreateNode(DataNode *parentNode, 
@@ -554,7 +562,7 @@ public:
     void UpdateColorTable(const std::string &ctName);
     void RedrawWindow();
     void ClearWindow(bool clearAllPlots = true);
-    avtImage_p ScreenCapture();
+    avtImage_p ScreenCapture(avtImageType imgT = ColorRGBImage, bool doZBuffer = false);
     avtDataset_p GetAllDatasets();
     void InvertBackgroundColor();
     void CopyGeneralAttributes(const ViewerWindow *);
@@ -634,6 +642,7 @@ public:
     void SetPickFunction(void (*func)(void *, bool, const PickAttributes *),
                          void *data, bool);
     void ClearPickPoints();
+    void RemovePicks(std::string);
     void RenamePickLabel(const std::string &, const std::string &);
 
     void ValidateQuery(const PickAttributes *, const Line *);
@@ -679,7 +688,8 @@ public:
     bool IsChangingScalableRenderingMode(bool toMode = false) const;
     bool DisableExternalRenderRequests(bool bClearImage = false);
     bool EnableExternalRenderRequests();
-    void ExternalRenderManual(avtDataObject_p& dob, int w, int h);
+    void ExternalRenderManual(avtDataObject_p& dob, int w, int h,
+                              avtImageType imgT, bool needZBuffer);
 
     // Rendering options.
     void SetAntialiasing(bool enabled);
@@ -708,8 +718,6 @@ public:
     void SetStereoRendering(bool enabled, int type);
     bool GetStereo() const;
     int  GetStereoType() const;
-    void SetDisplayListMode(int);
-    int  GetDisplayListMode(void) const;
     void SetSurfaceRepresentation(int rep);
     int  GetSurfaceRepresentation() const;
     int  GetNumPrimitives() const;
@@ -746,6 +754,16 @@ public:
     int GetCompressionActivationMode() const;
     int SetCompressionActivationMode(int);
     bool GetIsCompressingScalableImage() const;
+#ifdef VISIT_OSPRAY
+    void SetOsprayRendering(bool);
+    bool GetOsprayRendering() const;
+    void SetOspraySPP(int);
+    int GetOspraySPP() const;
+    void SetOsprayAO(int);
+    int GetOsprayAO() const;
+    void SetOsprayShadows(bool);
+    bool GetOsprayShadows() const;
+#endif
 
     void Lineout(const bool);
 
@@ -795,11 +813,12 @@ protected:
              const ExternalRenderRequestInfo& thisRequest) const;
     bool ExternalRender(const ExternalRenderRequestInfo& thisRequest,
              bool& shouldTurnOffScalableRendering, bool doAllAnnotations,
+             avtImageType imgT, bool needZBuffer,
              avtDataObject_p& dob);
     void ExternalRenderAuto(avtDataObject_p& dob, bool leftEye);
     bool IssueExternalRenderRequests(const ExternalRenderRequestInfo &reqInfo,
              bool &shouldTurnOffScalableRendering,
-             bool doAllAnnotations,
+             bool doAllAnnotations, avtImageType imgT, bool needZBuffer,
              std::vector<avtImage_p> &imgList,
              int windowID);
 

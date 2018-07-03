@@ -2068,6 +2068,43 @@ visit_SetTryHarderCyclesTimes(PyObject *self, PyObject *args)
 }
 
 // ****************************************************************************
+// Function: visit_SetBackendType
+//
+// Purpose: Tells the viewer which compute back end to use.
+//
+// Programmer: Brad Whitlock
+// Creation:   Wed Jan 17 11:04:01 PST 2018
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_SetBackendType(PyObject *self, PyObject *args)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    char *name = NULL;
+    if(!PyArg_ParseTuple(args, "s", &name))
+        return NULL;
+
+    int index = 0;
+#if defined(HAVE_LIBEAVL)
+    if(strcmp(name, "eavl") == 0 || strcmp(name, "EAVL") == 0)
+        index = 1;
+#endif
+#if defined(HAVE_LIBVTKM)
+    if(strcmp(name, "vtkm") == 0 || strcmp(name, "VTKM") == 0 || strcmp(name, "VTKm") == 0)
+        index = 2;
+#endif
+
+    MUTEX_LOCK();
+        GetViewerMethods()->SetBackendType(index);
+    MUTEX_UNLOCK();
+
+    // Return the success value.
+    return IntReturnValue(Synchronize());
+}
+
+// ****************************************************************************
 // Function: visit_SetCreateMeshQualityExpressions
 //
 // Purpose: Tells the viewer to turn on/off automatic creation
@@ -4601,6 +4638,49 @@ visit_ClearPickPoints(PyObject *self, PyObject *args)
 }
 
 // ****************************************************************************
+// Function: visit_RemovePicks
+//
+// Purpose:
+//   Tells the viewer to remove a list of pick points. 
+//
+// Notes:
+//
+// Programmer: Alister Maguire
+// Creation:   Mon Oct 16 15:41:23 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_RemovePicks(PyObject *self, PyObject *args)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    char *cLabels;
+    if(!PyArg_ParseTuple(args, "s", &cLabels))
+        return NULL;
+
+    std::string sLabels(cLabels);
+
+    if (!suppressQueryOutputState)
+        ToggleSuppressQueryOutput_NoLogging(true);
+
+    MUTEX_LOCK();
+        GetViewerMethods()->RemovePicks(sLabels);
+        GetViewerMethods()->RedrawWindow();
+    MUTEX_UNLOCK();
+
+    if (!suppressQueryOutputState)
+        ToggleSuppressQueryOutput_NoLogging(false);
+
+    std::string removedPicks = 
+        GetViewerState()->GetPickAttributes()->GetRemovedPicks();
+
+    return PyString_FromString(removedPicks.c_str());
+}
+
+// ****************************************************************************
 // Function: visit_ClearReferenceLines
 //
 // Purpose:
@@ -6386,6 +6466,69 @@ visit_GetExportOptions(PyObject *self, PyObject *args)
 }
 
 // ****************************************************************************
+// Method: visit_DatabasePlugins
+//
+// Purpose:
+//   Gets the list of database plugins for a host.
+//
+// Programmer: Brad Whitlock
+// Creation:   Fri Feb 16 10:14:44 PST 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_DatabasePlugins(PyObject *self, PyObject *args)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    char *host = NULL;
+    // Try and get the export attributes and database options.
+    if(!PyArg_ParseTuple(args,"s",&host))
+    {
+        PyErr_Clear();
+    }
+
+    // Get a pointer to the atts.
+    DBPluginInfoAttributes *dbplugininfo =
+                        GetViewerState()->GetDBPluginInfoAttributes();
+
+    // Open an mdserver if host was not empty or it does not look like
+    // we have an mdserver.
+    std::string hostStr((host == NULL) ? "localhost" : host);
+    if(host != NULL || dbplugininfo->GetHost().empty())
+    {
+        PyObject *hargs = PyTuple_New(1);
+        PyTuple_SET_ITEM(hargs, 0, PyString_FromString(hostStr.c_str()));
+        PyObject *ret = visit_OpenMDServer(self, hargs);
+        Py_DECREF(hargs);
+        if(ret == NULL)
+            return NULL;
+        Py_DECREF(ret);
+    }
+
+    MUTEX_LOCK();
+        GetViewerMethods()->UpdateDBPluginInfo(hostStr);
+    MUTEX_UNLOCK();
+
+    const stringVector &types = dbplugininfo->GetTypes();
+    PyObject *plugins = PyTuple_New(types.size());
+    for(int i = 0; i < types.size(); ++i)
+    {
+        PyObject *dval = PyString_FromString(types[i].c_str());
+        if(dval == NULL)
+            continue;
+        PyTuple_SET_ITEM(plugins, i, dval);
+    }
+    PyObject *dict = PyDict_New();
+    PyDict_SetItemString(dict,"host",PyString_FromString(dbplugininfo->GetHost().c_str()));
+    PyDict_SetItemString(dict,"plugins",plugins);
+
+    return dict;
+}
+
+// ****************************************************************************
 //  Method:  visit_GetDefaultFileOpenOptions
 //
 //  Purpose:
@@ -7877,36 +8020,12 @@ visit_ResetPlotOptions(PyObject *self, PyObject *args)
     return IntReturnValue(errorFlag);
 }
 
-// ****************************************************************************
-// Function: visit_SetActivePlots
-//
-// Purpose:
-//   This is a Python callback that sets the active plots in the plot list.
-//
-// Note:       This function accepts a tuple or single int value.
-//
-// Programmer: John Bemis, Brad Whitlock
-// Creation:   Thu Sep 20 16:54:38 PST 2001
-//
-// Modifications:
-//   Brad Whitlock, Fri Jul 26 12:33:25 PDT 2002
-//   Made it return a success value and I made it return an error if any of
-//   the input plot indices are bad.
-//
-//   Brad Whitlock, Fri Dec 27 10:59:12 PDT 2002
-//   I passed an intVector to the viewer proxy instead of an array of ints.
-//
-// ****************************************************************************
-
-STATIC PyObject *
-visit_SetActivePlots(PyObject *self, PyObject *args)
+bool
+GetIntOrIntVector(PyObject *args, intVector &vec)
 {
-    ENSURE_VIEWER_EXISTS();
-
-    intVector  vec;
     PyObject   *tuple;
     if(!PyArg_ParseTuple(args, "O", &tuple))
-        return NULL;
+        return false;
 
     if(PyTuple_Check(tuple))
     {
@@ -7931,6 +8050,42 @@ visit_SetActivePlots(PyObject *self, PyObject *args)
     else if(PyLong_Check(tuple))
         vec.push_back(int(PyLong_AsDouble(tuple)));
     else
+        return false;
+
+    return true;
+}
+
+// ****************************************************************************
+// Function: visit_SetActivePlots
+//
+// Purpose:
+//   This is a Python callback that sets the active plots in the plot list.
+//
+// Note:       This function accepts a tuple or single int value.
+//
+// Programmer: John Bemis, Brad Whitlock
+// Creation:   Thu Sep 20 16:54:38 PST 2001
+//
+// Modifications:
+//   Brad Whitlock, Fri Jul 26 12:33:25 PDT 2002
+//   Made it return a success value and I made it return an error if any of
+//   the input plot indices are bad.
+//
+//   Brad Whitlock, Fri Dec 27 10:59:12 PDT 2002
+//   I passed an intVector to the viewer proxy instead of an array of ints.
+//
+//   Brad Whitlock, Thu Sep 12 17:26:17 PDT 2013
+//   Move some code into GetIntOrIntVector.
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_SetActivePlots(PyObject *self, PyObject *args)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    intVector  vec;
+    if(!GetIntOrIntVector(args, vec))
         return NULL;
 
     //
@@ -7954,6 +8109,108 @@ visit_SetActivePlots(PyObject *self, PyObject *args)
     }
     if(okayToSet)
         GetViewerMethods()->SetActivePlots(activePlots);
+    MUTEX_UNLOCK();
+
+    // Return the success value.
+    return IntReturnValue(okayToSet ? Synchronize() : 1);
+}
+
+// ****************************************************************************
+// Function: visit_StartPlotAnimation
+//
+// Purpose:
+//   This is a Python callback that sets the plots that will animate.
+//
+// Note:       This function accepts a tuple or single int value.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 17:26:17 PDT 2013
+//
+// Modifications:
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_StartPlotAnimation(PyObject *self, PyObject *args)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    intVector  vec;
+    if(!GetIntOrIntVector(args, vec))
+        return NULL;
+
+    //
+    // Set the active plots using the indices in the vector.
+    //
+    bool okayToSet = false;
+    MUTEX_LOCK();
+    intVector activePlots;
+    for(size_t j = 0; j < vec.size(); ++j)
+    {
+        if(vec[j] < 0 || vec[j] >= GetViewerState()->GetPlotList()->GetNumPlots())
+        {
+            okayToSet = false;
+            break;
+        }
+        else
+        {
+            okayToSet = true;
+            activePlots.push_back(vec[j]);
+        }
+    }
+    if(okayToSet)
+        GetViewerMethods()->StartPlotAnimation(activePlots);
+    MUTEX_UNLOCK();
+
+    // Return the success value.
+    return IntReturnValue(okayToSet ? Synchronize() : 1);
+}
+
+// ****************************************************************************
+// Function: visit_StopPlotAnimation
+//
+// Purpose:
+//   This is a Python callback that sets the plots that will animate.
+//
+// Note:       This function accepts a tuple or single int value.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 17:26:17 PDT 2013
+//
+// Modifications:
+//
+// ****************************************************************************
+
+STATIC PyObject *
+visit_StopPlotAnimation(PyObject *self, PyObject *args)
+{
+    ENSURE_VIEWER_EXISTS();
+
+    intVector  vec;
+    if(!GetIntOrIntVector(args, vec))
+        return NULL;
+
+    //
+    // Set the active plots using the indices in the vector.
+    //
+    bool okayToSet = false;
+    MUTEX_LOCK();
+    intVector activePlots;
+    for(size_t j = 0; j < vec.size(); ++j)
+    {
+        if(vec[j] < 0 || vec[j] >= GetViewerState()->GetPlotList()->GetNumPlots())
+        {
+            okayToSet = false;
+            break;
+        }
+        else
+        {
+            okayToSet = true;
+            activePlots.push_back(vec[j]);
+        }
+    }
+    if(okayToSet)
+        GetViewerMethods()->StopPlotAnimation(activePlots);
     MUTEX_UNLOCK();
 
     // Return the success value.
@@ -12127,6 +12384,69 @@ visit_SetQueryOutputToString(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+// ****************************************************************************
+// Function: ParseTimePickOptins
+//
+// Purpose:
+//   Places time query options into their own MapNode entry in the PickParams,
+//   so that VQM knows how to parse them.
+//
+// Notes:
+//
+// Programmer: Kathleen Biagas
+// Creation:   January 12, 2012
+//
+// Modifications:
+//    Kathleen Biagas, Thu Jan 10 09:00:14 PST 2013
+//    Verify numeric entries.
+//
+//    Alister Maguire, Tue May 22 10:17:15 PDT 2018
+//    Moved the location of this function so that NodePick and ZonePick
+//    could have access to it. I also added retrieval of "return_curves" 
+//    and updated the condition in which time values are retrieved. 
+//    
+//
+// ****************************************************************************
+
+void
+ParseTimePickOptions(MapNode &pickParams)
+{
+
+    bool returnCurves = (pickParams.HasEntry("pick_range") &&
+                         pickParams.HasNumericEntry("return_curves") &&
+                         pickParams.GetEntry("return_curves")->ToBool());
+
+    if (((pickParams.HasNumericEntry("do_time") && 
+        pickParams.GetEntry("do_time")->ToBool()) ||
+        returnCurves) &&
+        !pickParams.HasEntry("time_options"))
+    {
+        MapNode timeOptions;
+        if (pickParams.HasNumericEntry("stride"))
+        {
+            timeOptions["stride"] = pickParams.GetEntry("stride")->ToInt();
+            pickParams.RemoveEntry("stride");
+        }
+        if (pickParams.HasNumericEntry("start_time"))
+        {
+            timeOptions["start_time"] = pickParams.GetEntry("start_time")->ToInt();
+            pickParams.RemoveEntry("start_time");
+        }
+        if (pickParams.HasNumericEntry("end_time"))
+        {
+            timeOptions["end_time"] = pickParams.GetEntry("end_time")->ToInt();
+            pickParams.RemoveEntry("end_time");
+        }
+        if (pickParams.HasNumericEntry("return_curves"))
+        {
+            timeOptions["return_curves"] = pickParams.GetEntry("return_curves")->ToBool();
+            pickParams.RemoveEntry("return_curves");
+        }
+        if (timeOptions.GetNumEntries() > 0)
+            pickParams["time_options"] = timeOptions;
+    }
+}
+
 
 // ****************************************************************************
 // Function: visit_SetQueryFloatFormat()
@@ -12401,6 +12721,9 @@ visit_QueryOverTime(PyObject *self, PyObject *args, PyObject *kwargs)
 //   Kathleen Biagas, Wed Jan  9 08:55:03 PST 2013
 //   Use new helper method that doesn't log the SuppressQueryOutput call.
 //
+//   Alister Maguire, Tue May 22 10:17:15 PDT 2018
+//   Added a call to ParseTimePickOptions.
+//
 // ****************************************************************************
 
 STATIC PyObject *
@@ -12456,6 +12779,8 @@ visit_ZonePick_deprecated(PyObject *self, PyObject *args)
         params["coord"] = pt;
     }
 
+    ParseTimePickOptions(params);
+
     if (!suppressQueryOutputState)
         ToggleSuppressQueryOutput_NoLogging(true);
 
@@ -12488,6 +12813,9 @@ visit_ZonePick_deprecated(PyObject *self, PyObject *args)
 //
 //   Kathleen Biagas, Wed Jan  9 08:55:03 PST 2013
 //   Use new helper method that doesn't log the SuppressQueryOutput call.
+//
+//   Alister Maguire, Tue May 22 10:17:15 PDT 2018
+//   Added a call to ParseTimePickOptions.
 //
 // ****************************************************************************
 
@@ -12540,6 +12868,9 @@ visit_ZonePick(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
     pickParams["query_name"] = std::string("Pick");
+
+    ParseTimePickOptions(pickParams);
+
     if (!suppressQueryOutputState)
         ToggleSuppressQueryOutput_NoLogging(true);
 
@@ -12596,6 +12927,9 @@ visit_ZonePick(PyObject *self, PyObject *args, PyObject *kwargs)
 //   Kathleen Biagas, Wed Jan  9 08:55:03 PST 2013
 //   Use new helper method that doesn't log the SuppressQueryOutput call.
 //
+//   Alister Maguire, Tue May 22 10:17:15 PDT 2018
+//   Added a call to ParseTimePickOptions.
+//
 // ****************************************************************************
 
 STATIC PyObject *
@@ -12651,6 +12985,8 @@ visit_NodePick_deprecated(PyObject *self, PyObject *args)
         params["coord"] = pt;
     }
 
+    ParseTimePickOptions(params);
+
     if (!suppressQueryOutputState)
         ToggleSuppressQueryOutput_NoLogging(true);
 
@@ -12664,7 +13000,6 @@ visit_NodePick_deprecated(PyObject *self, PyObject *args)
 
     return visit_GetPickOutputObject(self, args);
 }
-
 
 // ****************************************************************************
 // Function: visit_NodePick
@@ -12683,6 +13018,9 @@ visit_NodePick_deprecated(PyObject *self, PyObject *args)
 //
 //   Kathleen Biagas, Wed Jan  9 08:55:03 PST 2013
 //   Use new helper method that doesn't log the SuppressQueryOutput call.
+//
+//   Alister Maguire, Tue May 22 10:17:15 PDT 2018
+//   Added a call to ParseTimePickOptions.
 //
 // ****************************************************************************
 
@@ -12735,6 +13073,8 @@ visit_NodePick(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
     pickParams["query_name"] = std::string("Pick");
+
+    ParseTimePickOptions(pickParams);
 
     if (!suppressQueryOutputState)
         ToggleSuppressQueryOutput_NoLogging(true);
@@ -13372,52 +13712,6 @@ visit_GetGlobalLineoutAttributes(PyObject *self, PyObject *args)
     *gla = *(GetViewerState()->GetGlobalLineoutAttributes());
 
     return retval;
-}
-
-// ****************************************************************************
-// Function: ParseTimePickOptins
-//
-// Purpose:
-//   Places time query options into their own MapNode entry in the PickParams,
-//   so that VQM knows how to parse them.
-//
-// Notes:
-//
-// Programmer: Kathleen Biagas
-// Creation:   January 12, 2012
-//
-// Modifications:
-//    Kathleen Biagas, Thu Jan 10 09:00:14 PST 2013
-//    Verify numeric entries.
-//
-// ****************************************************************************
-
-void
-ParseTimePickOptions(MapNode &pickParams)
-{
-    if (pickParams.HasNumericEntry("do_time") && 
-        pickParams.GetEntry("do_time")->ToBool() &&
-        !pickParams.HasEntry("time_options"))
-    {
-        MapNode timeOptions;
-        if (pickParams.HasNumericEntry("stride"))
-        {
-            timeOptions["stride"] = pickParams.GetEntry("stride")->ToInt();
-            pickParams.RemoveEntry("stride");
-        }
-        if (pickParams.HasNumericEntry("start_time"))
-        {
-            timeOptions["start_time"] = pickParams.GetEntry("start_time")->ToInt();
-            pickParams.RemoveEntry("start_time");
-        }
-        if (pickParams.HasNumericEntry("end_time"))
-        {
-            timeOptions["end_time"] = pickParams.GetEntry("end_time")->ToInt();
-            pickParams.RemoveEntry("end_time");
-        }
-        if (timeOptions.GetNumEntries() > 0)
-            pickParams["time_options"] = timeOptions;
-    }
 }
 
 // ****************************************************************************
@@ -17347,6 +17641,8 @@ AddProxyMethods()
                                                          visit_ClearCache_doc);
     AddMethod("ClearPickPoints", visit_ClearPickPoints,
                                                     visit_ClearPickPoints_doc);
+    AddMethod("RemovePicks", visit_RemovePicks,
+                                                    visit_RemovePicks_doc);
     AddMethod("ClearReferenceLines", visit_ClearReferenceLines,
                                                 visit_ClearReferenceLines_doc);
     AddMethod("ClearViewKeyframes", visit_ClearViewKeyframes,
@@ -17373,6 +17669,8 @@ AddProxyMethods()
                                           visit_CreateDatabaseCorrelation_doc);
     AddMethod("CreateNamedSelection", visit_CreateNamedSelection,
                                            visit_CreateNamedSelection_doc);
+    AddMethod("DatabasePlugins", visit_DatabasePlugins,
+                                               visit_DatabasePlugins_doc);
     AddMethod("DefineArrayExpression", visit_DefineArrayExpression,
                                                visit_DefineExpression_doc);
     AddMethod("DefineCurveExpression", visit_DefineCurveExpression,
@@ -17589,6 +17887,7 @@ AddProxyMethods()
                                                 visit_SetAnimationTimeout_doc);
     AddMethod("SetAnnotationAttributes", visit_SetAnnotationAttributes,
                                             visit_SetAnnotationAttributes_doc);
+    AddMethod("SetBackendType", visit_SetBackendType, visit_SetBackendType_doc);
     AddMethod("SetCreateMeshQualityExpressions",
                visit_SetCreateMeshQualityExpressions,
                visit_SetCreateMeshQualityExpressions_doc);

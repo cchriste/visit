@@ -49,7 +49,6 @@
 
 #include <avtTransparencyActor.h>
 
-#include <vtkVisItDataSetMapper.h>
 
 #include <BadIndexException.h>
 #include <ImproperUseException.h>
@@ -98,7 +97,6 @@ avtVariableMapper::avtVariableMapper()
     opacity = 1.;
     lut = NULL; 
     lineWidth = LW_0;
-    lineStyle = SOLID; 
     limitsMode = 0;  // use original data extents
     colorTexturingFlag = true;
     colorTexturingFlagAllowed = true;
@@ -155,6 +153,9 @@ avtVariableMapper::~avtVariableMapper()
 //    Tell our mapper whether or not the scene is 3D.  (This is needed so
 //    the rectilinear grid mapper can decide whether or not to do lighting.)
 //
+//    Kathleen Biagas, Tue Jul 12 13:34:19 MST 2016
+//    Removed vtkVisItDataSetMapper.
+//
 // ****************************************************************************
 
 void
@@ -203,18 +204,10 @@ avtVariableMapper::CustomizeMappers(void)
 
             // Turn on color texturing in the mapper.
             mappers[i]->SetInterpolateScalarsBeforeMapping(colorTexturingFlag?1:0);
-
-            if(strcmp(mappers[i]->GetClassName(), "vtkVisItDataSetMapper")==0)
-            {
-                vtkVisItDataSetMapper *m = (vtkVisItDataSetMapper *)mappers[i];
-                m->SetSceneIs3D(GetInput()->GetInfo().GetAttributes().
-                                                   GetSpatialDimension() == 3);
-            }
         }
         if (actors[i] != NULL)
         {
             vtkProperty *prop = actors[i]->GetProperty();
-            prop->SetLineStipplePattern(LineStyle2StipplePattern(lineStyle));
             prop->SetLineWidth(LineWidth2Int(lineWidth));
         }
     }
@@ -543,14 +536,14 @@ avtVariableMapper::TurnLightingOn(void)
             vtkProperty *prop = actors[i]->GetProperty();
             if (prop->GetRepresentation() == VTK_SURFACE)
             {
-                // This method can get called multiple times.  If there are multiple
-                // lights, then blindly calling SetAmbient to 0.0 may turn off an
-                // ambient light that augments a normal light.  So only set the 
-                // default lighting attributes if we know we are in "unlit" mode,
-                // which would mean diffuse would be not 1.0.
+                // This method can get called multiple times.  If there are
+                // multiple lights, then blindly calling SetAmbient to 0.0 may
+                // turn off an ambient light that augments a normal light.  So
+                // only set the default lighting attributes if we know we are
+                // in "unlit" mode, which would mean diffuse would be not 1.0.
                 if (prop->GetDiffuse() == 1.0)
-                    ; // no-op, since lighting is already on and we don't want to 
-                      // kill ambient lights, as per above.
+                    ; // no-op, since lighting is already on and we don't want
+                      // to kill ambient lights, as per above.
                 else if (prop->GetDiffuse() != 1.0)
                 {
                     prop->SetAmbient(0.0);
@@ -762,84 +755,6 @@ avtVariableMapper::SetLineWidth(_LineWidth lw)
     }
 }
 
-
-// ****************************************************************************
-//  Method: avtVariableMapper::SetLineStyle
-//
-//  Purpose:
-//      Sets the line style for all the actors of plot.
-//
-//  Arguments:
-//      s        The new line style
-//
-//  Programmer:  Kathleen Bonnell 
-//  Creation:    March 22, 2001 
-//
-//  Modifications:
-//
-//    Kathleen Bonnell, Thu Jun 21 16:33:54 PDT 2001
-//    Enabled setting of actor's stipple pattern.
-//  
-//    Kathleen Bonnell, Sat Aug 18 18:09:04 PDT 2001
-//    Use enum types from LineAttributes.h to ensure proper
-//    line width and style are sent down to vtk.
-//
-// ****************************************************************************
-
-void
-avtVariableMapper::SetLineStyle(_LineStyle ls)
-{
-    lineStyle = ls; 
-
-    if ( actors == NULL )
-    {
-        // this occurs when this method called before input is set.
-        return;
-    }
-
-
-    for (int i = 0 ; i < nMappers ; i++)
-    {
-        if (actors[i] != NULL)
-        {
-            actors[i]->GetProperty()->SetLineStipplePattern(
-                                      LineStyle2StipplePattern(lineStyle));
-        }
-    }
-}
-
-
-// ****************************************************************************
-//  Method: avtVariableMapper::SetPointSize
-//
-//  Purpose:
-//      Sets the point size for all the actors of plot.
-//
-//  Arguments:
-//      s        The new point size
-//
-//  Programmer:  Kathleen Bonnell 
-//  Creation:    March 22, 2001 
-//  
-// ****************************************************************************
-
-void
-avtVariableMapper::SetPointSize(double s)
-{
-    if ( actors == NULL )
-    {
-        // this occurs when this method called before input is set.
-        return;
-    }
-
-    for (int i = 0 ; i < nMappers ; i++)
-    {
-        if (actors[i] != NULL)
-        {
-            actors[i]->GetProperty()->SetPointSize(s);
-        }
-    }
-}
 
 // ****************************************************************************
 //  Method: avtVariableMapper::GetCurrentRange

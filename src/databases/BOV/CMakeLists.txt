@@ -15,14 +15,17 @@ BOVPluginInfo.C
 SET(LIBM_SOURCES
 BOVMDServerPluginInfo.C
 ${COMMON_SOURCES}
+avtBOVOptions.C
+avtBOVWriter.C
 avtBOVFileFormat.C
 )
 
 SET(LIBE_SOURCES
 BOVEnginePluginInfo.C
 ${COMMON_SOURCES}
-avtBOVFileFormat.C
+avtBOVOptions.C
 avtBOVWriter.C
+avtBOVFileFormat.C
 )
 
 INCLUDE_DIRECTORIES(

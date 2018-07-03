@@ -430,7 +430,6 @@ void
 avtH5PartWriter::WriteUnstructuredMesh(vtkUnstructuredGrid *ug, int chunk)
 {
     int dim = GetInput()->GetInfo().GetAttributes().GetSpatialDimension();
-    int npts = ug->GetNumberOfPoints();
     int nzones = ug->GetNumberOfCells();
 
     // Write the variables line
@@ -515,7 +514,6 @@ avtH5PartWriter::WritePolyData(vtkPolyData *pd, int chunk)
     }
 
     int nPoints = pd->GetVerts()->GetNumberOfCells();
-    int nlines  = pd->GetLines()->GetNumberOfCells();
 
     H5PartSetChunkSize( file, nPoints );
     // For the basic writting everything is at Step#0
@@ -642,7 +640,9 @@ avtH5PartWriter::WritePoints(vtkPoints *pts)
     {
         float *ptr = (float *) arr->GetVoidPointer(0);
 
-        h5part_float32_t *coordsWriteX, *coordsWriteY, *coordsWriteZ;
+        h5part_float32_t *coordsWriteX = NULL,
+                         *coordsWriteY = NULL,
+                         *coordsWriteZ = NULL;
         coordsWriteX = new h5part_float32_t[nparticles];
         coordsWriteY = new h5part_float32_t[nparticles];
         if( dim == 3 )
@@ -670,7 +670,9 @@ avtH5PartWriter::WritePoints(vtkPoints *pts)
     {
         double *ptr = (double *) arr->GetVoidPointer(0);
 
-        h5part_float64_t *coordsWriteX, *coordsWriteY, *coordsWriteZ;
+        h5part_float64_t *coordsWriteX = NULL,
+                         *coordsWriteY = NULL,
+                         *coordsWriteZ = NULL;
         coordsWriteX = new h5part_float64_t[nparticles];
         coordsWriteY = new h5part_float64_t[nparticles];
         if( dim == 3 )

@@ -283,7 +283,6 @@ void VectorAttributes::Init()
     useStride = false;
     stride = 1;
     nVectors = 400;
-    lineStyle = 0;
     lineWidth = 0;
     scale = 0.25;
     scaleByMagnitude = true;
@@ -304,6 +303,7 @@ void VectorAttributes::Init()
     stemWidth = 0.08;
     origOnly = true;
     glyphType = Arrow;
+    animationStep = 0;
 
     VectorAttributes::SelectAll();
 }
@@ -329,7 +329,6 @@ void VectorAttributes::Copy(const VectorAttributes &obj)
     useStride = obj.useStride;
     stride = obj.stride;
     nVectors = obj.nVectors;
-    lineStyle = obj.lineStyle;
     lineWidth = obj.lineWidth;
     scale = obj.scale;
     scaleByMagnitude = obj.scaleByMagnitude;
@@ -352,6 +351,7 @@ void VectorAttributes::Copy(const VectorAttributes &obj)
     stemWidth = obj.stemWidth;
     origOnly = obj.origOnly;
     glyphType = obj.glyphType;
+    animationStep = obj.animationStep;
 
     VectorAttributes::SelectAll();
 }
@@ -515,7 +515,6 @@ VectorAttributes::operator == (const VectorAttributes &obj) const
             (useStride == obj.useStride) &&
             (stride == obj.stride) &&
             (nVectors == obj.nVectors) &&
-            (lineStyle == obj.lineStyle) &&
             (lineWidth == obj.lineWidth) &&
             (scale == obj.scale) &&
             (scaleByMagnitude == obj.scaleByMagnitude) &&
@@ -537,7 +536,8 @@ VectorAttributes::operator == (const VectorAttributes &obj) const
             (geometryQuality == obj.geometryQuality) &&
             (stemWidth == obj.stemWidth) &&
             (origOnly == obj.origOnly) &&
-            (glyphType == obj.glyphType));
+            (glyphType == obj.glyphType) &&
+            (animationStep == obj.animationStep));
 }
 
 // ****************************************************************************
@@ -685,7 +685,6 @@ VectorAttributes::SelectAll()
     Select(ID_useStride,        (void *)&useStride);
     Select(ID_stride,           (void *)&stride);
     Select(ID_nVectors,         (void *)&nVectors);
-    Select(ID_lineStyle,        (void *)&lineStyle);
     Select(ID_lineWidth,        (void *)&lineWidth);
     Select(ID_scale,            (void *)&scale);
     Select(ID_scaleByMagnitude, (void *)&scaleByMagnitude);
@@ -708,6 +707,7 @@ VectorAttributes::SelectAll()
     Select(ID_stemWidth,        (void *)&stemWidth);
     Select(ID_origOnly,         (void *)&origOnly);
     Select(ID_glyphType,        (void *)&glyphType);
+    Select(ID_animationStep,    (void *)&animationStep);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -762,12 +762,6 @@ VectorAttributes::CreateNode(DataNode *parentNode, bool completeSave, bool force
     {
         addToParent = true;
         node->AddNode(new DataNode("nVectors", nVectors));
-    }
-
-    if(completeSave || !FieldsEqual(ID_lineStyle, &defaultObject))
-    {
-        addToParent = true;
-        node->AddNode(new DataNode("lineStyle", lineStyle));
     }
 
     if(completeSave || !FieldsEqual(ID_lineWidth, &defaultObject))
@@ -904,6 +898,12 @@ VectorAttributes::CreateNode(DataNode *parentNode, bool completeSave, bool force
         node->AddNode(new DataNode("glyphType", GlyphType_ToString(glyphType)));
     }
 
+    if(completeSave || !FieldsEqual(ID_animationStep, &defaultObject))
+    {
+        addToParent = true;
+        node->AddNode(new DataNode("animationStep", animationStep));
+    }
+
 
     // Add the node to the parent node.
     if(addToParent || forceAdd)
@@ -962,8 +962,6 @@ VectorAttributes::SetFromNode(DataNode *parentNode)
         SetStride(node->AsInt());
     if((node = searchNode->GetNode("nVectors")) != 0)
         SetNVectors(node->AsInt());
-    if((node = searchNode->GetNode("lineStyle")) != 0)
-        SetLineStyle(node->AsInt());
     if((node = searchNode->GetNode("lineWidth")) != 0)
         SetLineWidth(node->AsInt());
     if((node = searchNode->GetNode("scale")) != 0)
@@ -1078,6 +1076,8 @@ VectorAttributes::SetFromNode(DataNode *parentNode)
                 SetGlyphType(value);
         }
     }
+    if((node = searchNode->GetNode("animationStep")) != 0)
+        SetAnimationStep(node->AsInt());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1110,13 +1110,6 @@ VectorAttributes::SetNVectors(int nVectors_)
 {
     nVectors = nVectors_;
     Select(ID_nVectors, (void *)&nVectors);
-}
-
-void
-VectorAttributes::SetLineStyle(int lineStyle_)
-{
-    lineStyle = lineStyle_;
-    Select(ID_lineStyle, (void *)&lineStyle);
 }
 
 void
@@ -1273,6 +1266,13 @@ VectorAttributes::SetGlyphType(VectorAttributes::GlyphType glyphType_)
     Select(ID_glyphType, (void *)&glyphType);
 }
 
+void
+VectorAttributes::SetAnimationStep(int animationStep_)
+{
+    animationStep = animationStep_;
+    Select(ID_animationStep, (void *)&animationStep);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Get property methods
 ///////////////////////////////////////////////////////////////////////////////
@@ -1299,12 +1299,6 @@ int
 VectorAttributes::GetNVectors() const
 {
     return nVectors;
-}
-
-int
-VectorAttributes::GetLineStyle() const
-{
-    return lineStyle;
 }
 
 int
@@ -1451,6 +1445,12 @@ VectorAttributes::GetGlyphType() const
     return GlyphType(glyphType);
 }
 
+int
+VectorAttributes::GetAnimationStep() const
+{
+    return animationStep;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Select property methods
 ///////////////////////////////////////////////////////////////////////////////
@@ -1495,7 +1495,6 @@ VectorAttributes::GetFieldName(int index) const
     case ID_useStride:        return "useStride";
     case ID_stride:           return "stride";
     case ID_nVectors:         return "nVectors";
-    case ID_lineStyle:        return "lineStyle";
     case ID_lineWidth:        return "lineWidth";
     case ID_scale:            return "scale";
     case ID_scaleByMagnitude: return "scaleByMagnitude";
@@ -1518,6 +1517,7 @@ VectorAttributes::GetFieldName(int index) const
     case ID_stemWidth:        return "stemWidth";
     case ID_origOnly:         return "origOnly";
     case ID_glyphType:        return "glyphType";
+    case ID_animationStep:    return "animationStep";
     default:  return "invalid index";
     }
 }
@@ -1546,7 +1546,6 @@ VectorAttributes::GetFieldType(int index) const
     case ID_useStride:        return FieldType_bool;
     case ID_stride:           return FieldType_int;
     case ID_nVectors:         return FieldType_int;
-    case ID_lineStyle:        return FieldType_linestyle;
     case ID_lineWidth:        return FieldType_linewidth;
     case ID_scale:            return FieldType_double;
     case ID_scaleByMagnitude: return FieldType_bool;
@@ -1569,6 +1568,7 @@ VectorAttributes::GetFieldType(int index) const
     case ID_stemWidth:        return FieldType_double;
     case ID_origOnly:         return FieldType_bool;
     case ID_glyphType:        return FieldType_enum;
+    case ID_animationStep:    return FieldType_int;
     default:  return FieldType_unknown;
     }
 }
@@ -1597,7 +1597,6 @@ VectorAttributes::GetFieldTypeName(int index) const
     case ID_useStride:        return "bool";
     case ID_stride:           return "int";
     case ID_nVectors:         return "int";
-    case ID_lineStyle:        return "linestyle";
     case ID_lineWidth:        return "linewidth";
     case ID_scale:            return "double";
     case ID_scaleByMagnitude: return "bool";
@@ -1620,6 +1619,7 @@ VectorAttributes::GetFieldTypeName(int index) const
     case ID_stemWidth:        return "double";
     case ID_origOnly:         return "bool";
     case ID_glyphType:        return "enum";
+    case ID_animationStep:    return "int";
     default:  return "invalid index";
     }
 }
@@ -1664,11 +1664,6 @@ VectorAttributes::FieldsEqual(int index_, const AttributeGroup *rhs) const
     case ID_nVectors:
         {  // new scope
         retval = (nVectors == obj.nVectors);
-        }
-        break;
-    case ID_lineStyle:
-        {  // new scope
-        retval = (lineStyle == obj.lineStyle);
         }
         break;
     case ID_lineWidth:
@@ -1781,6 +1776,11 @@ VectorAttributes::FieldsEqual(int index_, const AttributeGroup *rhs) const
         retval = (glyphType == obj.glyphType);
         }
         break;
+    case ID_animationStep:
+        {  // new scope
+        retval = (animationStep == obj.animationStep);
+        }
+        break;
     default: retval = false;
     }
 
@@ -1799,5 +1799,14 @@ VectorAttributes::ChangesRequireRecalculation(const VectorAttributes &obj)
             (glyphLocation != obj.glyphLocation) ||
             (nVectors != obj.nVectors) ||
             (origOnly != obj.origOnly));
+}
+
+#include <math.h>
+double
+VectorAttributes::GetAnimationScale() const
+{
+    const int nsteps = 100;
+    double angle = 2.* M_PI * (double(animationStep % nsteps) / double(nsteps-1));
+    return 0.75 + 0.25 * cos(angle);
 }
 

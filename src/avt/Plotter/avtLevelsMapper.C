@@ -54,8 +54,6 @@
 #include <avtDatasetExaminer.h>
 #include <avtTransparencyActor.h>
 
-#include <vtkVisItDataSetMapper.h>
-
 #include <BadIndexException.h>
 #include <DebugStream.h>
 
@@ -101,7 +99,6 @@ const double INV_255 = 0.0039215686274509803377;
 avtLevelsMapper::avtLevelsMapper()
 {
     lineWidth = LW_0;
-    lineStyle = SOLID; 
     useColorMap = false;
 }
 
@@ -194,6 +191,9 @@ avtLevelsMapper::~avtLevelsMapper()
 //    Kathleen Biagas, Thu Oct  9 12:36:47 PDT 2014
 //    Moved color-setting code to UpdateMapperColors.
 //
+//    Kathleen Biagas, Tue Jul 12 13:33:21 MST 2016
+//    Removed vtkVisItDataSetMapper.
+//
 // ****************************************************************************
 
 void
@@ -206,14 +206,7 @@ avtLevelsMapper::CustomizeMappers(void)
         {
             mappers[i]->ScalarVisibilityOff();
 
-            if (strcmp(mappers[i]->GetClassName(), "vtkVisItDataSetMapper")==0)
-            {                 
-                vtkVisItDataSetMapper *m = (vtkVisItDataSetMapper *)mappers[i];
-                m->SetSceneIs3D(GetInput()->GetInfo().GetAttributes().
-                                                    GetSpatialDimension() == 3);
-            }
             vtkProperty* prop = actors[i]->GetProperty();
-            prop->SetLineStipplePattern(LineStyle2StipplePattern(lineStyle));
             prop->SetLineWidth(LineWidth2Int(lineWidth));
         }
     }
@@ -266,87 +259,7 @@ avtLevelsMapper::SetLineWidth(_LineWidth lw)
 
 
 // ****************************************************************************
-//  Method: avtLevelsMapper::SetLineStyle
-//
-//  Purpose:
-//      Sets the line style for all the actors of plot.
-//
-//  Arguments:
-//      s        The new line style
-//
-//  Programmer:  Kathleen Bonnell
-//  Creation:    March 22, 2001
-//
-//  Modifications:
-//
-//    Kathleen Bonnell, Thu Jun 21 16:33:54 PDT 2001
-//    Enable setting of actor's stipple pattern.
-//
-//    Kathleen Bonnell, Mon Jun 25 14:31:51 PDT 2001 
-//    Made stipplePattern a class member.
-//
-//    Kathleen Bonnell, Sat Aug 18 18:09:04 PDT 2001
-//    Use enum types from LineAttributes.h to ensure proper
-//    line width and style are sent down to vtk.
-//
-// ****************************************************************************
-
-void
-avtLevelsMapper::SetLineStyle(_LineStyle ls)
-{
-    lineStyle = ls; 
-    if ( actors == NULL )
-    {
-        // this occurs when this method called before input is set.
-        return;
-    }
-
-    for (int i = 0 ; i < nMappers ; i++)
-    {
-        if (actors[i] != NULL)
-        {
-            actors[i]->GetProperty()->
-                SetLineStipplePattern(LineStyle2StipplePattern(lineStyle));
-        }
-    }
-}
-
-
-// ****************************************************************************
-//  Method: avtLevelsMapper::SetPointSize
-//
-//  Purpose:
-//      Sets the point size for all the actors of plot.
-//
-//  Arguments:
-//      s        The new point size
-//
-//  Programmer:  Kathleen Bonnell
-//  Creation:    March 22, 2001
-//
-// ****************************************************************************
-
-void
-avtLevelsMapper::SetPointSize(double s)
-{
-    if ( actors == NULL )
-    {
-        // this occurs when this method called before input is set.
-        return;
-    }
-
-    for (int i = 0 ; i < nMappers ; i++)
-    {
-        if (actors[i] != NULL)
-        {
-            actors[i]->GetProperty()->SetPointSize(s);
-        }
-    }
-}
-
-
-// ****************************************************************************
-//  Method: avtVariableMapper::GetOriginalDataRange
+//  Method: avtLevelsMapper::GetOriginalDataRange
 //
 //  Purpose:
 //      Gets the original range of the input.

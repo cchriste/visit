@@ -52,9 +52,6 @@
     <Field name="geometryRepresentation" label="geometryRepresentation" type="enum" subtype="GeometryRepresentation">
       Surfaces
     </Field>
-    <Field name="displayListMode" label="displayListMode" type="enum" subtype="TriStateMode">
-      Auto
-    </Field>
     <Field name="stereoRendering" label="stereoRendering" type="bool">
       false
     </Field>
@@ -118,6 +115,18 @@
     </Field>
     <Field name="compactDomainsAutoThreshold" label="compactDomainsAutoThreshold" type="int">
       256
+    </Field>
+    <Field name="osprayRendering" label="OSPRay Rendering" type="bool">
+      false
+    </Field>
+    <Field name="ospraySPP" label="OSPRay samples per pixel" type="int">
+      1
+    </Field>
+    <Field name="osprayAO" label="OSPRay ambient occlusion samples" type="int">
+      0
+    </Field>
+    <Field name="osprayShadows" label="OSPRay shadows" type="bool">
+      false
     </Field>
     <Function name="GetEffectiveScalableThreshold" user="true" member="true">
     </Function>

@@ -62,6 +62,7 @@
 #include <PickAttributes.h>
 #include <PickPointInfo.h>
 #include <RenderingAttributes.h>
+#include <StackTimer.h>
 
 #include <ViewerActionManager.h>
 #include <ViewerEngineManagerInterface.h>
@@ -485,6 +486,29 @@ ViewerWindow::SetVisWindow(VisWindow *vw)
     processingViewChanged = false;
     if (visWindow->GetMultiresolutionMode())
         visWindow->SetViewChangedCB(ViewChangedCallback, (void*)this);
+}
+
+// ****************************************************************************
+// Method: ViewerWindow::GetVisWindow
+//
+// Purpose:
+//   Get the vis window.
+//
+// Returns:    The vis window.
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Mar 16 13:21:13 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+VisWindow *
+ViewerWindow::GetVisWindow()
+{
+    return visWindow;
 }
 
 // ****************************************************************************
@@ -2210,17 +2234,41 @@ ViewerWindow::ClearWindow(bool clearAllPlots)
 //  Purpose: 
 //    Tells the VisWindow to do a screen capture.
 //
+//  Arguments:
+//    doZBuffer : Make sure we return the z buffer in the image.
+//    dpAlpha   : Make sure we return alpha in the pixel data.
+//
 //  Returns:    The image from the screen capture.
 //
 //  Programmer: Hank Childs
 //  Creation:   February 11, 2001
 //
+//  Modifications:
+//    Brad Whitlock, Wed Sep 20 17:43:40 PDT 2017
+//    I added args for saving the zbuffer and alpha channel.
+//
 // ****************************************************************************
 
 avtImage_p
-ViewerWindow::ScreenCapture(void)
+ViewerWindow::ScreenCapture(avtImageType imgT, bool doZBuffer)
 {
-    return visWindow->ScreenCapture();
+    // These match the default arguments for VisWindow::ScreenCapture
+    bool doViewportOnly = false;
+    bool doOpaque = true;
+    bool doTranslucent = true;
+    avtImage_p input = NULL;
+
+    // If we're getting alpha, we don't want the background pixels
+    bool doAlpha = imgT == ColorRGBAImage;
+    bool disableBackground = doAlpha;       
+
+    return visWindow->ScreenCapture(doViewportOnly,
+                                    doZBuffer,
+                                    doOpaque,
+                                    doTranslucent,
+                                    doAlpha,
+                                    disableBackground,
+                                    input);
 }
 
 // ****************************************************************************
@@ -2348,7 +2396,6 @@ ViewerWindow::CopyGeneralAttributes(const ViewerWindow *source)
     SetMultiresolutionMode(source->GetMultiresolutionMode());
     SetMultiresolutionCellSize(source->GetMultiresolutionCellSize());
     SetStereoRendering(source->GetStereo(), source->GetStereoType());
-    SetDisplayListMode(source->GetDisplayListMode());
     SetSurfaceRepresentation(source->GetSurfaceRepresentation());
     SetNotifyForEachRender(source->GetNotifyForEachRender());
     SetScalableAutoThreshold(source->GetScalableAutoThreshold());
@@ -2710,12 +2757,29 @@ ViewerWindow::UpdateView(const WINDOW_MODE mode, const double *limits)
 //    I renamed haveRenderedInCurve to viewSetInCurve, since it was more
 //    accurate.
 //
+//    Alister Maguire, Tue Jun  5 09:13:10 PDT 2018
+//    Added retrieval and setting of the view scale to prevent
+//    skew when rendering. 
+//
 // ****************************************************************************
 
 void
 ViewerWindow::SetViewCurve(const avtViewCurve &v)
 {
     visWindow->SetViewCurve(v);
+
+    double scale;
+    int size[2];
+    visWindow->GetSize(size[0], size[1]);
+    bool validViewScale = v.GetScaleFactor(size, scale);
+    if (!validViewScale)
+    {
+        debug1 << "WARNING: an unsuccessful attempt to retrieve the "
+               << "view scale was made. This may result in the view being "
+               << "skewed..." << endl;
+    }
+
+    plotList->SetViewScale(scale);
 
     viewSetInCurve = true;
 
@@ -4634,6 +4698,9 @@ ViewerWindow::RecenterViewAxisArray(const double *limits)
 //    Kathleen Bonnell, Tue Mar  3 15:04:57 PST 2009
 //    CanDoLogViewScaling changed to PermitsLogViewScaling.
 //
+//    Alister Maguire, Tue Jun  5 13:56:57 PDT 2018
+//    Added an update for the view scale. 
+//
 // ****************************************************************************
 
 void
@@ -4705,6 +4772,14 @@ ViewerWindow::ResetViewCurve()
         }
     }
     visWindow->SetViewCurve(viewCurve);
+
+    //
+    // Update the view scale. 
+    //
+    int size[2];
+    visWindow->GetSize(size[0], size[1]);
+    double scale = viewCurve.GetScaleFactor(size);
+    plotList->SetViewScale(scale);
 
     //
     // Flag the view as unmodified.
@@ -5428,6 +5503,9 @@ ViewerWindow::SetInitialView3d()
 //    Kathleen Bonnell, Tue Mar  3 15:04:57 PST 2009
 //    CanDoLogViewScaling changed to PermitsLogViewScaling.
 //
+//    Alister Maguire, Tue Jun 12 16:38:16 PDT 2018
+//    Added update of the view scale. 
+//
 // ****************************************************************************
 
 void
@@ -5515,6 +5593,23 @@ ViewerWindow::UpdateViewCurve(const double *limits)
         else 
             ResetViewCurve();
     }
+
+    //
+    // Update the plot lists' view scale. 
+    //
+    const avtViewCurve &newViewCurve = GetViewCurve();
+    double scale;
+    int size[2];
+    visWindow->GetSize(size[0], size[1]);
+    bool validViewScale = newViewCurve.GetScaleFactor(size, scale);
+    if (!validViewScale)
+    {
+        debug1 << "WARNING: an unsuccessful attempt to retrieve the "
+               << "view scale was made. This may result in the view being "
+               << "skewed..." << endl;
+    }
+
+    plotList->SetViewScale(scale);
 
     viewSetInCurve = true;
 }
@@ -6308,6 +6403,7 @@ ViewerWindow::GetWindowAttributes() const
     int size[2];
     visWindow->GetSize(size[0], size[1]);
     winAtts.SetSize(size);
+debug5 << "GetWindowAttributes: size=" << size[0] << ", " << size[1] << endl;
 
     //
     // Set the background colors
@@ -6344,9 +6440,6 @@ ViewerWindow::GetWindowAttributes() const
         (RenderingAttributes::TriStateMode) GetScalableActivationMode());
     renderAtts.SetCompactDomainsAutoThreshold(GetCompactDomainsAutoThreshold());
     renderAtts.SetCompactDomainsActivationMode((RenderingAttributes::TriStateMode) GetCompactDomainsActivationMode());
-
-    renderAtts.SetDisplayListMode(
-        (RenderingAttributes::TriStateMode) GetDisplayListMode());
 
     renderAtts.SetAntialiasing(GetAntialiasing());
 
@@ -6387,6 +6480,13 @@ ViewerWindow::GetWindowAttributes() const
 
     renderAtts.SetCompressionActivationMode(
         (RenderingAttributes::TriStateMode) compressionActivationMode);
+
+#ifdef VISIT_OSPRAY
+    renderAtts.SetOsprayRendering(GetOsprayRendering());
+    renderAtts.SetOsprayShadows(GetOsprayShadows());
+    renderAtts.SetOspraySPP(GetOspraySPP());
+    renderAtts.SetOsprayAO(GetOsprayAO());
+#endif
 
     winAtts.SetRenderAtts(renderAtts);
 
@@ -6802,6 +6902,51 @@ void
 ViewerWindow::ClearPickPoints()
 {
     visWindow->ClearPickPoints();
+    ViewerQueryManager::Instance()->ClearPickPoints();
+
+    // Tell each plot in the window that the pick points have been cleared.
+    // This is important for the spreadsheet plot.
+    PickAttributes pickAtts;
+    pickAtts.SetClearWindow(true);
+    ViewerPlotList *plist = GetPlotList();
+    int numPlots = plist->GetNumPlots();
+    for (int i = 0 ; i < numPlots ; i++)
+        plist->GetPlot(i)->SetPlotAtts(&pickAtts);
+}
+
+
+// ****************************************************************************
+//  Method: ViewerWindow::RemovePicks
+//
+//  Purpose: 
+//    Remove a list of picks from the window. 
+//
+//  Programmer: Alister Maguire
+//  Creation:   Mon Oct 16 15:41:23 PDT 2017
+//
+//  Modifications:
+//
+// ****************************************************************************
+
+void
+ViewerWindow::RemovePicks(const std::string sLabels)
+{
+    std::vector< std::string > vLabels;
+    std::string                label;
+    std::stringstream          ss(sLabels); 
+    
+    // Remove leading and trailing whitespace. 
+    while (getline(ss, label, ','))
+    {
+        size_t start = label.find_first_not_of(" ");
+        size_t end   = label.find_last_not_of(" ");
+        label        = label.substr(start, end-start+1);
+        vLabels.push_back(label);
+    }
+    
+    std::string removedPicks = visWindow->RemovePicks(vLabels);
+    visWindow->RemovePicks(vLabels);
+    GetViewerState()->GetPickAttributes()->SetRemovedPicks(removedPicks);
     ViewerQueryManager::Instance()->ClearPickPoints();
 
     // Tell each plot in the window that the pick points have been cleared.
@@ -7473,40 +7618,6 @@ int
 ViewerWindow::GetStereoType() const
 {
     return visWindow->GetStereoType();
-}
-
-// ****************************************************************************
-// Method: ViewerWindow::SetDisplayListMode
-//
-// Purpose: 
-//     Sets the display list mode -- never, always, or auto.
-//
-// Programmer: Hank Childs
-// Creation:   May 10, 2004
-//
-// ****************************************************************************
-
-void
-ViewerWindow::SetDisplayListMode(int mode)
-{
-    visWindow->SetDisplayListMode(mode);
-}
-
-// ****************************************************************************
-// Method: ViewerWindow::GetDisplayListMode
-//
-// Purpose: 
-//     Gets the display list mode.
-//
-// Programmer: Hank Childs
-// Creation:   May 10, 2004
-//
-// ****************************************************************************
-
-int
-ViewerWindow::GetDisplayListMode() const
-{
-    return visWindow->GetDisplayListMode();
 }
 
 // ****************************************************************************
@@ -8341,6 +8452,136 @@ ViewerWindow::GetCompactDomainsAutoThreshold() const
     return visWindow->GetCompactDomainsAutoThreshold();
 }
 
+#ifdef VISIT_OSPRAY
+// ****************************************************************************
+// Method:  ViewerWindow::SetOsprayRendering
+//
+// Purpose: Set/Get OSPRay rendering flag
+//
+// Programmer:  Alok Hota
+// Creation:    Tue 24 Apr 2018 11:09:41 AM EDT
+//
+// ****************************************************************************
+
+void
+ViewerWindow::SetOsprayRendering(bool enabled)
+{
+    visWindow->SetOsprayRendering(enabled);
+}
+
+// ****************************************************************************
+// Method:  ViewerWindow::GetOsprayRendering
+//
+// Purpose: Set/Get OSPRay rendering flag
+//
+// Programmer:  Alok Hota
+// Creation:    Tue 24 Apr 2018 11:10:04 AM EDT
+//
+// ****************************************************************************
+
+bool
+ViewerWindow::GetOsprayRendering() const
+{
+    return visWindow->GetOsprayRendering();
+}
+
+// ****************************************************************************
+// Method:  ViewerWindow::SetOspraySPP
+//
+// Purpose: Set/Get OSPRay samples per pixel
+//
+// Programmer:  Alok Hota
+// Creation:    Tue 24 Apr 2018 11:09:41 AM EDT
+//
+// ****************************************************************************
+
+void
+ViewerWindow::SetOspraySPP(int val)
+{
+    visWindow->SetOspraySPP(val);
+}
+
+// ****************************************************************************
+// Method:  ViewerWindow::GetOspraySPP
+//
+// Purpose: Set/Get OSPRay samples per pixel
+//
+// Programmer:  Alok Hota
+// Creation:    Tue 24 Apr 2018 11:10:04 AM EDT
+//
+// ****************************************************************************
+
+int
+ViewerWindow::GetOspraySPP() const
+{
+    return visWindow->GetOspraySPP();
+}
+
+// ****************************************************************************
+// Method:  ViewerWindow::SetOsprayAO
+//
+// Purpose: Set/Get OSPRay ambient occlusion samples per pixel
+//
+// Programmer:  Alok Hota
+// Creation:    Tue 24 Apr 2018 11:09:41 AM EDT
+//
+// ****************************************************************************
+
+void
+ViewerWindow::SetOsprayAO(int val)
+{
+    visWindow->SetOsprayAO(val);
+}
+
+// ****************************************************************************
+// Method:  ViewerWindow::GetOsprayAO
+//
+// Purpose: Set/Get OSPRay ambient occlusion samples per pixel
+//
+// Programmer:  Alok Hota
+// Creation:    Wed 02 May 2018 10:01:18 AM EDT
+//
+// ****************************************************************************
+
+int
+ViewerWindow::GetOsprayAO() const
+{
+    return visWindow->GetOsprayAO();
+}
+
+// ****************************************************************************
+// Method:  ViewerWindow::SetOsprayShadows
+//
+// Purpose: Set/Get OSPRay shadows
+//
+// Programmer:  Alok Hota
+// Creation:    Wed 02 May 2018 10:01:18 AM EDT
+//
+// ****************************************************************************
+
+void
+ViewerWindow::SetOsprayShadows(bool enabled)
+{
+    visWindow->SetOsprayShadows(enabled);
+}
+
+// ****************************************************************************
+// Method:  ViewerWindow::GetOsprayShadows
+//
+// Purpose: Set/Get OSPRay shadows
+//
+// Programmer:  Alok Hota
+// Creation:    Tue 24 Apr 2018 11:10:04 AM EDT
+//
+// ****************************************************************************
+
+bool
+ViewerWindow::GetOsprayShadows() const
+{
+    return visWindow->GetOsprayShadows();
+}
+#endif
+
 // ****************************************************************************
 // Method: ViewerWindow::CreateNode
 //
@@ -8513,7 +8754,6 @@ ViewerWindow::CreateNode(DataNode *parentNode,
         windowNode->AddNode(new DataNode("compactDomainsActivationMode", GetCompactDomainsActivationMode()));
         windowNode->AddNode(new DataNode("notifyForEachRender", GetNotifyForEachRender()));
         windowNode->AddNode(new DataNode("surfaceRepresentation", GetSurfaceRepresentation()));
-        windowNode->AddNode(new DataNode("displayListMode", GetDisplayListMode()));
         windowNode->AddNode(new DataNode("stereoRendering", GetStereo()));
         windowNode->AddNode(new DataNode("stereoType", GetStereoType()));
         windowNode->AddNode(new DataNode("antialiasing", GetAntialiasing()));
@@ -8862,8 +9102,6 @@ ViewerWindow::SetFromNode(DataNode *parentNode,
         SetNotifyForEachRender(node->AsBool());
     if((node = windowNode->GetNode("surfaceRepresentation")) != 0)
         SetSurfaceRepresentation(node->AsInt());
-    if((node = windowNode->GetNode("displayListMode")) != 0)
-        SetDisplayListMode(node->AsInt());
     int stereoType = 0;
     if((node = windowNode->GetNode("stereoType")) != 0)
         stereoType = node->AsInt();
@@ -9809,9 +10047,11 @@ ViewerWindow::GetExternalRenderRequestInfo(
 
 bool
 ViewerWindow::ExternalRender(const ExternalRenderRequestInfo& thisRequest,
-    bool& shouldTurnOffScalableRendering, bool doAllAnnotations,
+    bool& shouldTurnOffScalableRendering, bool doAllAnnotations, 
+    avtImageType imgT, bool needZBuffer,
     avtDataObject_p& dob)
 {
+    StackTimer t0("ViewerWindow::ExternalRender");
     bool success = false;
     std::vector<avtImage_p> imgList;
 
@@ -9821,6 +10061,8 @@ ViewerWindow::ExternalRender(const ExternalRenderRequestInfo& thisRequest,
         success = IssueExternalRenderRequests(thisRequest,
                       shouldTurnOffScalableRendering,
                       doAllAnnotations,
+                      imgT,
+                      needZBuffer,
                       imgList,
                       GetWindowId());
     }
@@ -9862,6 +10104,7 @@ ViewerWindow::ExternalRender(const ExternalRenderRequestInfo& thisRequest,
         // NOTE: YOU NEED TO MAKE SURE ALL ENGINES HAVE USED
         // SAME BACKGROUND COLOR IN ORDER FOR THIS TO WORK
         //
+        StackTimer t1("Image Compositing");
         avtWholeImageCompositerWithZ imageCompositer;
         int numRows = thisRequest.winAtts.GetSize()[1];
         int numCols = thisRequest.winAtts.GetSize()[0];
@@ -10000,9 +10243,13 @@ ViewerWindow::IssueExternalRenderRequests(
     const ExternalRenderRequestInfo &reqInfo,
     bool &shouldTurnOffScalableRendering,
     bool doAllAnnotations,
+    avtImageType imgT,
+    bool needZBuffer,
     std::vector<avtImage_p> &imgList,
     int windowID)
 {
+    StackTimer t0("ViewerWindow::IssueExternalRenderRequests");
+
     // break-out individual members of the request info
     const std::vector<const char*> &pluginIDsList         = reqInfo.pluginIDsList;
     const std::vector<EngineKey> &engineKeysList          = reqInfo.engineKeysList;
@@ -10054,7 +10301,7 @@ ViewerWindow::IssueExternalRenderRequests(
         }
 
         size_t numEnginesToRender = perEnginePlotIds.size();
-        bool sendZBuffer = numEnginesToRender > 1 ? true : false;
+        bool sendZBuffer = (numEnginesToRender > 1) || needZBuffer;
 
         //
         // we have to force extents when we have more than one engine
@@ -10104,7 +10351,7 @@ ViewerWindow::IssueExternalRenderRequests(
             //   2 == valid image.
             avtImage_p img;
             int ret = GetViewerEngineManager()->Render(ek, img,
-                sendZBuffer, pos->second, annotMode, windowID, leftEye,
+                imgT, sendZBuffer, pos->second, annotMode, windowID, leftEye,
                 this->ProcessEventsCB, this->ProcessEventsCBData);
 
             if(ret == 0)
@@ -10192,12 +10439,17 @@ ViewerWindow::IssueExternalRenderRequests(
 //
 //   Mark C. Miller, Sat Jul 22 23:21:09 PDT 2006
 //   Added leftEye arg to GetExternalRenderRequestInfo
-//  
+//
+//   Brad Whitlock, Thu Sep 21 16:32:18 PDT 2017
+//   Added zbuffer and imgT.
+//
 // ****************************************************************************
 
 void
-ViewerWindow::ExternalRenderManual(avtDataObject_p& dob, int w, int h)
+ViewerWindow::ExternalRenderManual(avtDataObject_p& dob, int w, int h,
+    avtImageType imgT, bool needZBuffer)
 {
+    StackTimer t0("ViewerWindow::ExternalRenderManual");
     const char *mName = "ViewerWindow::ExternalRenderManual: ";
     bool dummyBool;
     int tries = 0;
@@ -10218,7 +10470,8 @@ ViewerWindow::ExternalRenderManual(avtDataObject_p& dob, int w, int h)
             SetScalableActivationMode(RenderingAttributes::Always);
 
         debug4 << mName << "Calling ExternalRender" << endl;
-        success = ExternalRender(thisRequest, dummyBool, true, dob);
+        success = ExternalRender(thisRequest, dummyBool, true, 
+                                 imgT, needZBuffer, dob);
 
         if (!success)
         {
@@ -10258,7 +10511,12 @@ ViewerWindow::ExternalRenderManual(avtDataObject_p& dob, int w, int h)
 //
 //   Mark C. Miller, Sat Jul 22 23:21:09 PDT 2006
 //   Added leftEye to support stereo SR
+//
+//   Brad Whitlock, Thu Sep 21 16:32:18 PDT 2017
+//   Added zbuffer and alpha.
+//
 // ****************************************************************************
+
 void
 ViewerWindow::ExternalRenderAuto(avtDataObject_p& dob, bool leftEye)
 {
@@ -10294,10 +10552,12 @@ ViewerWindow::ExternalRenderAuto(avtDataObject_p& dob, bool leftEye)
     const int maxTries = 3;
     int trys = 0;
     bool success = false;
+    bool needZBuffer = false;
     while (!success && trys < maxTries)
     {
         success = ExternalRender(thisRequest,
-                                 shouldTurnOffScalableRendering, false, dob);
+                                 shouldTurnOffScalableRendering, false,
+                                 ColorRGBImage, needZBuffer, dob);
         if (!success)
         {
             GetPlotList()->ClearActors();

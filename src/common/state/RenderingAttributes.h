@@ -129,7 +129,6 @@ public:
     void SetMultiresolutionMode(bool multiresolutionMode_);
     void SetMultiresolutionCellSize(float multiresolutionCellSize_);
     void SetGeometryRepresentation(GeometryRepresentation geometryRepresentation_);
-    void SetDisplayListMode(TriStateMode displayListMode_);
     void SetStereoRendering(bool stereoRendering_);
     void SetStereoType(StereoTypes stereoType_);
     void SetNotifyForEachRender(bool notifyForEachRender_);
@@ -149,6 +148,10 @@ public:
     void SetColorTexturingFlag(bool colorTexturingFlag_);
     void SetCompactDomainsActivationMode(TriStateMode compactDomainsActivationMode_);
     void SetCompactDomainsAutoThreshold(int compactDomainsAutoThreshold_);
+    void SetOsprayRendering(bool osprayRendering_);
+    void SetOspraySPP(int ospraySPP_);
+    void SetOsprayAO(int osprayAO_);
+    void SetOsprayShadows(bool osprayShadows_);
 
     // Property getting methods
     bool                 GetAntialiasing() const;
@@ -163,7 +166,6 @@ public:
     bool                 GetMultiresolutionMode() const;
     float                GetMultiresolutionCellSize() const;
     GeometryRepresentation GetGeometryRepresentation() const;
-    TriStateMode         GetDisplayListMode() const;
     bool                 GetStereoRendering() const;
     StereoTypes          GetStereoType() const;
     bool                 GetNotifyForEachRender() const;
@@ -186,6 +188,10 @@ public:
     bool                 GetColorTexturingFlag() const;
     TriStateMode         GetCompactDomainsActivationMode() const;
     int                  GetCompactDomainsAutoThreshold() const;
+    bool                 GetOsprayRendering() const;
+    int                  GetOspraySPP() const;
+    int                  GetOsprayAO() const;
+    bool                 GetOsprayShadows() const;
 
     // Persistence methods
     virtual bool CreateNode(DataNode *node, bool completeSave, bool forceAdd);
@@ -232,7 +238,6 @@ public:
         ID_multiresolutionMode,
         ID_multiresolutionCellSize,
         ID_geometryRepresentation,
-        ID_displayListMode,
         ID_stereoRendering,
         ID_stereoType,
         ID_notifyForEachRender,
@@ -252,6 +257,10 @@ public:
         ID_colorTexturingFlag,
         ID_compactDomainsActivationMode,
         ID_compactDomainsAutoThreshold,
+        ID_osprayRendering,
+        ID_ospraySPP,
+        ID_osprayAO,
+        ID_osprayShadows,
         ID__LAST
     };
 
@@ -268,7 +277,6 @@ private:
     bool           multiresolutionMode;
     float          multiresolutionCellSize;
     int            geometryRepresentation;
-    int            displayListMode;
     bool           stereoRendering;
     int            stereoType;
     bool           notifyForEachRender;
@@ -288,11 +296,15 @@ private:
     bool           colorTexturingFlag;
     int            compactDomainsActivationMode;
     int            compactDomainsAutoThreshold;
+    bool           osprayRendering;
+    int            ospraySPP;
+    int            osprayAO;
+    bool           osprayShadows;
 
     // Static class format string for type map.
     static const char *TypeMapFormatString;
     static const private_tmfs_t TmfsStruct;
 };
-#define RENDERINGATTRIBUTES_TMFS "bbiiiibdibfiibibiibffabdbbDDibii"
+#define RENDERINGATTRIBUTES_TMFS "bbiiiibdibfibibiibffabdbbDDibiibiib"
 
 #endif

@@ -15,6 +15,7 @@ int VisItAddOperator(const char *operatorType, int applyToAll);
 int VisItDrawPlots(void);
 int VisItDeleteActivePlots(void);
 int VisItSetActivePlots(const int *ids, int nids);
+int VisItChangePlotVar(const char *var, int all);
 
 /* Set values for the current plot */
 int VisItSetPlotOptionsC(const char *name,char v);
@@ -51,5 +52,10 @@ int VisItSetOperatorOptionsLv(const char *name,const long *v,int L);
 int VisItSetOperatorOptionsFv(const char *name,const float *v,int L);
 int VisItSetOperatorOptionsDv(const char *name,const double *v,int L);
 int VisItSetOperatorOptionsSv(const char *name,const char **sv,int L);
+
+int VisItSetView2D(visit_handle v);
+int VisItGetView2D(visit_handle v);
+int VisItSetView3D(visit_handle v);
+int VisItGetView3D(visit_handle v);
 
 #endif

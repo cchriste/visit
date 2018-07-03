@@ -116,12 +116,14 @@ class PIPELINE_API avtRay
     friend class                  avtVolume;
 
   public:
-                                  avtRay(int, int);
+                                  avtRay(double *s, bool *vs, int, int);
     virtual                      ~avtRay();
+
+    void                          Reset();
 
     inline void                   SetSample(const int &,
                                             const double[AVT_VARIABLE_LIMIT]);
-    inline void                   SetSamples(const int &start, const int &end,
+    inline void                   SetSamples(int start, int end,
                                           const double (*)[AVT_VARIABLE_LIMIT]);
     inline void                   UpdateNumberOfRuns(int);
     bool                          GetSample(int, double [AVT_VARIABLE_LIMIT])
@@ -267,32 +269,50 @@ avtRay::SetSample(const int &si, const double val[AVT_VARIABLE_LIMIT])
 // ****************************************************************************
 
 inline void
-avtRay::SetSamples(const int &start, const int &end,
+avtRay::SetSamples(int start, int end,
                    const double (*samps)[AVT_VARIABLE_LIMIT])
 {
     if (start >= 0 && end < numSamples)
     {
-        for (int i = start ; i <= end ; i++)
+        if(arbitrator != NULL)
         {
-            bool shouldOverwrite = true;
-            if (validSample[i] && arbitrator != NULL)
+            int index = arbitrator->GetArbitrationVariable();
+            for (int i = start ; i <= end ; i++)
             {
-                int index = arbitrator->GetArbitrationVariable();
-                shouldOverwrite = arbitrator->ShouldOverwrite(sample[index][i],
-                                                        samps[i-start][index]);
-            }
-            if (shouldOverwrite)
-            {
-                for (int j = 0 ; j < numVariables ; j++)
+                bool shouldOverwrite = true;
+                if (validSample[i])
                 {
-                    sample[j][i] = samps[i-start][j];
+                    shouldOverwrite = arbitrator->ShouldOverwrite(sample[index][i],
+                                                                  samps[i-start][index]);
+                }
+                if (shouldOverwrite)
+                {
+                    for (int j = 0 ; j < numVariables ; j++)
+                    {
+                        sample[j][i] = samps[i-start][j];
+                    }
+                }
+                if (!validSample[i])
+                {
+                    validSample[i] = true;
+                    numValidSamples++;
+                    UpdateNumberOfRuns(i);
                 }
             }
-            if (!validSample[i])
+        }
+        else
+        {
+            for (int i = start ; i <= end ; i++)
             {
-                validSample[i] = true;
-                numValidSamples++;
-                UpdateNumberOfRuns(i);
+                for (int j = 0 ; j < numVariables ; j++)
+                    sample[j][i] = samps[i-start][j];
+
+                if (!validSample[i])
+                {
+                    validSample[i] = true;
+                    numValidSamples++;
+                    UpdateNumberOfRuns(i);
+                }
             }
         }
     }

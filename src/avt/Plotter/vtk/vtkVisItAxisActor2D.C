@@ -516,6 +516,9 @@ void vtkVisItAxisActor2D::PrintSelf(ostream& os, vtkIndent indent)
 //   Create a new vtkTextProperty when updating the properties
 //   of the TitleActor. Fixes bug with triad letters. 
 //
+//   Eric Brugger, Thu Jun 14 09:02:39 PDT 2018
+//   Correct the title placement for vertical axes for the VTK8 upgrade.
+//
 // ****************************************************************************
 
 void vtkVisItAxisActor2D::BuildAxis(vtkViewport *viewport)
@@ -917,13 +920,13 @@ void vtkVisItAxisActor2D::BuildAxis(vtkViewport *viewport)
       this->TitleActor->SetPosition(pos[0], pos[1]);
       if(this->TitleAtEnd)
         {
-        titleTprop->SetJustificationToCentered();
-        titleTprop->SetVerticalJustificationToBottom();
+        titleTprop->SetJustificationToLeft();
+        titleTprop->SetVerticalJustificationToCentered();
         }
       else
         {
-        titleTprop->SetJustificationToRight();
-        titleTprop->SetVerticalJustificationToCentered();
+        titleTprop->SetJustificationToCentered();
+        titleTprop->SetVerticalJustificationToBottom();
         }
       }
     else
@@ -1369,13 +1372,11 @@ vtkVisItAxisActor2D::SetNumberOfLabelsBuilt(const int numLabels)
 //------------------------------------------------------------------------------
 // Take into account the MTimes of Point1Coordinate and Point2Coordinate.
 // -----------------------------------------------------------------------------
-unsigned long 
+vtkMTimeType
 vtkVisItAxisActor2D::GetMTime()
 {
-  unsigned long mTime = this->Superclass::GetMTime();
-
-  unsigned long time;
-  time = this->Point1Coordinate->GetMTime();
+  vtkMTimeType mTime = this->Superclass::GetMTime();
+  vtkMTimeType time  = this->Point1Coordinate->GetMTime();
   mTime = (time > mTime ? time : mTime);
   time = this->Point2Coordinate->GetMTime();
   mTime = (time > mTime ? time : mTime);

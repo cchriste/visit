@@ -76,9 +76,12 @@ public class VisualCueInfo extends AttributeSubject
         glyphType = new String("");
         label = new String("");
         showLabel = false;
-        lineStyle = 0;
         lineWidth = 0;
         opacity = 1;
+        highlightColor = new float[3];
+        highlightColor[0] = 0f;
+        highlightColor[1] = 1f;
+        highlightColor[2] = 0f;
     }
 
     public VisualCueInfo(int nMoreFields)
@@ -91,9 +94,12 @@ public class VisualCueInfo extends AttributeSubject
         glyphType = new String("");
         label = new String("");
         showLabel = false;
-        lineStyle = 0;
         lineWidth = 0;
         opacity = 1;
+        highlightColor = new float[3];
+        highlightColor[0] = 0f;
+        highlightColor[1] = 1f;
+        highlightColor[2] = 0f;
     }
 
     public VisualCueInfo(VisualCueInfo obj)
@@ -114,9 +120,13 @@ public class VisualCueInfo extends AttributeSubject
         glyphType = new String(obj.glyphType);
         label = new String(obj.label);
         showLabel = obj.showLabel;
-        lineStyle = obj.lineStyle;
         lineWidth = obj.lineWidth;
         opacity = obj.opacity;
+        highlightColor = new float[3];
+        highlightColor[0] = obj.highlightColor[0];
+        highlightColor[1] = obj.highlightColor[1];
+        highlightColor[2] = obj.highlightColor[2];
+
 
         SelectAll();
     }
@@ -144,6 +154,11 @@ public class VisualCueInfo extends AttributeSubject
             Double points2 = (Double)obj.points.elementAt(i);
             points_equal = points1.equals(points2);
         }
+        // Compare the highlightColor arrays.
+        boolean highlightColor_equal = true;
+        for(i = 0; i < 3 && highlightColor_equal; ++i)
+            highlightColor_equal = (highlightColor[i] == obj.highlightColor[i]);
+
         // Create the return value
         return (points_equal &&
                 (cueType == obj.cueType) &&
@@ -151,9 +166,9 @@ public class VisualCueInfo extends AttributeSubject
                 (glyphType.equals(obj.glyphType)) &&
                 (label.equals(obj.label)) &&
                 (showLabel == obj.showLabel) &&
-                (lineStyle == obj.lineStyle) &&
                 (lineWidth == obj.lineWidth) &&
-                (opacity == obj.opacity));
+                (opacity == obj.opacity) &&
+                highlightColor_equal);
     }
 
     // Property setting methods
@@ -193,21 +208,31 @@ public class VisualCueInfo extends AttributeSubject
         Select(5);
     }
 
-    public void SetLineStyle(int lineStyle_)
-    {
-        lineStyle = lineStyle_;
-        Select(6);
-    }
-
     public void SetLineWidth(int lineWidth_)
     {
         lineWidth = lineWidth_;
-        Select(7);
+        Select(6);
     }
 
     public void SetOpacity(double opacity_)
     {
         opacity = opacity_;
+        Select(7);
+    }
+
+    public void SetHighlightColor(float[] highlightColor_)
+    {
+        highlightColor[0] = highlightColor_[0];
+        highlightColor[1] = highlightColor_[1];
+        highlightColor[2] = highlightColor_[2];
+        Select(8);
+    }
+
+    public void SetHighlightColor(float e0, float e1, float e2)
+    {
+        highlightColor[0] = e0;
+        highlightColor[1] = e1;
+        highlightColor[2] = e2;
         Select(8);
     }
 
@@ -218,9 +243,9 @@ public class VisualCueInfo extends AttributeSubject
     public String         GetGlyphType() { return glyphType; }
     public String         GetLabel() { return label; }
     public boolean        GetShowLabel() { return showLabel; }
-    public int            GetLineStyle() { return lineStyle; }
     public int            GetLineWidth() { return lineWidth; }
     public double         GetOpacity() { return opacity; }
+    public float[]        GetHighlightColor() { return highlightColor; }
 
     // Write and read methods.
     public void WriteAtts(CommunicationBuffer buf)
@@ -238,11 +263,11 @@ public class VisualCueInfo extends AttributeSubject
         if(WriteSelect(5, buf))
             buf.WriteBool(showLabel);
         if(WriteSelect(6, buf))
-            buf.WriteInt(lineStyle);
-        if(WriteSelect(7, buf))
             buf.WriteInt(lineWidth);
-        if(WriteSelect(8, buf))
+        if(WriteSelect(7, buf))
             buf.WriteDouble(opacity);
+        if(WriteSelect(8, buf))
+            buf.WriteFloatArray(highlightColor);
     }
 
     public void ReadAtts(int index, CommunicationBuffer buf)
@@ -269,13 +294,13 @@ public class VisualCueInfo extends AttributeSubject
             SetShowLabel(buf.ReadBool());
             break;
         case 6:
-            SetLineStyle(buf.ReadInt());
-            break;
-        case 7:
             SetLineWidth(buf.ReadInt());
             break;
-        case 8:
+        case 7:
             SetOpacity(buf.ReadDouble());
+            break;
+        case 8:
+            SetHighlightColor(buf.ReadFloatArray());
             break;
         }
     }
@@ -296,9 +321,9 @@ public class VisualCueInfo extends AttributeSubject
         str = str + stringToString("glyphType", glyphType, indent) + "\n";
         str = str + stringToString("label", label, indent) + "\n";
         str = str + boolToString("showLabel", showLabel, indent) + "\n";
-        str = str + intToString("lineStyle", lineStyle, indent) + "\n";
         str = str + intToString("lineWidth", lineWidth, indent) + "\n";
         str = str + doubleToString("opacity", opacity, indent) + "\n";
+        str = str + floatArrayToString("highlightColor", highlightColor, indent) + "\n";
         return str;
     }
 
@@ -310,8 +335,8 @@ public class VisualCueInfo extends AttributeSubject
     private String         glyphType;
     private String         label;
     private boolean        showLabel;
-    private int            lineStyle;
     private int            lineWidth;
     private double         opacity;
+    private float[]        highlightColor;
 }
 

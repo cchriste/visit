@@ -1,5 +1,13 @@
 <?xml version="1.0"?>
   <Plugin name="Mesh" type="plot" label="Mesh" version="1.0" enabled="true" mdspecificcode="false" engspecificcode="false" onlyengine="false" noengine="false" vartype="mesh" iconFile="Mesh.xpm">
+    <Files components="V">
+      avtMeshFilter.C
+      avtMeshPlotMapper.C
+    </Files>
+    <Files components="E">
+      avtMeshFilter.C
+      avtMeshPlotMapper.C
+    </Files>
     <Attribute name="MeshAttributes" purpose="Attributes for the mesh plot" persistent="true" keyframe="true" exportAPI="" exportInclude="" codefile="MeshAttributes.code">
       <Enum name="SmoothingLevel">
         None
@@ -21,9 +29,6 @@
       </Enum>
       <Field name="legendFlag" label="Legend" type="bool">
         true
-      </Field>
-      <Field name="lineStyle" label="Line style" type="linestyle">
-        0
       </Field>
       <Field name="lineWidth" label="Line width" type="linewidth">
         0

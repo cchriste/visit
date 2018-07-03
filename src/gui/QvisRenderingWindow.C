@@ -56,6 +56,8 @@
 #include <WindowInformation.h>
 #include <QvisOpacitySlider.h>
 
+#include <DebugStream.h>
+
 // ****************************************************************************
 // Method: QvisRenderingWindow::QvisRenderingWindow
 //
@@ -100,7 +102,6 @@ QvisRenderingWindow::QvisRenderingWindow(const QString &caption,
     windowInfo = 0;
 
     objectRepresentation = 0;
-    dlMode = 0;
     stereoType = 0;
     scalrenActivationMode = 0;
     scalrenCompressMode = 0;
@@ -137,6 +138,7 @@ QvisRenderingWindow::~QvisRenderingWindow()
     if(windowInfo)
         windowInfo->Detach(this);
 }
+
 
 // ****************************************************************************
 // Method: QvisRenderingWindow::CreateBasicPage
@@ -351,25 +353,6 @@ QvisRenderingWindow::CreateBasicPage()
     basicLayout->addWidget(points, row, 3);
     row++;
 
-    // Create the display list widgets.
-    QLabel *displayListLabel = new QLabel(tr("Use display lists"), basicOptions);
-    basicLayout->addWidget(displayListLabel, row, 0, 1, 3);
-    dlMode = new QButtonGroup(basicOptions);
-    connect(dlMode, SIGNAL(buttonClicked(int)),
-            this, SLOT(displayListModeChanged(int)));
-    row++;
-
-    QRadioButton *dl_auto = new QRadioButton(tr("Auto"), basicOptions);
-    dlMode->addButton(dl_auto, 0);
-    basicLayout->addWidget(dl_auto, row, 1);
-    QRadioButton *dl_always = new QRadioButton(tr("Always"), basicOptions);
-    dlMode->addButton(dl_always, 1);
-    basicLayout->addWidget(dl_always, row, 2);
-    QRadioButton *dl_never = new QRadioButton(tr("Never"), basicOptions);
-    dlMode->addButton(dl_never, 2);
-    basicLayout->addWidget(dl_never, row, 3);
-    row++;
-
     // Create the stereo widgets.
     stereoToggle = new QCheckBox(tr("Stereo"), basicOptions);
     connect(stereoToggle, SIGNAL(toggled(bool)),
@@ -441,6 +424,11 @@ QvisRenderingWindow::CreateBasicPage()
 // Creation:   Thu Jun 19 13:18:25 PDT 2008
 //
 // Modifications:
+//   Alok Hota, Mon 23 Apr 07:12:51 PM EDT 2018
+//   Added OSPRay rendering toggle and associated parameters
+//
+//   Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//   Added OSPRay option default values
 //   
 // ****************************************************************************
 
@@ -594,8 +582,58 @@ QvisRenderingWindow::CreateAdvancedPage()
     advLayout->addWidget(colorTexturingToggle, row, 0, 1, 3);
     row++;
 
+#ifdef VISIT_OSPRAY
+    // Create the OSPRay rendering toggle
+    osprayRenderingToggle = new QCheckBox(tr("OSPRay rendering"),
+            advancedOptions);
+    connect(osprayRenderingToggle, SIGNAL(toggled(bool)),
+            this, SLOT(osprayRenderingToggled(bool)));
+    advLayout->addWidget(osprayRenderingToggle, row, 0, 1, 3);
+    row++;
+
+    ospraySPPLabel = new QLabel(tr("Samples per pixel"), advancedOptions);
+    ospraySPPLabel->setEnabled(false);
+    advLayout->addWidget(ospraySPPLabel, row, 1, 1, 2);
+    ospraySPP = new QSpinBox(advancedOptions);
+    ospraySPP->setMinimum(1);
+    ospraySPP->setEnabled(false);
+    connect(ospraySPP, SIGNAL(valueChanged(int)),
+            this, SLOT(ospraySPPChanged(int)));
+    advLayout->addWidget(ospraySPP, row, 3);
+    row++;
+    connect(osprayRenderingToggle, SIGNAL(toggled(bool)),
+            ospraySPPLabel, SLOT(setEnabled(bool)));
+    connect(osprayRenderingToggle, SIGNAL(toggled(bool)),
+            ospraySPP, SLOT(setEnabled(bool)));
+
+    osprayAOLabel = new QLabel(tr("Ambient occlusion samples"), advancedOptions);
+    osprayAOLabel->setEnabled(false);
+    advLayout->addWidget(osprayAOLabel, row, 1, 1, 2);
+    osprayAO = new QSpinBox(advancedOptions);
+    osprayAO->setMinimum(0);
+    osprayAO->setEnabled(false);
+    connect(osprayAO, SIGNAL(valueChanged(int)),
+            this, SLOT(osprayAOChanged(int)));
+    advLayout->addWidget(osprayAO, row, 3);
+    row++;
+    connect(osprayRenderingToggle, SIGNAL(toggled(bool)),
+            osprayAOLabel, SLOT(setEnabled(bool)));
+    connect(osprayRenderingToggle, SIGNAL(toggled(bool)),
+            osprayAO, SLOT(setEnabled(bool)));
+
+    osprayShadowsToggle = new QCheckBox(tr("Shadows"), advancedOptions);
+    osprayShadowsToggle->setEnabled(false);
+    connect(osprayShadowsToggle, SIGNAL(toggled(bool)),
+            this, SLOT(osprayShadowsToggled(bool)));
+    advLayout->addWidget(osprayShadowsToggle, row, 1, 1, 2);
+    connect(osprayRenderingToggle, SIGNAL(toggled(bool)),
+            osprayShadowsToggle, SLOT(setEnabled(bool)));
+    row++;
+#endif
+
     return advancedOptions;
 }
+
 
 // ****************************************************************************
 // Method: QvisRenderingWindow::CreateInformationPage
@@ -806,6 +844,13 @@ QvisRenderingWindow::UpdateWindow(bool doAll)
 //   Eric Brugger, Tue Oct 25 12:32:40 PDT 2011
 //   Add a multi resolution display capability for AMR data.
 //
+//   Alok Hota, Mon 23 Apr 07:12:51 PM EDT 2018
+//   Added OSPRay rendering toggle
+//
+//   Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//   Modified OSPRay rendering toggle to disable other OSPRay options
+//   when it is disabled
+//
 // ****************************************************************************
 
 void
@@ -849,18 +894,6 @@ QvisRenderingWindow::UpdateOptions(bool doAll)
             objectRepresentation->button(itmp)->setChecked(true);
             objectRepresentation->blockSignals(false);
             break;
-        case RenderingAttributes::ID_displayListMode:
-            itmp = (int) renderAtts->GetDisplayListMode();
-            if (itmp == 2) // Auto for atts's enum type order
-                itmp2 = 0; // Order of Auto in window
-            else if (itmp == 1) // Always for atts' enum type order
-                itmp2 = 1; // Order of Always in window.
-            else           // Never for atts' enum type order
-                itmp2 = 2; // Order of Never in window.
-            dlMode->blockSignals(true);
-            dlMode->button(itmp2)->setChecked(true);
-            dlMode->blockSignals(false);
-            break;
         case RenderingAttributes::ID_stereoRendering:
             stereoToggle->blockSignals(true);
             stereoToggle->setChecked(renderAtts->GetStereoRendering());
@@ -876,6 +909,28 @@ QvisRenderingWindow::UpdateOptions(bool doAll)
             renderNotifyToggle->setChecked(renderAtts->GetNotifyForEachRender());
             renderNotifyToggle->blockSignals(false);
             break;
+#ifdef VISIT_OSPRAY
+        case RenderingAttributes::ID_osprayRendering:
+            osprayRenderingToggle->blockSignals(true);
+            osprayRenderingToggle->setChecked(renderAtts->GetOsprayRendering());
+            osprayRenderingToggle->blockSignals(false);
+            break;
+        case RenderingAttributes::ID_ospraySPP:
+            ospraySPP->blockSignals(true);
+            ospraySPP->setValue(int(renderAtts->GetOspraySPP()));
+            ospraySPP->blockSignals(false);
+            break;
+        case RenderingAttributes::ID_osprayAO:
+            osprayAO->blockSignals(true);
+            osprayAO->setValue(int(renderAtts->GetOsprayAO()));
+            osprayAO->blockSignals(false);
+            break;
+        case RenderingAttributes::ID_osprayShadows:
+            osprayShadowsToggle->blockSignals(true);
+            osprayShadowsToggle->setChecked(renderAtts->GetOsprayShadows());
+            osprayShadowsToggle->blockSignals(false);
+            break;
+#endif
         case RenderingAttributes::ID_scalableActivationMode:
             { // new scope
             RenderingAttributes::TriStateMode rtmp;
@@ -1608,38 +1663,6 @@ QvisRenderingWindow::objectRepresentationChanged(int val)
 }
 
 // ****************************************************************************
-// Method: QvisRenderingWindow::displayListModeChanged
-//
-// Purpose: 
-//   This Qt slot function is called when we change the display list mode.
-//
-// Arguments:
-//   mode : The new display list mode.
-//
-// Programmer: Hank Childs
-// Creation:   May 9, 2004
-//
-// Modifications:
-//   
-// ****************************************************************************
-
-void
-QvisRenderingWindow::displayListModeChanged(int mode)
-{
-    int itmp = 0;
-    if (mode == 0)      // Auto in Window
-        itmp = 2;       // Auto for atts' enum type
-    else if (mode == 1) // Always in window
-        itmp = 1;       // Always for atts' enum type
-    else                // Never in window.
-        itmp = 0;       // Never for atts' enum type
-
-    renderAtts->SetDisplayListMode((RenderingAttributes::TriStateMode)itmp);
-    SetUpdate(false);
-    Apply();
-}
-
-// ****************************************************************************
 // Method: QvisRenderingWindow::stereoToggled
 //
 // Purpose: 
@@ -2246,4 +2269,98 @@ QvisRenderingWindow::GetCurrentValues()
                        DoublesToQString(renderAtts->GetEndCuePoint(), 3));
         renderAtts->SetEndCuePoint(renderAtts->GetEndCuePoint());
     }
+}
+
+
+// ****************************************************************************
+// Method: QvisRenderingWindow::osprayRenderingToggled
+//
+// Purpose: 
+//    Triggered when ospray rendering is toggled.
+//
+// Programmer:  Garrett Morrison
+// Creation:    Wed May 16 17:42:42 PDT 2018
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+QvisRenderingWindow::osprayRenderingToggled(bool val)
+{
+    renderAtts->SetOsprayRendering(val);
+    SetUpdate(false);
+    Apply();
+}
+
+
+// ****************************************************************************
+// Method: QvisRenderingWindow::ospraySPPChanged
+//
+// Purpose: 
+//    Triggered when ospray samples per pixel are changed.
+//
+//  Arguments:
+//    val        the new value 
+//
+// Programmer:  Garrett Morrison
+// Creation:    Wed May 16 17:42:42 PDT 2018
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+QvisRenderingWindow::ospraySPPChanged(int val)
+{
+    renderAtts->SetOspraySPP(val);
+    SetUpdate(false);
+    Apply();
+}
+
+
+// ****************************************************************************
+// Method: QvisRenderingWindow::osprayAOChanged
+//
+// Purpose: 
+//    Triggered when ospray ambient occlusion samples are changed.
+//
+//  Arguments:
+//    val        the new value 
+//
+// Programmer:  Garrett Morrison
+// Creation:    Wed May 16 17:42:42 PDT 2018
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+QvisRenderingWindow::osprayAOChanged(int val)
+{
+    renderAtts->SetOsprayAO(val);
+    SetUpdate(false);
+    Apply();
+}
+
+
+// ****************************************************************************
+// Method: QvisRenderingWindow::osprayShadowsToggled
+//
+// Purpose: 
+//    Triggered when ospray shadows are toggled.
+//
+// Programmer:  Garrett Morrison
+// Creation:    Wed May 16 17:42:42 PDT 2018
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+QvisRenderingWindow::osprayShadowsToggled(bool val)
+{
+    renderAtts->SetOsprayShadows(val);
+    SetUpdate(false);
+    Apply();
 }

@@ -226,6 +226,9 @@ CreateExtentsString(const double * extents,
 //    Cyrus Harrison, Tue Sep 18 11:01:57 PDT 2007
 //    Added init of floatFormat.
 //
+//    Alister Maguire, Tue Oct  3 11:27:21 PDT 2017
+//    Added init of overrideTimeStep. 
+//
 // ****************************************************************************
 
 ViewerQueryManager::ViewerQueryManager() : ViewerBase()
@@ -252,6 +255,7 @@ ViewerQueryManager::ViewerQueryManager() : ViewerBase()
 
     suppressQueryOutput = false;
     activePlotsChanged = true;
+    overrideTimeStep = false;
     floatFormat = "%g";
 
     DDTPickCB = NULL;
@@ -1930,9 +1934,16 @@ ViewerQueryManager::ClearPickPoints()
 //    Brad Whitlock, Wed Jun 27 16:29:29 PDT 2012
 //    I fixed a small memory leak.
 //
+//    Alister Maguire, Tue Oct  3 11:27:21 PDT 2017
+//    Added in an option for overriding the time step. This is currently
+//    needed when calling a pick range over time. 
+//
+//    Alister Maguire, Thu Oct 26 16:48:04 PDT 2017
+//    When picking by label, set the pick letter to be the label. 
+//
 //    Alister Maguire, Wed May  9 09:48:44 PDT 2018
 //    After preparing for new pick, call UpdatePickAtts. Otherwise, 
-//    old attributes will carry on to new picks.
+//    old attributes will carry on to new picks. 
 //
 // ****************************************************************************
 
@@ -2085,9 +2096,18 @@ ViewerQueryManager::ComputePick(PICK_POINT_INFO *ppi, const int dom,
         //
         pickAtts->SetMatSelected(!usesAllMaterials ||
                                  plot->GetRealVarType() == AVT_MATERIAL);
+        
         if (!pickAtts->GetReusePickLetter())
-            pickAtts->SetPickLetter(designator);
-        pickAtts->SetTimeStep(plot->GetState());
+        {
+            if (pickAtts->GetElementLabel() != "") 
+                pickAtts->SetPickLetter(pickAtts->GetElementLabel()); 
+            else 
+                pickAtts->SetPickLetter(designator);
+        }
+        if (overrideTimeStep)
+            pickAtts->SetTimeStep(pickAtts->GetTimeStep());
+        else
+            pickAtts->SetTimeStep(plot->GetState());
         pickAtts->SetDatabaseName(db);
         if (win->GetWindowMode() == WINMODE_CURVE)
         {
@@ -3327,6 +3347,15 @@ ViewerQueryManager::HandlePickCache()
 //    Adding support for picking zones and nodes by label if the database
 //    supports them.
 //
+//    Alister Mguire, Tue Oct  3 11:27:21 PDT 2017
+//    Added support for retrieving the data from a pick range over time. 
+//
+//    Alister Maguire, Tue Oct 31 10:14:39 PDT 2017
+//    Added clean-up for when the element label has been set. 
+//
+//    Alister Maguire, Tue May 22 14:16:38 PDT 2018
+//    Added ability to plot range curves. 
+//
 // ****************************************************************************
 
 void
@@ -3387,6 +3416,24 @@ ViewerQueryManager::PointQuery(const MapNode &queryParams)
         debug3<<"LabelPick specified by \"element_label\" not present\n";
     }
 
+    // some parameters common to all Picks.
+    int timeCurve = 0;
+    if (queryParams.HasNumericEntry("do_time"))
+        timeCurve = queryParams.GetEntry("do_time")->ToInt();
+    timeCurve |= (pickAtts->GetDoTimeCurve() ? 1 : 0);
+
+    //
+    // If the user is trying to retrieve curves without a range, 
+    // make note of this in the debug log. 
+    //
+    if (!hasPickRange && 
+         pickAtts->GetTimeOptions().HasEntry("return_curves"))
+    {
+        debug2 << "\nUser has requested to return curves without a "
+               << "range, but this is not supported. Only pick range " 
+               << "over time currently supports return_curves.\n";
+    }
+
     if(hasPickRange)
     {
         MapNode multiOutput;
@@ -3416,31 +3463,222 @@ ViewerQueryManager::PointQuery(const MapNode &queryParams)
         intVector pickList;
         bool parseError = StringHelpers::ParseRange(range, pickList);
         const int numPicks = static_cast<int>(pickList.size());
-        for(int i = 0; i < numPicks; ++i)
-        {
 
-            MapNode singlePick(queryParams);
-            singlePick["pick_range"] = "";
-            if(hasElementLabel)
+        MapNode rangeTimeOpts = pickAtts->GetTimeOptions();
+        if (queryParams.HasEntry("time_options"))
+             rangeTimeOpts = (*queryParams.GetEntry("time_options"));
+
+        //
+        // Check if we are returning curves. This is currently only available
+        // when performing a pick range over time. 
+        //
+        bool returnCurves = false;
+        if (rangeTimeOpts.HasEntry("return_curves"))
+            returnCurves = rangeTimeOpts.GetEntry("return_curves")->ToBool();
+
+        //
+        // Under certain circumstances, we need to do the time picks 
+        // here instead of in the queryOverTimeFilter. 
+        //
+        bool showPickHighlight = pickAtts->GetShowPickHighlight();
+        bool showPickLetter    = pickAtts->GetShowPickLetter();
+        bool doTimeManually    = (returnCurves || (timeCurve && 
+                                 (showPickLetter || showPickHighlight)));
+            
+        //
+        // If we're doing time manually, we need to retrieve some time info. 
+        //
+        int origTimeStep = 0;
+        int startT = 0;
+        int endT   = 0;
+        int stride = 1;
+        if (doTimeManually)
+        {
+            //
+            // When we are performing a time curve and returning the curves, 
+            // we need to set the timestep manually. 
+            //
+            overrideTimeStep  = true;
+
+            ViewerPlotList *origList = win->GetPlotList();
+            intVector plotIDs;
+            origList->GetActivePlotIDs(plotIDs);
+            int origPlotID       = (plotIDs.size() > 0 ? plotIDs[0] : -1);
+            ViewerPlot *origPlot = origList->GetPlot(origPlotID);
+            origTimeStep     = origPlot->GetState();
+            const avtDatabaseMetaData *md = origPlot->GetMetaData();
+            int nStates          = md->GetNumStates();
+            if (nStates <= 1)
             {
+                GetViewerMessaging()->Error(
+                    TR("Cannot create a time query curve with 1 time state."));
+                return;
+            }
+
+            //
+            // We only want to highlight and show pick letter on the 
+            // original pick. So let's disable it first. 
+            //
+            if (showPickHighlight)
+                pickAtts->SetShowPickHighlight(false);
+            if (showPickLetter)
+                pickAtts->SetShowPickLetter(false);
+ 
+            //
+            // Retrieve the start time, end time, and stride.
+            // 
+            startT = 0;
+            endT   = nStates-1;
+            stride = 1;
+            if (!RetrieveTimeSteps(startT, endT, stride, nStates, rangeTimeOpts))
+                    return;
+        }
+
+        for(int curPick = 0; curPick < numPicks; ++curPick)
+        {
+            //
+            // If we're doing time manually, we need to perform 
+            // the picks individually, cache the values, and then 
+            // perform the curve. 
+            // 
+            if (doTimeManually)
+            {
+                MapNode timeCurveOutput;
+                overrideTimeStep = true;
+
+                //
+                // For the recursive calls, we want to pretend 
+                // that we're not using a time curve.
+                //
+                pickAtts->SetDoTimeCurve(false);
+    
+                std::stringstream masterKey;
+                if (hasElementLabel)
+                    masterKey<<label<<" ";
+                masterKey<<pickList[curPick]; 
+                
+                doubleVector timeCurvePts;
+                MapNode singlePick(queryParams);
+
+                for (int curT = startT; curT <= endT; curT += stride)
+                {
+                    singlePick["pick_range"] = "";
+                    singlePick["do_time"] = false;
+                    pickAtts->SetTimeStep(curT);
+
+                    if (showPickHighlight && (curT == origTimeStep))
+                    {
+                        pickAtts->SetShowPickHighlight(true);
+                        pickAtts->SetShowPickLetter(true);
+                    }
+                    else if (pickAtts->GetShowPickHighlight() ||
+                             pickAtts->GetShowPickLetter())
+                    {
+                        pickAtts->SetShowPickHighlight(false);
+                        pickAtts->SetShowPickLetter(false);
+                    }
+                   
+                    if (hasElementLabel)
+                    {
+                        std::stringstream ss;
+                        ss<<label<<" "<<pickList[curPick];
+                        singlePick["element_label"] = ss.str();
+                    }
+                    else
+                    {
+                        singlePick["element"] = pickList[curPick];
+                    }
+
+                    //
+                    // Perform the pick query. 
+                    //
+                    PointQuery(singlePick);
+
+                    //
+                    // Retrieve the variable values from our query. 
+                    //
+                    if (timeCurve)
+                    {
+                        int numVars = pickAtts->GetNumVarInfos();
+                        for (int i = 0; i < numVars; ++i)
+                        {
+                            doubleVector vals = 
+                                pickAtts->GetVarInfo(i).GetValues();
+                            timeCurvePts.push_back(vals.back());
+                        }
+                    }
+
+                    //
+                    // If the user wants the curve points, we need
+                    // to add them to the output. 
+                    //
+                    if (returnCurves)
+                    {
+                        MapNode output;
+                        pickAtts->CreateOutputMapNode(output, true);
+                        std::stringstream ss;
+                        ss<<"timestep_"<<curT;
+                        timeCurveOutput[ss.str()] = output;
+                    }
+                }
+
+                //
+                // If the user wants a curve plot, we need to send the
+                // pick cache to the queryOverTimeFilter. 
+                //
+                if (timeCurve)
+                {
+                    overrideTimeStep      = false;
+                    singlePick["do_time"] = true;
+                    pickAtts->SetDoTimeCurve(true);
+                    timeQueryAtts->SetCachedCurvePts(timeCurvePts);
+                    timeQueryAtts->SetUseCachedPts(true);
+                    timeCurvePts.clear();
+                    PointQuery(singlePick);
+                    pickAtts->SetDoTimeCurve(false);
+                }
+
+                pickAtts->SetShowPickHighlight(showPickHighlight);
+                pickAtts->SetShowPickLetter(showPickLetter);
+                overrideTimeStep = false;
+
+                if (returnCurves)
+                    multiOutput[masterKey.str()] = timeCurveOutput;
+            }
+            else 
+            {
+                MapNode singlePick(queryParams);
+                singlePick["pick_range"] = "";
+                if (timeCurve)
+                {
+                    singlePick["do_time"] = true;
+                }
+                if(hasElementLabel)
+                {
+                    std::stringstream ss;
+                    ss<<label<<" "<<pickList[curPick];
+                    singlePick["element_label"] = ss.str();
+                }
+                else
+                {
+                    singlePick["element"] = pickList[curPick];
+                }
+
+                PointQuery(singlePick);
+                MapNode output;
+                pickAtts->CreateOutputMapNode(output, true);
                 std::stringstream ss;
-                ss<<label<<" "<<pickList[i];
-                singlePick["element_label"] = ss.str();
+                if(hasElementLabel)
+                {
+                    ss<<label<<" ";
+                }
+                ss<<pickList[curPick];
+
+                if (!timeCurve)
+                {
+                    multiOutput[ss.str()] = output;
+                }
             }
-            else
-            {
-                singlePick["element"] = pickList[i];
-            }
-            PointQuery(singlePick);
-            MapNode output;
-            pickAtts->CreateOutputMapNode(output, true);
-            std::stringstream ss;
-            if(hasElementLabel)
-            {
-                ss<<label<<" ";
-            }
-            ss<<pickList[i];
-            multiOutput[ss.str()] = output;
         }
         pickAtts->SetNotifyEnabled(true);
         win->EnableUpdates();
@@ -3449,18 +3687,12 @@ ViewerQueryManager::PointQuery(const MapNode &queryParams)
         pickAtts->SetRangeOutput(multiOutput);
         pickAtts->SetFulfilled(true);
         UpdatePickAtts();
+        pickAtts->SetElementLabel("");
         return;
     }
 
-
     if (!vars.empty())
         pickAtts->SetVariables(vars);
-
-    // some parameters common to all Picks.
-    int timeCurve = 0;
-    if (queryParams.HasNumericEntry("do_time"))
-        timeCurve = queryParams.GetEntry("do_time")->ToInt();
-    timeCurve |= (pickAtts->GetDoTimeCurve() ? 1 : 0);
 
     // A query with time options should override what is set from PickWindow,
     // but then PickAtts should be reset, so save what PickAtts currently has
@@ -3672,6 +3904,8 @@ ViewerQueryManager::PointQuery(const MapNode &queryParams)
 
                 PointQuery(pointQueryParams);
             }
+            //clean-up
+            pickAtts->SetElementLabel("");
             return;
         }
         if (!vars.empty())
@@ -3723,6 +3957,7 @@ ViewerQueryManager::PointQuery(const MapNode &queryParams)
     stringVector emptyVars;
     emptyVars.push_back("default");
     pickAtts->SetVariables(emptyVars);
+    pickAtts->SetElementLabel("");
 }
 
 
@@ -4160,6 +4395,9 @@ GetUniqueVars(const stringVector &vars, const string &activeVar,
 //    Changed windowtype for Statistics queries to be Basic, as the actual
 //    code for the queries does not seem to make use of the 'ActualData' flag.
 //
+//    Brad Whitlock, Fri Sep  6 12:53:42 PDT 2013
+//    Add Grid Information query.
+//
 //    Kevin Griffin, Thu Aug 11 10:53:13 PDT 2016
 //    Added the GyRadius Query.
 //
@@ -4289,6 +4527,7 @@ ViewerQueryManager::InitializeQueryList()
     GetViewerState()->GetQueryList()->AddQuery("SpatialExtents", dq, mr, ad, 1, 0, qo);
     GetViewerState()->GetQueryList()->AddQuery("NumNodes", dq, mr, ad, 1, 0, qo);
     GetViewerState()->GetQueryList()->AddQuery("NumZones", dq, mr, ad, 1, 0, qo);
+    GetViewerState()->GetQueryList()->AddQuery("Grid Information", dq, mr, basic, 1, 0, qo);
     GetViewerState()->GetQueryList()->AddQuery("Zone Center", dq, mr, dz, 1, 0, qo);
     GetViewerState()->GetQueryList()->AddQuery("Node Coords", dq, mr, dn, 1, 0, qo);
     int TrajVars = QUERY_SCALAR_VAR;
@@ -4345,6 +4584,83 @@ ViewerQueryManager::VerifyQueryVariables(const string &qName,
         }
     }
    return badIndex;
+}
+
+
+// ****************************************************************************
+//  Method: ViewerQueryManager::RetrieveTimeSteps
+//
+//  Purpose:
+//      Retrieve the start time, stop time and stride for
+//      performing a time query. 
+//
+//  Arguments:
+//      startT       The start time for the query. 
+//      endT         The end time for the query. 
+//      stride       The stride of the time query. 
+//      nStates      The total number of time states available in the data. 
+//      timeParams   A map node containing the query input parameters. 
+//
+//  Returns:
+//      True if retrieval was successfull. False otherwise. 
+//
+//  Programmer: Alister Maguire 
+//  Creation:   Wed May 16 15:29:02 PDT 2018
+//
+//  Modifications:
+//
+// ****************************************************************************
+bool ViewerQueryManager::RetrieveTimeSteps(int &startT, 
+                                           int &endT, 
+                                           int &stride, 
+                                           int  nStates,
+                                           MapNode timeParams)
+{
+    startT = 0;
+    endT = nStates-1;
+    stride = 1;
+    if (timeParams.HasNumericEntry("start_time"))
+        startT = timeParams.GetEntry("start_time")->ToInt();
+    else if (timeQueryAtts->GetStartTimeFlag())
+        startT =  timeQueryAtts->GetStartTime();
+
+    if (timeParams.HasNumericEntry("end_time"))
+        endT = timeParams.GetEntry("end_time")->ToInt();
+    else if (timeQueryAtts->GetEndTimeFlag())
+        endT =  timeQueryAtts->GetEndTime();
+
+    if (timeParams.HasNumericEntry("stride"))
+        stride = timeParams.GetEntry("stride")->ToInt();
+    else if (timeQueryAtts->GetStrideFlag())
+        stride = timeQueryAtts->GetStride();
+    if (startT < 0)
+    {
+        GetViewerMessaging()->Warning(TR("Clamping start time to 0."));
+        startT = 0;
+    }
+    if (endT > nStates-1)
+    {
+        GetViewerMessaging()->Warning(
+            TR("Clamping end time to number of available timesteps."));
+        endT = nStates-1;
+    }
+
+    if (startT >= endT)
+    {
+        GetViewerMessaging()->Error(
+            TR("Query over time: start time must be smaller than end time"
+               " please correct and try again."));
+        return false;
+    }
+    int nUserFrames = (int) ceil(double((endT - startT)/stride))+1;
+    if (nUserFrames <= 1)
+    {
+        GetViewerMessaging()->Error(
+            TR("Query over time requires more than 1 frame, "
+               "please correct start and end times try again."));
+        return false;
+    }
+    return true;
 }
 
 
@@ -4659,6 +4975,9 @@ ViewerQueryManager::UpdateQueryOverTimeAtts()
 //    Test for missing/disabled Curve and Multi-Curve Plots,
 //    issue error message.
 //
+//    Alister Maguire, Wed May 23 09:46:54 PDT 2018
+//    Replaced retrieval of time steps with RetrieveTimeSteps(). 
+//
 // ***********************************************************************
 
 void
@@ -4819,47 +5138,9 @@ ViewerQueryManager::DoTimeQuery(ViewerWindow *origWin,
     int startT = 0;
     int endT = nStates-1;
     int stride = 1;
-    if (qParams.HasNumericEntry("start_time"))
-        startT = qParams.GetEntry("start_time")->ToInt();
-    else if (timeQueryAtts->GetStartTimeFlag())
-        startT =  timeQueryAtts->GetStartTime();
 
-    if (qParams.HasNumericEntry("end_time"))
-        endT = qParams.GetEntry("end_time")->ToInt();
-    else if (timeQueryAtts->GetEndTimeFlag())
-        endT =  timeQueryAtts->GetEndTime();
-
-    if (qParams.HasNumericEntry("stride"))
-        stride = qParams.GetEntry("stride")->ToInt();
-    else if (timeQueryAtts->GetStrideFlag())
-        stride = timeQueryAtts->GetStride();
-    if (startT < 0)
-    {
-        GetViewerMessaging()->Warning(TR("Clamping start time to 0."));
-        startT = 0;
-    }
-    if (endT > nStates-1)
-    {
-        GetViewerMessaging()->Warning(
-            TR("Clamping end time to number of available timesteps."));
-        endT = nStates-1;
-    }
-
-    if (startT >= endT)
-    {
-        GetViewerMessaging()->Error(
-            TR("Query over time: start time must be smaller than end time"
-               " please correct and try again."));
+    if (!RetrieveTimeSteps(startT, endT, stride, nStates, qParams))
         return;
-    }
-    int nUserFrames = (int) ceil(double((endT - startT)/stride))+1;
-    if (nUserFrames <= 1)
-    {
-        GetViewerMessaging()->Error(
-            TR("Query over time requires more than 1 frame, "
-               "please correct start and end times try again."));
-        return;
-    }
 
     timeQueryAtts->SetStartTime(startT);
     timeQueryAtts->SetEndTime(endT);

@@ -49,8 +49,13 @@
 #include <vtkDataSet.h>
 #include <vtkPointData.h>
 
+#include <DebugStream.h>
 #include <ExpressionException.h>
+#include <StackTimer.h>
 
+#ifdef _OPENMP
+# include <omp.h>
+#endif
 
 // ****************************************************************************
 //  Method: avtMagnitudeExpression constructor
@@ -87,6 +92,40 @@ avtMagnitudeExpression::~avtMagnitudeExpression()
     ;
 }
 
+// ****************************************************************************
+//  Method: avtMagnitudeExpression::CalculateMagnitude
+//
+//  Purpose:
+//      Do the operation over all cells/nodes quickly.
+//
+//  Arguments:
+//      vectorIn      The input vector array.
+//      scalarOut     The output scalar array.
+//      numTuples     The input number of cells/nodes.
+//
+//  Returns:      None.
+//
+//  Programmer:   Christopher Stone
+//  Creation:     April 01, 2017
+//
+//  Modifications:
+//
+// ****************************************************************************
+#ifdef _OPENMP
+template <typename ArrayType>
+static void
+ompCalculateMagnitude(const ArrayType *vectorIn, ArrayType *scalarOut, const int numTuples)
+{
+    #pragma omp parallel for
+    for (vtkIdType i = 0; i < numTuples ; ++i)
+    {
+        const vtkIdType idx = 3*i;
+        scalarOut[i] = sqrt((double)vectorIn[idx+0]*(double)vectorIn[idx+0]+
+                            (double)vectorIn[idx+1]*(double)vectorIn[idx+1]+
+                            (double)vectorIn[idx+2]*(double)vectorIn[idx+2]);
+    }
+}
+#endif
 
 // ****************************************************************************
 //  Method: avtMagnitudeExpression::DeriveVariable
@@ -162,25 +201,42 @@ avtMagnitudeExpression::DeriveVariable(vtkDataSet *in_ds, int currentDomainsInde
 
 #define COMPUTE_MAG(dtype) \
 { \
-    dtype *x   = (dtype*)vectorValues->GetVoidPointer(0); \
+    dtype *vec = (dtype*)vectorValues->GetVoidPointer(0); \
     dtype *r   = (dtype*)results->GetVoidPointer(0); \
-    for (vtkIdType i = 0, idx = 0 ; i < ntuples ; i++, idx += 3) \
+    for (vtkIdType i = 0; i < ntuples ; ++i) \
     { \
-        r[i] = sqrt((double)x[idx+0]*(double)x[idx+0]+\
-                    (double)x[idx+1]*(double)x[idx+1]+\
-                    (double)x[idx+2]*(double)x[idx+2]); \
+        const vtkIdType idx = 3*i; \
+        r[i] = sqrt((double)vec[idx+0]*(double)vec[idx+0]+\
+                    (double)vec[idx+1]*(double)vec[idx+1]+\
+                    (double)vec[idx+2]*(double)vec[idx+2]); \
     } \
-} 
+}
 
     if(vectorValues->HasStandardMemoryLayout())
     {
-        switch(vectorValues->GetDataType())
+#ifdef _OPENMP
+#pragma message("Compiling for OpenMP")
+        if (vectorValues->GetDataType() == VTK_DOUBLE || vectorValues->GetDataType() == VTK_FLOAT)
         {
-        vtkTemplateMacro(COMPUTE_MAG(VTK_TT));
+            StackTimer t1("avtMagnitudeExpression OpenMP");
+            if (vectorValues->GetDataType() == VTK_DOUBLE)
+                ompCalculateMagnitude( (double *)vectorValues->GetVoidPointer(0), (double *)results->GetVoidPointer(0), ntuples );
+            else
+                ompCalculateMagnitude( (float *)vectorValues->GetVoidPointer(0), (float *)results->GetVoidPointer(0), ntuples );
+        }
+        else
+#endif
+        {
+            StackTimer t1("avtMagnitudeExpression vtkTemplateMacro");
+            switch(vectorValues->GetDataType())
+            {
+                vtkTemplateMacro(COMPUTE_MAG(VTK_TT));
+            }
         }
     }
     else
     {
+        StackTimer t1("avtMagnitudeExpression");
         for(vtkIdType i = 0; i < ntuples ; i++)
         {
             const double *x = vectorValues->GetTuple(i);
@@ -191,4 +247,40 @@ avtMagnitudeExpression::DeriveVariable(vtkDataSet *in_ds, int currentDomainsInde
     return results;
 }
 
+// ****************************************************************************
+// Method: avtMagnitudeExpression::DeriveVariableVTKm
+//
+// Purpose:
+//   Use VTKm to compute the vector magnitude.
+//
+// Arguments:
+//   ds                  : The VTKm dataset.
+//   currentDomainsIndex : Index of this domain.
+//   activeVar           : The active input variable.
+//   outputVar           : The name of the variable to create and add to ds.
+//
+// Returns:    
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Mar  9 16:52:59 PST 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+#ifdef HAVE_LIBVTKM
+#include <vtkmExpressions.h>
+#endif
+
+void
+avtMagnitudeExpression::DeriveVariableVTKm(vtkmDataSet *ds, int currentDomainsIndex,
+    const std::string &activeVar, const std::string &outputVar)
+{
+#ifdef HAVE_LIBVTKM
+    StackTimer t0("avtMagnitudeExpression::DeriveVariableVTKm");
+    vtkmMagnitudeExpression(ds, currentDomainsIndex, activeVar, outputVar);
+#endif
+}
 

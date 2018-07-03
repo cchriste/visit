@@ -5,15 +5,15 @@
     </CXXFLAGS>
     <Files components="V">
       avtCurveFilter.C
-      avtCurveRenderer.C
-      avtOpenGLCurveRenderer.C
+      avtCurveMapper.C
       avtPolarToCartesianFilter.C
+      vtkCurveMapper.C
     </Files>
     <Files components="E">
       avtCurveFilter.C
-      avtCurveRenderer.C
-      avtOpenGLCurveRenderer.C
+      avtCurveMapper.C
       avtPolarToCartesianFilter.C
+      vtkCurveMapper.C
     </Files>
     <Attribute name="CurveAttributes" purpose="Attributes for the xy plot" persistent="true" keyframe="true" exportAPI="" exportInclude="" codefile="CurveAttributes.code">
       <Enum name="CurveColor">
@@ -49,9 +49,6 @@
       </Enum>
       <Field name="showLines" label="showLines" type="bool">
         true
-      </Field>
-      <Field name="lineStyle" label="Line Style" type="linestyle" enabler="showLines:true">
-        0
       </Field>
       <Field name="lineWidth" label="Line Width" type="linewidth" enabler="showLines:true">
         0
@@ -160,6 +157,12 @@
       <Function name="CurveViewerEnginePluginInfo::SetColor" user="true" member="true" access="private">
       </Function>
       <Function name="CurveViewerEnginePluginInfo::PermitsCurveViewScaling" user="false" member="true">
+      </Function>
+      <Function name="CurveViewerEnginePluginInfo::SupportsAnimation" user="false" member="true">
+      </Function>
+      <Function name="CurveViewerEnginePluginInfo::AnimationReset" user="false" member="true">
+      </Function>
+      <Function name="CurveViewerEnginePluginInfo::AnimationStep" user="false" member="true">
       </Function>
       <Include file="source" quoted="false">
         Line.h

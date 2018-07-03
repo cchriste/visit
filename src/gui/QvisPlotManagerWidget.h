@@ -238,6 +238,9 @@ typedef std::vector<PluginEntry> PluginEntryVector;
 //   Brad Whitlock, Fri Jul 23 15:23:49 PDT 2010
 //   I made the widget observe the selection list.
 //
+//   Brad Whitlock, Fri Sep 13 12:29:07 PDT 2013
+//   Add animateThisPlot method.
+//
 //   Mark C. Miller, Tue May  8 18:35:59 PDT 2018
 //   Adjust default values for destroyMenuItems and forceUpdate in calls
 //   where they are used to match old logic.
@@ -306,6 +309,7 @@ private slots:
     void cloneThisPlot();
     void redrawThisPlot();
     void followTimeSliderThisPlot(bool);
+    void animateThisPlot(bool val);
     void setActivePlot();
 
     void setActivePlots();
@@ -329,8 +333,8 @@ private slots:
     void addPlotHelper(int plotType, const QString &varName);
     void operatorAction(QAction *);
 
-    void applyWindowChanged(int val);;
-    void applyOperatorToggled(bool val);;
+    void applyWindowChanged(int val);
+    void applyOperatorToggled(bool val);
     void applySelectionToggled(bool val);
 private:
     bool                    sourceVisible;

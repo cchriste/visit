@@ -41,6 +41,9 @@
 #include "SimV2Tracing.h"
 #include "DeclareDataCallbacks.h"
 #include "SimUI.h"
+#include "VisIt_View2D.h"
+#include "VisIt_View3D.h"
+#include "VisIt_NameList.h"
 
 #ifdef _WIN32
 #if _MSC_VER < 1600
@@ -71,6 +74,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -237,6 +241,7 @@ typedef struct
     int   (*draw_plots)(void *);
     int   (*delete_active_plots)(void *);
     int   (*set_active_plots)(void *, const int *, int);
+    int   (*change_plot_var)(void *, const char *, int);
 
     int   (*set_plot_options)(void *, const char *, int, void *, int);
     int   (*set_operator_options)(void *, const char *, int, void *, int);
@@ -244,6 +249,11 @@ typedef struct
 
     int   (*exportdatabase_with_options)(void *, const char *, const char *, visit_handle, visit_handle);
     int   (*restoresession)(void *, const char *);
+
+    int   (*set_view2D)(void *, visit_handle);
+    int   (*get_view2D)(void *, visit_handle);
+    int   (*set_view3D)(void *, visit_handle);
+    int   (*get_view3D)(void *, visit_handle);
 } control_callback_t;
 
 #define STRUCT_MEMBER(F, FR, FA)  void (*set_##F)(FR (*) FA, void*);
@@ -2116,12 +2126,19 @@ static int LoadVisItLibrary(void)
         CONTROL_DLSYM_OPTIONAL(draw_plots,           int,    (void *));
         CONTROL_DLSYM_OPTIONAL(delete_active_plots,  int,    (void *));
         CONTROL_DLSYM_OPTIONAL(set_active_plots,     int,    (void *, const int *, int));
+        CONTROL_DLSYM_OPTIONAL(change_plot_var,      int,    (void *, const char *, int));
+
         CONTROL_DLSYM_OPTIONAL(set_plot_options,     int,    (void *, const char *, int, void *, int));
         CONTROL_DLSYM_OPTIONAL(set_operator_options, int,    (void *, const char *, int, void *, int));
 
         CONTROL_DLSYM_OPTIONAL(initialize_batch,     int,    (void *, int, char **));
         CONTROL_DLSYM_OPTIONAL(exportdatabase_with_options, int, (void *, const char *, const char *, visit_handle, visit_handle));
         CONTROL_DLSYM_OPTIONAL(restoresession,       int,    (void *, const char *));
+
+        CONTROL_DLSYM_OPTIONAL(set_view2D,           int,    (void *, visit_handle));
+        CONTROL_DLSYM_OPTIONAL(get_view2D,           int,    (void *, visit_handle));
+        CONTROL_DLSYM_OPTIONAL(set_view3D,           int,    (void *, visit_handle));
+        CONTROL_DLSYM_OPTIONAL(get_view3D,           int,    (void *, visit_handle));
 
         /* Get the data functions from the library. */
         DECLARE_DATA_CALLBACKS(DATA_DLSYM)
@@ -4504,6 +4521,44 @@ VisItSetActivePlots(const int *ids, int nids)
 
 /******************************************************************************
 *
+* Name: VisItChangePlotVar
+*
+* Purpose: Changes the plot variables.
+*
+* Programmer: Brad Whitlock
+* Date:       Thu Dec 14 14:43:29 PST 2017
+*
+* Modifications:
+*
+******************************************************************************/
+
+int
+VisItChangePlotVar(const char *var, int all)
+{
+    int retval = VISIT_ERROR;
+
+    LIBSIM_API_ENTER(VisItChangePlotVar);
+
+    if(var == NULL)
+    {
+        LIBSIM_API_LEAVE0(VisItChangePlotVar,
+                         "VisItChangePlotVar: NULL was passed for the variable.");
+        return VISIT_ERROR;
+    }
+
+    /* Make sure the function exists before using it. */
+    if (engine && callbacks != NULL && callbacks->control.change_plot_var)
+    {
+        LIBSIM_MESSAGE("  Calling simv2_change_plot_var");
+        retval = (*callbacks->control.change_plot_var)(engine, var, all);
+    }
+
+    LIBSIM_API_LEAVE1(VisItChangePlotVar, "return %s", ErrorToString(retval))
+    return retval;
+}
+
+/******************************************************************************
+*
 * Name: VisItSetPlotOptions*
 *
 * Purpose: Sets the operator options for the active operator.
@@ -4659,4 +4714,815 @@ VisItRestoreSession(const char *filename)
     }
     LIBSIM_API_LEAVE1(VisItRestoreSession, "return %s", ErrorToString(retval))
     return retval;
+}
+
+/******************************************************************************
+*
+* Name: VisItSetView2D
+*
+* Purpose: Set the 2D view.
+*
+* Programmer: Brad Whitlock
+* Date:       Thu Jun  1 15:54:47 PDT 2017
+*
+* Modifications:
+*
+******************************************************************************/
+
+int
+VisItSetView2D(visit_handle v)
+{
+    int retval = VISIT_ERROR;
+
+    LIBSIM_API_ENTER(VisItSetView2D);
+    /* Make sure the function exists before using it. */
+    if (engine && callbacks != NULL && callbacks->control.set_view2D)
+    {
+        LIBSIM_MESSAGE("  Calling simv2_set_view2D");
+        retval = (*callbacks->control.set_view2D)(engine, v);
+    }
+    LIBSIM_API_LEAVE1(VisItSetView2D, "return %s", ErrorToString(retval))
+    return retval;
+}
+
+/******************************************************************************
+*
+* Name: VisItGetView2D
+*
+* Purpose: Get the 2D view.
+*
+* Programmer: Brad Whitlock
+* Date:       Thu Jun  1 15:54:47 PDT 2017
+*
+* Modifications:
+*
+******************************************************************************/
+
+int
+VisItGetView2D(visit_handle v)
+{
+    int retval = VISIT_ERROR;
+
+    LIBSIM_API_ENTER(VisItGetView2D);
+    /* Make sure the function exists before using it. */
+    if (engine && callbacks != NULL && callbacks->control.get_view2D)
+    {
+        LIBSIM_MESSAGE("  Calling simv2_get_view2D");
+        retval = (*callbacks->control.get_view2D)(engine, v);
+    }
+    LIBSIM_API_LEAVE1(VisItGetView2D, "return %s", ErrorToString(retval))
+    return retval;
+}
+
+/******************************************************************************
+*
+* Name: VisItSetView3D
+*
+* Purpose: Set the 3D view.
+*
+* Programmer: Brad Whitlock
+* Date:       Thu Jun  1 15:54:47 PDT 2017
+*
+* Modifications:
+*
+******************************************************************************/
+
+int
+VisItSetView3D(visit_handle v)
+{
+    int retval = VISIT_ERROR;
+
+    LIBSIM_API_ENTER(VisItSetView3D);
+    /* Make sure the function exists before using it. */
+    if (engine && callbacks != NULL && callbacks->control.set_view3D)
+    {
+        LIBSIM_MESSAGE("  Calling simv2_set_view3D");
+        retval = (*callbacks->control.set_view3D)(engine, v);
+    }
+    LIBSIM_API_LEAVE1(VisItSetView3D, "return %s", ErrorToString(retval))
+    return retval;
+}
+
+/******************************************************************************
+*
+* Name: VisItGetView3D
+*
+* Purpose: Get the 3D view.
+*
+* Programmer: Brad Whitlock
+* Date:       Thu Jun  1 15:54:47 PDT 2017
+*
+* Modifications:
+*
+******************************************************************************/
+
+int
+VisItGetView3D(visit_handle v)
+{
+    int retval = VISIT_ERROR;
+
+    LIBSIM_API_ENTER(VisItGetView3D);
+    /* Make sure the function exists before using it. */
+    if (engine && callbacks != NULL && callbacks->control.get_view3D)
+    {
+        LIBSIM_MESSAGE("  Calling simv2_get_view3D");
+        retval = (*callbacks->control.get_view3D)(engine, v);
+    }
+    LIBSIM_API_LEAVE1(VisItGetView3D, "return %s", ErrorToString(retval))
+    return retval;
+}
+
+/******************************************************************************
+*
+* Name: VisItSaveCinema
+*
+* Purpose: Save a Cinema database.
+*
+* Programmer: Brad Whitlock
+* Date:       Thu Jun  1 15:54:47 PDT 2017
+*
+* Modifications:
+*
+******************************************************************************/
+static void spherical_to_cartesian(double p[3], double theta, double phi)
+{
+    p[0] = cos(theta) * cos(phi);
+    p[1] = sin(theta);
+    p[2] = cos(theta) * sin(phi);
+}
+
+static int ideg(double rad)
+{
+    return (int)((360. * rad) / (2. * M_PI));
+}
+
+typedef struct
+{
+    visit_handle h;
+    char *file_cdb;
+    int spec;
+    int composite;
+    int imgFormat;
+    int width;
+    int height;
+    int cameraType;
+    int nphi;
+    int ntheta;
+    visit_handle varnames;
+
+    double *phi;
+    double *theta;
+    double *times;
+    int     times_n;
+    int     times_size;
+} cinema_t;
+
+void
+cinema_t_create(cinema_t *obj)
+{
+    obj->h = VISIT_INVALID_HANDLE;
+    obj->file_cdb = strdup("visit.cdb");
+    obj->spec = VISIT_CINEMA_SPEC_A;
+    obj->composite = 0;
+    obj->width = 600;
+    obj->height = 600;
+    obj->imgFormat = VISIT_IMAGEFORMAT_PNG;
+    obj->cameraType = VISIT_CINEMA_CAMERA_PHI_THETA;
+    obj->nphi = 12;
+    obj->ntheta = 7;
+    obj->varnames = VISIT_INVALID_HANDLE;
+
+    obj->phi = NULL;
+    obj->theta = NULL;
+    obj->times_n = 0;
+    obj->times_size = 1000;
+    obj->times = (double *)malloc(obj->times_size * sizeof(double));
+}
+
+void
+cinema_t_destroy(cinema_t *obj)
+{
+    if(obj == NULL)
+        return;
+    if(obj->file_cdb != NULL)
+    {
+        free(obj->file_cdb);
+        obj->file_cdb = NULL;
+    }
+    if(obj->phi != NULL)
+    {
+        free(obj->phi);
+        obj->phi = NULL;
+    }
+    if(obj->theta != NULL)
+    {
+        free(obj->theta);
+        obj->theta = NULL;
+    }
+    if(obj->times != NULL)
+    {
+        obj->times_n = 0;
+        free(obj->times);
+        obj->times = NULL;
+    }
+}
+
+void
+cinema_t_addtime(cinema_t *obj, double t)
+{
+    if(obj->times_n+1 >= obj->times_size)
+    {
+        obj->times_size += 1000;
+        obj->times = (double *)realloc(obj->times, obj->times_size * sizeof(double));
+    }
+    obj->times[obj->times_n++] = t;
+}
+
+void
+cinema_t_compute_phi_theta(cinema_t *obj)
+{
+    int itheta, iphi;
+    double tt, tp;
+    obj->theta = (double *)malloc(obj->ntheta * sizeof(double));
+    obj->phi   = (double *)malloc(obj->nphi * sizeof(double));
+    for(itheta = 0; itheta < obj->ntheta; ++itheta)
+    {
+        if(obj->ntheta > 1)
+            tt = (float)(itheta) / (float)(obj->ntheta-1);
+        else
+            tt = 0.;
+        obj->theta[itheta] = ((1.-tt) * -M_PI/2.) + (tt*M_PI/2.);
+    }
+    for(iphi = 0; iphi < obj->nphi; ++iphi)
+    {
+        if(obj->nphi > 1)
+            tp = (float)(iphi) / (float)(obj->nphi-1);
+        else
+            tp = 0.;
+        obj->phi[iphi] = ((1.-tp) * -M_PI) + (tp*M_PI);
+    }
+}
+
+static cinema_t *cinema_map = NULL;
+static int       cinema_map_n = 0;
+static int       cinema_map_size = 0;
+static int       cinema_map_id = 0;
+static const char *cinema_ext[] = {".bmp", ".jpeg", ".png", ".povray", ".ppm", ".rgb", ".tiff", ".exr"};
+
+cinema_t *cinema_create(const char *file_cdb)
+{
+    if(cinema_map == NULL)
+    {
+        cinema_map_size = 10;
+        cinema_map_n = 1;
+        cinema_map = (cinema_t *)malloc(cinema_map_size * sizeof(cinema_t));
+
+        cinema_t_create(&cinema_map[0]);
+        free(cinema_map[0].file_cdb);
+        cinema_map[0].file_cdb = strdup(file_cdb);
+        cinema_map[0].h = cinema_map_id++;
+
+        return cinema_map;
+    }
+    else
+    {
+        int i;
+        for(i = 0; i < cinema_map_n; ++i)
+        {
+            if(strcmp(cinema_map[i].file_cdb, file_cdb) == 0)
+                return &cinema_map[i];
+        }
+        if(cinema_map_n+1 >= cinema_map_size)
+        {
+            cinema_map_size += 10;
+            cinema_map = (cinema_t*)realloc(cinema_map, cinema_map_size*sizeof(cinema_t));
+        }
+
+        cinema_t_create(&cinema_map[cinema_map_n]);
+        free(cinema_map[cinema_map_n].file_cdb);
+        cinema_map[cinema_map_n].file_cdb = strdup(file_cdb);
+        cinema_map[cinema_map_n].h = cinema_map_id++;
+
+        return &cinema_map[cinema_map_n++];
+    }
+}
+
+int cinema_destroy(visit_handle h)
+{
+    int i, j;
+    for(i = 0; i < cinema_map_n; ++i)
+    {
+        if(h == cinema_map[i].h)
+        {
+            cinema_t_destroy(&cinema_map[i]);
+            for(j = i; j < cinema_map_n-1; ++j)
+                memcpy(&cinema_map[j], &cinema_map[j+1], sizeof(cinema_t));
+            cinema_map_n--;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+cinema_t *cinema_get(visit_handle h)
+{
+    if(cinema_map != NULL)
+    {
+        int i;
+        for(i = 0; i < cinema_map_n; ++i)
+        {
+            if(cinema_map[i].h == h)
+                return &cinema_map[i];
+        }
+    }
+    return NULL;
+}
+
+int
+dir_join_size(char **dirnames, int ndirnames)
+{
+    int i, len = 0;
+    for(i = 0; i < ndirnames; ++i)
+    {
+       size_t s = strlen(dirnames[i]);
+       if(s < 100) /* pad the size in case the dirnames change size a little. */
+           s = 100;
+       len += s + 2;
+    }
+    return len;
+}
+
+int
+dir_exists(const char *dirname)
+{
+    struct stat s;
+    return (stat(dirname, &s) == 0) ? 1 : 0;
+}
+
+int
+dir_create(char **dirnames, int ndirnames)
+{
+    int len;
+    char *joinname;
+    if(parallelRank == 0)
+    {
+        len = dir_join_size(dirnames, ndirnames);
+        joinname = (char *)malloc(len * sizeof(char));
+        if(joinname != NULL)
+        {
+            int i, len = 0;
+            for(i = 0; i < ndirnames; ++i)
+            {
+                len += sprintf(joinname+len, "%s/", dirnames[i]);
+
+                if(!dir_exists(joinname))
+                {
+                    VisItMkdir(joinname, 7*64 + 7*8 + 7);
+                }
+            }
+
+            free(joinname);
+        }
+    }
+
+    return 1;
+}
+
+void
+dir_join(char *joinname, char **dirnames, int ndirnames)
+{
+    int i, len = 0;
+    for(i = 0; i < ndirnames; ++i)
+    {
+        len += sprintf(joinname+len, "%s/", dirnames[i]);
+    }
+}
+
+int
+cinema_t_hasvars(cinema_t *obj, int *nvars)
+{
+    int changevars = 0;
+    if(obj == NULL)
+    {
+        *nvars = 0;
+        return 0;
+    }
+
+    if(obj == NULL)
+        *nvars = 0;
+    else if(obj->varnames == VISIT_INVALID_HANDLE)
+    {
+        *nvars = 1;
+    }
+    else
+    {
+        if(VisIt_NameList_getNumName(obj->varnames, nvars) == VISIT_OKAY)
+        {
+            if(*nvars < 1)
+                *nvars = 1;
+            else
+                changevars = 1;
+        }
+    }
+    return changevars;
+}
+
+int
+cinema_t_static_image(cinema_t *obj)
+{
+    FILE *f = NULL;
+    int ret = VISIT_ERROR;
+    char filebase[1024], *path = NULL;
+    char *dirnames[2];
+    dirnames[0] = obj->file_cdb;
+    dirnames[1] = "image";
+
+    if(dir_create(dirnames, 2))
+    {
+        int i, nvars, changevars, len;
+
+        len = dir_join_size(dirnames, 2) + 1024;
+        path = (char *)malloc(len * sizeof(char));
+
+        /* Determine whether we have variables to switch. */
+        changevars = cinema_t_hasvars(obj, &nvars);
+
+        /* Loop through the variables. */
+        for(i = 0; i < nvars; ++i)
+        {
+            if(changevars)
+            {
+                char *var = NULL;
+                if(VisIt_NameList_getName(obj->varnames, i, &var) == VISIT_OKAY)
+                {
+                    VisItChangePlotVar(var, 1);
+                    sprintf(filebase, "%s_%1.6e", var, obj->times[obj->times_n-1]);
+                    free(var);
+                }
+            }
+            else
+            {
+                sprintf(filebase, "time_%1.6e", obj->times[obj->times_n-1]);
+            }
+
+            /* Make the image filename and save. */
+            dir_join(path, dirnames, 2);
+            strcat(path, filebase);
+            strcat(path, cinema_ext[obj->imgFormat]);
+ 
+            ret = VisItSaveWindow(path, obj->width, obj->height, obj->imgFormat);
+        }
+
+        /* Make the info.json filename. */
+        dir_join(path, dirnames, 2);
+        strcat(path, "info.json");
+        if((f = fopen(path, "wt")) != NULL)
+        {
+            fprintf(f, "{\n");
+            fprintf(f, "  \"type\" : \"simple\",\n");
+            fprintf(f, "  \"version\": \"1.1\",\n");
+            fprintf(f, "  \"metadata\":{\"type\":\"parametric-image-stack\"},\n");
+            if(changevars)
+                fprintf(f, "  \"name_pattern\":\"{var}_{time}%s\",\n", cinema_ext[obj->imgFormat]);
+            else
+                fprintf(f, "  \"name_pattern\":\"time_{time}%s\",\n", cinema_ext[obj->imgFormat]);
+            fprintf(f, "  \"arguments\":{\n");
+            if(changevars)
+            {
+                fprintf(f, "    \"var\": {\n");
+                fprintf(f, "       \"label\":\"Variable\",\n");
+                fprintf(f, "       \"type\":\"range\",\n");
+                fprintf(f, "       \"values\":[");
+                for(i = 0; i < nvars; ++i)
+                {
+                    char *var = NULL;
+                    VisIt_NameList_getName(obj->varnames, i, &var);
+                    fprintf(f, "\"%s\"", (var == NULL) ? "" : var);
+                    if(i < nvars-1)
+                        fprintf(f, ", ");
+                    if(var != NULL)
+                        free(var);
+                }
+                fprintf(f, "]\n");
+                fprintf(f, "    },\n");
+            }
+            fprintf(f, "    \"time\": {\n");
+            fprintf(f, "       \"default\":\"%1.6e\",\n", obj->times[0]);
+            fprintf(f, "       \"label\":\"Time\",\n");
+            fprintf(f, "       \"type\":\"range\",\n");
+            fprintf(f, "       \"values\":[");
+            for(i = 0; i < obj->times_n; ++i)
+            {
+                fprintf(f, "\"%1.6e\"", obj->times[i]);
+                if(i < obj->times_n-1)
+                    fprintf(f, ", ");
+            }
+            fprintf(f, "]\n");
+            fprintf(f, "    }\n");
+            fprintf(f, "  }\n");
+            fprintf(f, "}\n");
+            fclose(f);
+            ret = VISIT_OKAY;
+        }
+    }
+
+    return ret;
+}
+
+int
+cinema_t_static_composite(cinema_t *obj)
+{
+    fprintf(stderr, "cinema_t_static_composite: not implemented");
+    return VISIT_ERROR;
+}
+
+int
+cinema_t_phitheta_image(cinema_t *obj)
+{
+    FILE *f = NULL;
+    char timedir[100], phidir[100], thetadir[100], *path = NULL;
+    char *dirnames[5];
+    double pOffset, normal[3], up[3];
+    int i, itheta, iphi, changevars, nvars, ret = VISIT_ERROR;
+    visit_handle origview, view;
+
+    sprintf(timedir, "time_%1.6e", obj->times[obj->times_n-1]);
+    dirnames[0] = obj->file_cdb;
+    dirnames[1] = "image";
+    dirnames[2] = timedir;
+    dirnames[3] = phidir;
+    dirnames[4] = thetadir;
+
+    /* Get the camera. */
+    VisIt_View3D_alloc(&origview);
+    VisIt_View3D_alloc(&view);
+    VisItGetView3D(origview);
+
+    /* Determine whether we have variables to switch. */
+    changevars = cinema_t_hasvars(obj, &nvars);
+
+    /* Loop through the variables. */
+    for(i = 0; i < nvars; ++i)
+    {
+        if(changevars)
+        {
+            char *var = NULL;
+            if(VisIt_NameList_getName(obj->varnames, i, &var) == VISIT_OKAY)
+            {
+                VisItChangePlotVar(var, 1);
+                free(var);
+            }
+        }
+
+        /* Vary the camera and save images. */
+        for(itheta = 0; itheta < obj->ntheta; ++itheta)
+        {
+            sprintf(thetadir, "theta_%d", ideg(obj->theta[itheta]));
+            for(iphi = 0; iphi < obj->nphi; ++iphi)
+            {
+                sprintf(phidir, "phi_%d", ideg(obj->phi[iphi]));
+
+                if(path == NULL)
+                {
+                    int len = dir_join_size(dirnames, 5) + 1024;
+                    path = (char *)malloc(len * sizeof(char));
+                }
+
+                /* Compensate to match PV.*/
+                pOffset = -M_PI/2.;
+
+                /* Change the view.*/
+                spherical_to_cartesian(normal, obj->theta[itheta], obj->phi[iphi] + pOffset);
+                spherical_to_cartesian(up,     obj->theta[itheta]+M_PI/4., obj->phi[iphi] + pOffset);
+
+#if 0
+                printf("theta=%lg, phi=%lg, normal={%lg,%lg,%lg}, up={%lg,%lg,%lg}\n",
+                    theta[itheta], phi[iphi], normal[0], normal[1], normal[2],
+                    up[0], up[1], up[2]);
+#endif
+                /* Override the normal and up vectors. */
+                VisIt_View3D_copy(view, origview);
+                VisIt_View3D_setViewNormal(view, normal);
+                VisIt_View3D_setViewUp(view, up);               
+                VisItSetView3D(view);
+
+                /* Create the output directories. */
+                dir_create(dirnames, 5);
+
+                /* Make the filename. */
+                dir_join(path, dirnames, 5);
+                if(changevars)
+                {
+                    char *var = NULL;
+                    if(VisIt_NameList_getName(obj->varnames, i, &var) == VISIT_OKAY)
+                    {
+                        strcat(path, var);
+                        free(var);
+                    }
+                    else
+                        strcat(path, "image");
+                }
+                else
+                {
+                    strcat(path, "image");
+                }
+                strcat(path, cinema_ext[obj->imgFormat]);
+
+                /* Save the image*/
+                ret = VisItSaveWindow(path, obj->width, obj->height, obj->imgFormat);
+            }
+        }
+    }
+
+    VisIt_View3D_free(view);
+    VisIt_View3D_free(origview);
+
+    /* Make the Cinema database. */
+    if(parallelRank == 0)
+    {
+        dir_join(path, dirnames, 2);
+        if(obj->spec == VISIT_CINEMA_SPEC_A)
+        {
+            strcat(path, "info.json");
+            if((f = fopen(path, "wt")) != NULL)
+            {
+                fprintf(f, "{\n");
+                fprintf(f, "  \"type\" : \"simple\",\n");
+                fprintf(f, "  \"version\" : \"1.1\",\n");
+                fprintf(f, "  \"metadata\": {\n");
+                fprintf(f, "    \"type\": \"parametric-image-stack\"\n");
+                fprintf(f, "  },\n");
+                if(changevars)               
+                    fprintf(f, "  \"name_pattern\": \"time_{time}/phi_{phi}/theta_{theta}/{var}%s\",\n", cinema_ext[obj->imgFormat]);
+                else
+                    fprintf(f, "  \"name_pattern\": \"time_{time}/phi_{phi}/theta_{theta}/image%s\",\n", cinema_ext[obj->imgFormat]);
+                fprintf(f, "  \"arguments\": {\n");
+
+                fprintf(f, "    \"time\": {");
+                fprintf(f, "\"default\":\"%1.6e\",", obj->times[0]);
+                fprintf(f, " \"label\":\"Time\",");
+                fprintf(f, " \"type\":\"range\",");
+                fprintf(f, " \"values\":[");
+                for(i = 0; i < obj->times_n; ++i)
+                {
+                    fprintf(f, "\"%1.6e\"", obj->times[i]);
+                    if(i < obj->times_n-1)
+                        fprintf(f, ", ");
+                }
+                fprintf(f, "]},\n");
+
+                fprintf(f, "    \"theta\": {\"default\":%d, \"label\":\"theta\", \"type\":\"range\", \"values\":[", ideg(obj->theta[obj->ntheta/2]));
+                for(i = 0; i < obj->ntheta; ++i)
+                {
+                    fprintf(f, "%d", ideg(obj->theta[i]));
+                    if(i < obj->ntheta-1)
+                        fprintf(f, ",");
+                }
+                fprintf(f, "]},\n");
+
+                fprintf(f, "    \"phi\": {\"default\":%d, \"label\":\"phi\", \"type\":\"range\", \"values\":[", ideg(obj->phi[0]));
+                for(i = 0; i < obj->nphi; ++i)
+                {
+                    fprintf(f, "%d", ideg(obj->phi[i]));
+                    if(i < obj->nphi-1)
+                        fprintf(f, ",");
+                }
+                fprintf(f, "]}\n");
+
+                if(changevars)
+                {
+                    fprintf(f, "    ,\"var\": {");
+                    fprintf(f, "\"label\":\"Variable\",");
+                    fprintf(f, " \"type\":\"range\",");
+                    fprintf(f, " \"values\":[");
+                    for(i = 0; i < nvars; ++i)
+                    {
+                        char *var = NULL;
+                        VisIt_NameList_getName(obj->varnames, i, &var);
+                        fprintf(f, "\"%s\"", (var == NULL) ? "" : var);
+                        if(i < nvars-1)
+                            fprintf(f, ", ");
+                        if(var != NULL)
+                            free(var);
+                    }
+                    fprintf(f, "]");
+                    fprintf(f, "}\n");
+                }
+
+                fprintf(f, "  }\n");
+                fprintf(f, "}\n");
+                fclose(f);
+            }
+        }
+    }
+
+    free(path);
+
+    LIBSIM_API_LEAVE1(VisItSaveCinema, "return %s", ErrorToString(ret));
+    return ret;
+}
+
+int
+cinema_t_phitheta_composite(cinema_t *obj)
+{
+    fprintf(stderr, "cinema_t_phitheta_composite: not implemented");
+    return VISIT_ERROR;
+}
+
+visit_handle
+VisItBeginCinema(visit_handle *h,
+    const char *file_cdb, int dbspec, int composite,
+    int imgFormat, int width, int height, 
+    int cameraType, int nphi, int ntheta,
+    visit_handle varnames)
+{
+    int ret = VISIT_ERROR;
+    cinema_t *obj = NULL;
+    LIBSIM_API_ENTER(VisItBeginCinema);
+    if((file_cdb != NULL) &&
+       (composite == 0 || (composite == 1 && dbspec == VISIT_CINEMA_SPEC_C)) &&
+       (width > 0 && height > 0) &&
+       (imgFormat == VISIT_IMAGEFORMAT_BMP || imgFormat == VISIT_IMAGEFORMAT_JPEG || imgFormat == VISIT_IMAGEFORMAT_PNG || imgFormat == VISIT_IMAGEFORMAT_TIFF) &&
+       (cameraType == VISIT_CINEMA_CAMERA_STATIC || cameraType == VISIT_CINEMA_CAMERA_PHI_THETA) &&
+       (nphi > 0 && ntheta > 0)
+      )
+    {
+        if(dbspec == VISIT_CINEMA_SPEC_C) /* For now */
+        {
+            fprintf(stderr, "VisItBeginCinema does not yet support spec C.\n");
+        }
+        else if(dbspec == VISIT_CINEMA_SPEC_D)
+        {
+            fprintf(stderr, "VisItBeginCinema does not yet support spec D.\n");
+        }
+        else if(dbspec == VISIT_CINEMA_SPEC_A)
+        {
+            obj = cinema_create(file_cdb);
+            if(obj != NULL)
+            {
+                *h = obj->h;
+
+                obj->spec = dbspec;
+                obj->composite = composite;
+                obj->imgFormat = imgFormat;
+                obj->width = width;
+                obj->height = height;
+                obj->cameraType = cameraType;
+                obj->nphi = nphi;
+                obj->ntheta = ntheta;
+                obj->varnames = varnames;
+                cinema_t_compute_phi_theta(obj);
+            }
+        }
+    }
+
+    /* Create the containing directory ? */
+
+    ret = (obj != NULL) ? VISIT_OKAY : VISIT_ERROR;
+    LIBSIM_API_LEAVE1(VisItBeginCinema, "return %s", ErrorToString(ret));
+    return ret;
+}
+
+int
+VisItSaveCinema(visit_handle h, double time)
+{
+    int ret = VISIT_ERROR;
+    LIBSIM_API_ENTER(VisItSaveCinema);
+
+    /* Make sure the function exists before using it. */
+    if (engine && callbacks != NULL && callbacks->control.save_window)
+    {
+        cinema_t *obj = cinema_get(h);
+        if(obj != NULL)
+        {
+            cinema_t_addtime(obj, time);
+            if(obj->composite)
+            {
+                if(obj->cameraType == VISIT_CINEMA_CAMERA_STATIC)
+                    ret = cinema_t_static_composite(obj);
+                else if(obj->cameraType == VISIT_CINEMA_CAMERA_PHI_THETA)
+                    ret = cinema_t_phitheta_composite(obj);
+            }
+            else
+            {
+                if(obj->cameraType == VISIT_CINEMA_CAMERA_STATIC)
+                    ret = cinema_t_static_image(obj);
+                else if(obj->cameraType == VISIT_CINEMA_CAMERA_PHI_THETA)
+                    ret = cinema_t_phitheta_image(obj);
+            }
+        }
+    }
+    LIBSIM_API_LEAVE1(VisItSaveCinema, "return %s", ErrorToString(ret));
+    return ret;
+}
+
+int
+VisItEndCinema(visit_handle h)
+{
+    int ret = VISIT_ERROR;
+    LIBSIM_API_ENTER(VisItEndCinema);
+    /* We can remove a cinema object. */
+    ret = cinema_destroy(h) ? VISIT_OKAY : VISIT_ERROR;
+    LIBSIM_API_LEAVE1(VisItSaveCinema, "return %s", ErrorToString(ret));
+    return ret;
 }

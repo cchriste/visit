@@ -238,6 +238,7 @@ ViewerFactory::SetActionManagerLogic(ViewerActionManager *mgr, ViewerWindow *win
     mgr->SetLogic(ViewerRPC::ClearCacheForAllEnginesRPC,    new ClearCacheForAllEnginesAction(win));
     mgr->SetLogic(ViewerRPC::ClearCacheRPC,                 new ClearCacheAction(win));
     mgr->SetLogic(ViewerRPC::ClearPickPointsRPC,            new ClearPickPointsAction(win));
+    mgr->SetLogic(ViewerRPC::RemovePicksRPC,                new RemovePicksAction(win));
     mgr->SetLogic(ViewerRPC::ClearRefLinesRPC,              new ClearReferenceLinesAction(win));
     mgr->SetLogic(ViewerRPC::ClearViewKeyframesRPC,         new ClearViewKeyframesAction(win));
     mgr->SetLogic(ViewerRPC::ClearWindowRPC,                new ClearWindowAction(win));
@@ -389,6 +390,8 @@ ViewerFactory::SetActionManagerLogic(ViewerActionManager *mgr, ViewerWindow *win
     mgr->SetLogic(ViewerRPC::SetWindowLayoutRPC,            new SetWindowLayoutAction(win));
     mgr->SetLogic(ViewerRPC::SetWindowModeRPC,              new SetWindowModeAction(win));
     mgr->SetLogic(ViewerRPC::ShowAllWindowsRPC,             new ShowAllWindowsAction(win));
+    mgr->SetLogic(ViewerRPC::StartPlotAnimationRPC,         new StartPlotAnimationAction(win));
+    mgr->SetLogic(ViewerRPC::StopPlotAnimationRPC,          new StopPlotAnimationAction(win));
     mgr->SetLogic(ViewerRPC::SuppressQueryOutputRPC,        new SuppressQueryOutputAction(win));
     mgr->SetLogic(ViewerRPC::TimeSliderNextStateRPC,        new TimeSliderForwardStepAction(win));
     mgr->SetLogic(ViewerRPC::TimeSliderPreviousStateRPC,    new TimeSliderReverseStepAction(win));

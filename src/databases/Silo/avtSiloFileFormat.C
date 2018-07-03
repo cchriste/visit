@@ -58,6 +58,7 @@
 #include <vtkFloatArray.h>
 #include <vtkIdList.h>
 #include <vtkIdTypeArray.h>
+#include <vtkInformation.h>
 #include <vtkIntArray.h>
 #include <vtkLongArray.h>
 #include <vtkLongLongArray.h>
@@ -132,7 +133,6 @@ using std::vector;
 using std::ostringstream;
 using namespace SiloDBOptions;
 
-static void      ExceptionGenerator(char *);
 static void      ExceptionGenerator(char *);
 static char     *GenerateName(const char *, const char *, const char *);
 static string    PrepareDirName(const char *, const char *);
@@ -10173,6 +10173,10 @@ MakePHZonelistFromZonelistArbFragment(const int *nl, int shapecnt)
 //    so that the same code used to detect zoo-type elements in DBphzonelists
 //    can be used to detect them here too. Also, fixed a problem with ghost
 //    zone variable in presence of arbitrary polyhedra.
+//
+//    Kathleen Biagas, Mon Aug 15 14:09:55 PDT 2016
+//    VTK-8, API for updating GhostLevel changed.
+//
 // ****************************************************************************
 
 void
@@ -10506,7 +10510,7 @@ avtSiloFileFormat::ReadInConnectivity(vtkUnstructuredGrid *ugrid,
             }
             unsigned int ocdata[2] = {static_cast<unsigned int>(domain),
                                       static_cast<unsigned int>(i)};
-            oca->InsertNextTupleValue(ocdata);
+            oca->InsertNextTypedTuple(ocdata);
             cellReMap->push_back(i);
         }
         oca->Delete();
@@ -10603,7 +10607,8 @@ avtSiloFileFormat::ReadInConnectivity(vtkUnstructuredGrid *ugrid,
         ghostZones->SetName("avtGhostZones");
         ugrid->GetCellData()->AddArray(ghostZones);
         ghostZones->Delete();
-        vtkStreamingDemandDrivenPipeline::SetUpdateGhostLevel(ugrid->GetInformation(), 0);
+        ugrid->GetInformation()->Set(
+         vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS(), 0);
     }
 }
 
@@ -10699,7 +10704,7 @@ ArbInsertTriangle(vtkUnstructuredGrid *ugrid, int *nids, unsigned int ocdata[2],
     ugrid->InsertNextCell(VTK_TRIANGLE, 3, ids);
     vtkUnsignedIntArray *oca = vtkUnsignedIntArray::SafeDownCast(
         ugrid->GetCellData()->GetArray("avtOriginalCellNumbers"));
-    oca->InsertNextTupleValue(ocdata);
+    oca->InsertNextTypedTuple(ocdata);
     cellReMap->push_back(ocdata[1]);
 }
 
@@ -10731,7 +10736,7 @@ ArbInsertQuadrilateral(vtkUnstructuredGrid *ugrid, int *nids, unsigned int ocdat
     ugrid->InsertNextCell(VTK_QUAD, 4, ids);
     vtkUnsignedIntArray *oca = vtkUnsignedIntArray::SafeDownCast(
         ugrid->GetCellData()->GetArray("avtOriginalCellNumbers"));
-    oca->InsertNextTupleValue(ocdata);
+    oca->InsertNextTypedTuple(ocdata);
     cellReMap->push_back(ocdata[1]);
 }
 
@@ -10766,7 +10771,7 @@ ArbInsertTet(vtkUnstructuredGrid *ugrid, int *nids, unsigned int ocdata[2],
     ugrid->InsertNextCell(VTK_TETRA, 4, ids);
     vtkUnsignedIntArray *oca = vtkUnsignedIntArray::SafeDownCast(
         ugrid->GetCellData()->GetArray("avtOriginalCellNumbers"));
-    oca->InsertNextTupleValue(ocdata);
+    oca->InsertNextTypedTuple(ocdata);
     cellReMap->push_back(ocdata[1]);
 }
 
@@ -10824,7 +10829,7 @@ ArbInsertPyramid(vtkUnstructuredGrid *ugrid, int *nids, unsigned int ocdata[2],
     }
     vtkUnsignedIntArray *oca = vtkUnsignedIntArray::SafeDownCast(
         ugrid->GetCellData()->GetArray("avtOriginalCellNumbers"));
-    oca->InsertNextTupleValue(ocdata);
+    oca->InsertNextTypedTuple(ocdata);
     cellReMap->push_back(ocdata[1]);
 }
 
@@ -10851,7 +10856,7 @@ ArbInsertWedge(vtkUnstructuredGrid *ugrid, int *nids, unsigned int ocdata[2],
     ugrid->InsertNextCell(VTK_WEDGE, 6, ids);
     vtkUnsignedIntArray *oca = vtkUnsignedIntArray::SafeDownCast(
         ugrid->GetCellData()->GetArray("avtOriginalCellNumbers"));
-    oca->InsertNextTupleValue(ocdata);
+    oca->InsertNextTypedTuple(ocdata);
     cellReMap->push_back(ocdata[1]);
 }
 
@@ -10880,7 +10885,7 @@ ArbInsertHex(vtkUnstructuredGrid *ugrid, int *nids, unsigned int ocdata[2],
     ugrid->InsertNextCell(VTK_HEXAHEDRON, 8, ids);
     vtkUnsignedIntArray *oca = vtkUnsignedIntArray::SafeDownCast(
         ugrid->GetCellData()->GetArray("avtOriginalCellNumbers"));
-    oca->InsertNextTupleValue(ocdata);
+    oca->InsertNextTypedTuple(ocdata);
     cellReMap->push_back(ocdata[1]);
 }
 
@@ -11095,6 +11100,10 @@ ArbInsertArbitrary(vtkUnstructuredGrid *ugrid, int nsdims, DBphzonelist *phzl, i
 //    Mark C. Miller, Wed Jul 11 10:57:26 PDT 2012
 //    Changed interface to support repeated calls for different segments of
 //    the same zonelist.
+//
+//    Kathleen Biagas, Mon Aug 15 14:09:55 PDT 2016
+//    VTK-8, API for updating GhostLevel changed.
+//
 // ****************************************************************************
 void
 avtSiloFileFormat::ReadInArbConnectivity(const char *meshname,
@@ -11728,7 +11737,8 @@ avtSiloFileFormat::ReadInArbConnectivity(const char *meshname,
         ghostZones->SetName("avtGhostZones");
         ugrid->GetCellData()->AddArray(ghostZones);
         ghostZones->Delete();
-        vtkStreamingDemandDrivenPipeline::SetUpdateGhostLevel(ugrid->GetInformation(), 0);
+        ugrid->GetInformation()->Set(
+         vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS(), 0);
     }
 
     //
@@ -12568,6 +12578,9 @@ avtSiloFileFormat::CreateCurvilinearMesh(DBquadmesh *qm)
 //    Hank Childs, Fri Aug 27 17:22:19 PDT 2004
 //    Rename ghost data array.
 //
+//    Kathleen Biagas, Mon Aug 15 14:09:55 PDT 2016
+//    VTK-8, API for updating GhostLevel changed.
+//
 // ****************************************************************************
 
 void 
@@ -12681,7 +12694,8 @@ avtSiloFileFormat::GetQuadGhostZones(DBquadmesh *qm, vtkDataSet *ds)
         ds->GetFieldData()->AddArray(realDims);
         ds->GetFieldData()->CopyFieldOn("avtRealDims");
         realDims->Delete();
-        vtkStreamingDemandDrivenPipeline::SetUpdateGhostLevel(ds->GetInformation(), 0);
+        ds->GetInformation()->Set(
+         vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS(), 0);
     }
 }
 
@@ -15593,12 +15607,17 @@ avtSiloFileFormat::CheckForTimeVaryingMetadata(DBfile *toc)
 //
 //    Mark C. Miller, Wed Feb  8 10:37:38 PST 2012
 //    Made it a static function
+//
+//    Mark C. Miller, Thu May  3 11:10:06 PDT 2018
+//    Made it issue warning message too.
 // ****************************************************************************
 static void
 ExceptionGenerator(char *msg)
 {
     if (msg)
     {
+        if (strstr(msg, "Checksum failure"))
+            avtCallback::IssueWarning(msg);
         debug1 << "The following Silo error occurred: " << msg << endl;
     }
     else

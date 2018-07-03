@@ -322,12 +322,18 @@ typedef std::map<std::string, int> StringIntMap;
 //    Eric Brugger, Fri Oct 28 09:52:40 PDT 2011
 //    Add a multi resolution display capability for AMR data.
 //
+//    Brad Whitlock, Thu Sep 12 16:32:35 PDT 2013
+//    Added plot animation methods.
+//
 //    Burlen Loring, Sun Sep  6 14:58:03 PDT 2015
 //    Changed the return type of GetNumberOfCells to long long
 //
 //    Kevin Griffin, Wed May 11 16:47:05 PDT 2016
 //    Added a default argument to DeleteActivePlots to determine if the current
 //    active plots should be considered when updating the expression list.
+//
+//    Alister Maguire, Mon Jun  4 15:13:43 PDT 2018
+//    Added SetViewScale. 
 //
 // ****************************************************************************
 
@@ -366,6 +372,11 @@ public:
     void UpdateFrame(bool updatePlotStates = true);
     bool UpdateFrameForPlots(const intVector &);
     void RegenerateFrame();
+
+    bool HasAnimatingPlots() const;
+    bool AnimationStep();
+    void StartPlotAnimation(const intVector &plotIds);
+    void StopPlotAnimation(const intVector &plotIds);
 
     void SetAnimationAttributes(const AnimationAttributes &);
     const AnimationAttributes &GetAnimationAttributes() const;
@@ -502,6 +513,7 @@ public:
                                                  int state,
                                                  bool returnDefault=false);
     bool SetFullFrameScaling(bool, double *);
+    bool SetViewScale(const double);
 
     void CreateNode(DataNode *, const std::map<std::string, std::string> &);
     bool SetFromNode(DataNode *, const std::map<std::string, std::string> &,

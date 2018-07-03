@@ -118,8 +118,8 @@
 #include <avtExecutionManager.h>
 
 #include <visit-config.h>
-#ifdef HAVE_OSMESA
-#include <vtkVisItOSMesaRenderingFactory.h>
+#if defined(HAVE_OSMESA) || defined(HAVE_EGL)
+#  include <vtkOffScreenRenderingFactory.h>
 #endif
 
 #include <string>
@@ -820,10 +820,10 @@ Engine::InitializeCompute()
     InitVTKRendering::Initialize();
     if (avtCallback::GetSoftwareRendering())
     {
-        // Install factory for  VisIt's OSMesa Render Windnow
-#ifdef HAVE_OSMESA
-        debug1 << mName << "Offscreen rendering will use Mesa factory." << endl;
-        vtkVisItOSMesaRenderingFactory::ForceMesa();
+        // Install factory for  VisIt's OffScreen Render Window overrides
+#if defined(HAVE_OSMESA) || defined(HAVE_EGL)
+        debug1 << mName << "Offscreen rendering will use offscreen factory." << endl;
+        vtkOffScreenRenderingFactory::ForceOffScreen();
 #else
         debug1 << mName << "Offscreen rendering will use GL." << endl;
 #endif
@@ -2347,12 +2347,14 @@ Engine::ProcessCommandLine(int argc, char **argv)
         {
             this->launchXServers = false;
         }
+#ifdef VISIT_OSPRAY
         else if (strcmp(argv[i], "-ospray") == 0)
         {
             std::cout << "Engine found OSPRay flag" << std::endl;
             debug5 << "Engine found OSPRay flag" << endl;
             avtCallback::SetOSPRayMode(true);
         }
+#endif
     }
     avtCallback::SetSoftwareRendering(!haveHWAccel);
 }

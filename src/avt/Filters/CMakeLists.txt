@@ -87,7 +87,6 @@ avtGhostZoneAndFacelistFilter.C
 avtGhostZoneFilter.C
 avtImageCommunicator.C
 avtImageCompositer.C
-avtImgCommunicator.C
 avtLinearTransformFilter.C
 avtLineoutFilter.C
 avtLineScanFilter.C
@@ -103,9 +102,11 @@ avtPolylineCleanupFilter.C
 avtPolylineToRibbonFilter.C
 avtPolylineToTubeFilter.C
 avtRayCompositer.C
+avtRayTracerBase.C
 avtRayTracer.C
 avtResampleFilter.C
 avtSamplePointCommunicator.C
+avtSamplePointExtractorBase.C
 avtSamplePointExtractor.C
 avtSamplePointToSurfaceFilter.C
 avtShiftCenteringFilter.C
@@ -120,13 +121,24 @@ avtTiledImageCompositor.C
 avtTimeLoopCollectorFilter.C
 avtTimeLoopFilter.C
 avtTransform.C
+avtValueImageCompositer.C
 avtVertexNormalsFilter.C
+avtVoxelExtractor.C
 avtWarpFilter.C
 avtWholeImageCompositerNoZ.C
 avtWholeImageCompositerWithZ.C
 avtWorldSpaceToImageSpaceTransform.C
 avtXRayFilter.C
 )
+
+if (VISIT_SLIVR)
+    list(APPEND AVTFILTERS_SOURCES
+         avtImgCommunicator.C
+         avtSLIVRRayTracer.C
+         avtSLIVRSamplePointExtractor.C
+         avtSLIVRVoxelExtractor.C)
+    add_definitions(-DVISIT_SLIVR)
+endif()
 
 INCLUDE_DIRECTORIES(
 ${CMAKE_CURRENT_SOURCE_DIR}
@@ -157,16 +169,20 @@ ${VTK_INCLUDE_DIRS}
 )
 
 # Add link directories
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${EAVL_LIBRARY_DIR} ${VTK_LIBRARY_DIRS} ${MESA_LIBRARY_DIR} ${GLEW_LIBRARY_DIR})
+LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${EAVL_LIBRARY_DIR} )
+
+IF(VTKM_FOUND)
+    SET(VISIT_VTKM_LIB visit_vtkm)
+ENDIF()
 
 #********************************* SERIAL ************************************
 ADD_LIBRARY(avtfilters_ser ${AVTFILTERS_SOURCES})
-TARGET_LINK_LIBRARIES(avtfilters_ser visitcommon lightweight_visit_vtk visit_vtk avtmath avtview avtpipeline_ser avtdatabase_ser avtdbatts ${EAVL_LIB} ${VTKM_LIB} vtkFiltersModeling)
+TARGET_LINK_LIBRARIES(avtfilters_ser visitcommon lightweight_visit_vtk visit_vtk avtmath avtview avtpipeline_ser avtdatabase_ser avtdbatts ${EAVL_LIB} ${VISIT_VTKM_LIB} vtkFiltersModeling)
 VISIT_INSTALL_TARGETS(avtfilters_ser)
 
 #********************************* PARALLEL **********************************
 IF(VISIT_PARALLEL)
     ADD_PARALLEL_LIBRARY(avtfilters_par ${AVTFILTERS_SOURCES})
-    TARGET_LINK_LIBRARIES(avtfilters_par visitcommon lightweight_visit_vtk visit_vtk avtmath avtview avtpipeline_par avtdatabase_par avtdbatts ${EAVL_LIB} ${VTKM_LIB} vtkFiltersModeling)
+    TARGET_LINK_LIBRARIES(avtfilters_par visitcommon lightweight_visit_vtk visit_vtk avtmath avtview avtpipeline_par avtdatabase_par avtdbatts ${EAVL_LIB} ${VISIT_VTKM_LIB} vtkFiltersModeling)
     VISIT_INSTALL_TARGETS(avtfilters_par)
 ENDIF(VISIT_PARALLEL)

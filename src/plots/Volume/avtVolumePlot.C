@@ -232,8 +232,8 @@ bool
 avtVolumePlot::PlotIsImageBased(void)
 {
     return (atts.GetRendererType() == VolumeAttributes::RayCasting ||
-            atts.GetRendererType() == VolumeAttributes::RayCastingSLIVR ||
-            atts.GetRendererType() == VolumeAttributes::RayCastingIntegration);
+            atts.GetRendererType() == VolumeAttributes::RayCastingIntegration ||
+            atts.GetRendererType() == VolumeAttributes::RayCastingSLIVR);
 }
 
 
@@ -438,7 +438,7 @@ avtVolumePlot::SetLegend(bool legendOn)
 //  Method: avtVolumePlot::GetMapper
 //
 //  Purpose:
-//      Gets the mapper as its base class (avtMapper) for our base
+//      Gets the mapper as its base class (avtMapperBase) for our base
 //      class (avtPlot).
 //
 //  Returns:    The mapper for this plot.
@@ -448,7 +448,7 @@ avtVolumePlot::SetLegend(bool legendOn)
 //
 // ****************************************************************************
 
-avtMapper *
+avtMapperBase *
 avtVolumePlot::GetMapper(void)
 {
     return mapper;
@@ -649,6 +649,9 @@ bool DataMustBeResampled(avtDataObject_p input)
 //    Don't calc gradient for raycasting integration, lighting isn't applied
 //    for this case.
 //
+//    Alister Maguire, Fri May 12 10:15:45 PDT 2017
+//    Replaced the Texture3D renderer with the Default renderer.
+//
 // ****************************************************************************
 
 avtDataObject_p
@@ -739,7 +742,7 @@ avtVolumePlot::ApplyRenderingTransformation(avtDataObject_p input)
             InternalResampleAttributes resampleAtts;
             resampleAtts.SetDistributedResample(false);
             resampleAtts.SetTargetVal(atts.GetResampleTarget());
-            resampleAtts.SetPrefersPowersOfTwo(atts.GetRendererType() == VolumeAttributes::Texture3D);
+            resampleAtts.SetPrefersPowersOfTwo(atts.GetRendererType() == VolumeAttributes::Default);
             resampleAtts.SetUseTargetVal(true);
 
             // Unless user forced resampling use actual logical bounds if they exist.

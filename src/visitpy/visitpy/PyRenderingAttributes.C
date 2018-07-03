@@ -130,25 +130,6 @@ PyRenderingAttributes_ToString(const RenderingAttributes *atts, const char *pref
           break;
     }
 
-    const char *displayListMode_names = "Never, Always, Auto";
-    switch (atts->GetDisplayListMode())
-    {
-      case RenderingAttributes::Never:
-          SNPRINTF(tmpStr, 1000, "%sdisplayListMode = %sNever  # %s\n", prefix, prefix, displayListMode_names);
-          str += tmpStr;
-          break;
-      case RenderingAttributes::Always:
-          SNPRINTF(tmpStr, 1000, "%sdisplayListMode = %sAlways  # %s\n", prefix, prefix, displayListMode_names);
-          str += tmpStr;
-          break;
-      case RenderingAttributes::Auto:
-          SNPRINTF(tmpStr, 1000, "%sdisplayListMode = %sAuto  # %s\n", prefix, prefix, displayListMode_names);
-          str += tmpStr;
-          break;
-      default:
-          break;
-    }
-
     if(atts->GetStereoRendering())
         SNPRINTF(tmpStr, 1000, "%sstereoRendering = 1\n", prefix);
     else
@@ -308,6 +289,20 @@ PyRenderingAttributes_ToString(const RenderingAttributes *atts, const char *pref
     }
 
     SNPRINTF(tmpStr, 1000, "%scompactDomainsAutoThreshold = %d\n", prefix, atts->GetCompactDomainsAutoThreshold());
+    str += tmpStr;
+    if(atts->GetOsprayRendering())
+        SNPRINTF(tmpStr, 1000, "%sosprayRendering = 1\n", prefix);
+    else
+        SNPRINTF(tmpStr, 1000, "%sosprayRendering = 0\n", prefix);
+    str += tmpStr;
+    SNPRINTF(tmpStr, 1000, "%sospraySPP = %d\n", prefix, atts->GetOspraySPP());
+    str += tmpStr;
+    SNPRINTF(tmpStr, 1000, "%sosprayAO = %d\n", prefix, atts->GetOsprayAO());
+    str += tmpStr;
+    if(atts->GetOsprayShadows())
+        SNPRINTF(tmpStr, 1000, "%sosprayShadows = 1\n", prefix);
+    else
+        SNPRINTF(tmpStr, 1000, "%sosprayShadows = 0\n", prefix);
     str += tmpStr;
     return str;
 }
@@ -615,39 +610,6 @@ RenderingAttributes_GetGeometryRepresentation(PyObject *self, PyObject *args)
 {
     RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
     PyObject *retval = PyInt_FromLong(long(obj->data->GetGeometryRepresentation()));
-    return retval;
-}
-
-/*static*/ PyObject *
-RenderingAttributes_SetDisplayListMode(PyObject *self, PyObject *args)
-{
-    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
-
-    int ival;
-    if(!PyArg_ParseTuple(args, "i", &ival))
-        return NULL;
-
-    // Set the displayListMode in the object.
-    if(ival >= 0 && ival < 3)
-        obj->data->SetDisplayListMode(RenderingAttributes::TriStateMode(ival));
-    else
-    {
-        fprintf(stderr, "An invalid displayListMode value was given. "
-                        "Valid values are in the range of [0,2]. "
-                        "You can also use the following names: "
-                        "Never, Always, Auto.");
-        return NULL;
-    }
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-/*static*/ PyObject *
-RenderingAttributes_GetDisplayListMode(PyObject *self, PyObject *args)
-{
-    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
-    PyObject *retval = PyInt_FromLong(long(obj->data->GetDisplayListMode()));
     return retval;
 }
 
@@ -1256,6 +1218,102 @@ RenderingAttributes_GetCompactDomainsAutoThreshold(PyObject *self, PyObject *arg
     return retval;
 }
 
+/*static*/ PyObject *
+RenderingAttributes_SetOsprayRendering(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+
+    int ival;
+    if(!PyArg_ParseTuple(args, "i", &ival))
+        return NULL;
+
+    // Set the osprayRendering in the object.
+    obj->data->SetOsprayRendering(ival != 0);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+/*static*/ PyObject *
+RenderingAttributes_GetOsprayRendering(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+    PyObject *retval = PyInt_FromLong(obj->data->GetOsprayRendering()?1L:0L);
+    return retval;
+}
+
+/*static*/ PyObject *
+RenderingAttributes_SetOspraySPP(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+
+    int ival;
+    if(!PyArg_ParseTuple(args, "i", &ival))
+        return NULL;
+
+    // Set the ospraySPP in the object.
+    obj->data->SetOspraySPP((int)ival);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+/*static*/ PyObject *
+RenderingAttributes_GetOspraySPP(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+    PyObject *retval = PyInt_FromLong(long(obj->data->GetOspraySPP()));
+    return retval;
+}
+
+/*static*/ PyObject *
+RenderingAttributes_SetOsprayAO(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+
+    int ival;
+    if(!PyArg_ParseTuple(args, "i", &ival))
+        return NULL;
+
+    // Set the osprayAO in the object.
+    obj->data->SetOsprayAO((int)ival);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+/*static*/ PyObject *
+RenderingAttributes_GetOsprayAO(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+    PyObject *retval = PyInt_FromLong(long(obj->data->GetOsprayAO()));
+    return retval;
+}
+
+/*static*/ PyObject *
+RenderingAttributes_SetOsprayShadows(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+
+    int ival;
+    if(!PyArg_ParseTuple(args, "i", &ival))
+        return NULL;
+
+    // Set the osprayShadows in the object.
+    obj->data->SetOsprayShadows(ival != 0);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+/*static*/ PyObject *
+RenderingAttributes_GetOsprayShadows(PyObject *self, PyObject *args)
+{
+    RenderingAttributesObject *obj = (RenderingAttributesObject *)self;
+    PyObject *retval = PyInt_FromLong(obj->data->GetOsprayShadows()?1L:0L);
+    return retval;
+}
+
 
 
 PyMethodDef PyRenderingAttributes_methods[RENDERINGATTRIBUTES_NMETH] = {
@@ -1284,8 +1342,6 @@ PyMethodDef PyRenderingAttributes_methods[RENDERINGATTRIBUTES_NMETH] = {
     {"GetMultiresolutionCellSize", RenderingAttributes_GetMultiresolutionCellSize, METH_VARARGS},
     {"SetGeometryRepresentation", RenderingAttributes_SetGeometryRepresentation, METH_VARARGS},
     {"GetGeometryRepresentation", RenderingAttributes_GetGeometryRepresentation, METH_VARARGS},
-    {"SetDisplayListMode", RenderingAttributes_SetDisplayListMode, METH_VARARGS},
-    {"GetDisplayListMode", RenderingAttributes_GetDisplayListMode, METH_VARARGS},
     {"SetStereoRendering", RenderingAttributes_SetStereoRendering, METH_VARARGS},
     {"GetStereoRendering", RenderingAttributes_GetStereoRendering, METH_VARARGS},
     {"SetStereoType", RenderingAttributes_SetStereoType, METH_VARARGS},
@@ -1324,6 +1380,14 @@ PyMethodDef PyRenderingAttributes_methods[RENDERINGATTRIBUTES_NMETH] = {
     {"GetCompactDomainsActivationMode", RenderingAttributes_GetCompactDomainsActivationMode, METH_VARARGS},
     {"SetCompactDomainsAutoThreshold", RenderingAttributes_SetCompactDomainsAutoThreshold, METH_VARARGS},
     {"GetCompactDomainsAutoThreshold", RenderingAttributes_GetCompactDomainsAutoThreshold, METH_VARARGS},
+    {"SetOsprayRendering", RenderingAttributes_SetOsprayRendering, METH_VARARGS},
+    {"GetOsprayRendering", RenderingAttributes_GetOsprayRendering, METH_VARARGS},
+    {"SetOspraySPP", RenderingAttributes_SetOspraySPP, METH_VARARGS},
+    {"GetOspraySPP", RenderingAttributes_GetOspraySPP, METH_VARARGS},
+    {"SetOsprayAO", RenderingAttributes_SetOsprayAO, METH_VARARGS},
+    {"GetOsprayAO", RenderingAttributes_GetOsprayAO, METH_VARARGS},
+    {"SetOsprayShadows", RenderingAttributes_SetOsprayShadows, METH_VARARGS},
+    {"GetOsprayShadows", RenderingAttributes_GetOsprayShadows, METH_VARARGS},
     {NULL, NULL}
 };
 
@@ -1382,15 +1446,6 @@ PyRenderingAttributes_getattr(PyObject *self, char *name)
         return PyInt_FromLong(long(RenderingAttributes::Wireframe));
     if(strcmp(name, "Points") == 0)
         return PyInt_FromLong(long(RenderingAttributes::Points));
-
-    if(strcmp(name, "displayListMode") == 0)
-        return RenderingAttributes_GetDisplayListMode(self, NULL);
-    if(strcmp(name, "Never") == 0)
-        return PyInt_FromLong(long(RenderingAttributes::Never));
-    if(strcmp(name, "Always") == 0)
-        return PyInt_FromLong(long(RenderingAttributes::Always));
-    if(strcmp(name, "Auto") == 0)
-        return PyInt_FromLong(long(RenderingAttributes::Auto));
 
     if(strcmp(name, "stereoRendering") == 0)
         return RenderingAttributes_GetStereoRendering(self, NULL);
@@ -1460,6 +1515,14 @@ PyRenderingAttributes_getattr(PyObject *self, char *name)
 
     if(strcmp(name, "compactDomainsAutoThreshold") == 0)
         return RenderingAttributes_GetCompactDomainsAutoThreshold(self, NULL);
+    if(strcmp(name, "osprayRendering") == 0)
+        return RenderingAttributes_GetOsprayRendering(self, NULL);
+    if(strcmp(name, "ospraySPP") == 0)
+        return RenderingAttributes_GetOspraySPP(self, NULL);
+    if(strcmp(name, "osprayAO") == 0)
+        return RenderingAttributes_GetOsprayAO(self, NULL);
+    if(strcmp(name, "osprayShadows") == 0)
+        return RenderingAttributes_GetOsprayShadows(self, NULL);
 
     return Py_FindMethod(PyRenderingAttributes_methods, self, name);
 }
@@ -1498,8 +1561,6 @@ PyRenderingAttributes_setattr(PyObject *self, char *name, PyObject *args)
         obj = RenderingAttributes_SetMultiresolutionCellSize(self, tuple);
     else if(strcmp(name, "geometryRepresentation") == 0)
         obj = RenderingAttributes_SetGeometryRepresentation(self, tuple);
-    else if(strcmp(name, "displayListMode") == 0)
-        obj = RenderingAttributes_SetDisplayListMode(self, tuple);
     else if(strcmp(name, "stereoRendering") == 0)
         obj = RenderingAttributes_SetStereoRendering(self, tuple);
     else if(strcmp(name, "stereoType") == 0)
@@ -1538,6 +1599,14 @@ PyRenderingAttributes_setattr(PyObject *self, char *name, PyObject *args)
         obj = RenderingAttributes_SetCompactDomainsActivationMode(self, tuple);
     else if(strcmp(name, "compactDomainsAutoThreshold") == 0)
         obj = RenderingAttributes_SetCompactDomainsAutoThreshold(self, tuple);
+    else if(strcmp(name, "osprayRendering") == 0)
+        obj = RenderingAttributes_SetOsprayRendering(self, tuple);
+    else if(strcmp(name, "ospraySPP") == 0)
+        obj = RenderingAttributes_SetOspraySPP(self, tuple);
+    else if(strcmp(name, "osprayAO") == 0)
+        obj = RenderingAttributes_SetOsprayAO(self, tuple);
+    else if(strcmp(name, "osprayShadows") == 0)
+        obj = RenderingAttributes_SetOsprayShadows(self, tuple);
 
     if(obj != NULL)
         Py_DECREF(obj);

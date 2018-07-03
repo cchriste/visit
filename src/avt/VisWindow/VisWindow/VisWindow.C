@@ -2135,32 +2135,46 @@ VisWindow::Realize(void)
 //   for now because previously they hadn't made use of vtk actor
 //   visibility so actors were always visibible
 //
+//   Brad Whitlock,Mon Sep 25 14:42:57 PDT 2017
+//   Pass in image type.
+//
+//   Brad Whitlock, Mon Feb 12 17:45:01 PST 2018
+//   Selectively disable the background colleague so we get a clear 
+//   background.
+//
 // ****************************************************************************
 
 void
 VisWindow::ScreenRender(
+    avtImageType imgT,
     bool doViewportOnly, bool doZBufferToo, bool doOpaque,
     bool doTranslucent, bool disableBackground, avtImage_p input)
 {
-    int axesVis = axes3D->GetVisibility();
-    if (disableBackground)
+    int bgVis = windowBackground->GetVisibility();
+    bool disableBG = disableBackground ||
+                     (imgT == ColorRGBAImage || 
+                      imgT == LuminanceImage ||
+                      imgT == ValueImage);
+
+    if (disableBG)
     {
         // remove non-distributed geometry from the render
-        if (axesVis)
-            axes3D->SetVisibility(0);
+        if (bgVis)
+            windowBackground->SetVisibility(0);
         tools->SetVisibility(0);
         annotations->SetVisibility(0);
     }
 
     rendering->ScreenRender(
+        imgT,
         doViewportOnly, doZBufferToo, doOpaque,
         doTranslucent, disableBackground, input);
 
-    if (disableBackground)
+    if (disableBG)
     {
         // restore non-distributed geometry
-        if (axesVis)
-            axes3D->SetVisibility(1);
+        if (bgVis)
+            windowBackground->SetVisibility(1);
         tools->SetVisibility(1);
         annotations->SetVisibility(1);
     }
@@ -2185,6 +2199,25 @@ VisWindow::ScreenReadBack(bool doViewportOnly, bool doZBufferToo,
 {
     return rendering->ScreenReadback(
         doViewportOnly, doZBufferToo, captureAlpha);
+}
+
+// ****************************************************************************
+//  Method: VisWindow::BackgroundReadBack
+//
+//  Purpose:
+//      Render the background and read it back into an avtImage
+//
+//  Programmer: Brad Whitlock
+//  Creation:   Tue Mar 14 19:48:23 PDT 2017
+//
+//  Modifications:
+//
+// ****************************************************************************
+
+avtImage_p
+VisWindow::BackgroundReadback(bool doViewportOnly)
+{
+    return rendering->BackgroundReadback(doViewportOnly);
 }
 
 
@@ -2233,6 +2266,7 @@ VisWindow::ScreenCapture(bool doViewportOnly, bool doZBufferToo,
                          bool disableBackground, avtImage_p input)
 {
     rendering->ScreenRender(
+        captureAlpha ? ColorRGBAImage : ColorRGBImage,
         doViewportOnly, doZBufferToo, doOpaque, doTranslucent,
         disableBackground, input);
 
@@ -2264,6 +2298,30 @@ VisWindow::PostProcessScreenCapture(avtImage_p capturedImage,
     return rendering->PostProcessScreenCapture(capturedImage,
                                                doViewportOnly,
                                                keepZBuffer);
+}
+
+// ****************************************************************************
+// Method: VisWindow::ScreenCaptureValues
+//
+// Purpose:
+//   Screen captures a value image.
+//
+//
+// Returns:    an avtImage with data values.
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Mon Sep 25 14:56:47 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+avtImage_p
+VisWindow::ScreenCaptureValues(bool getZBuffer)
+{
+    return rendering->ScreenCaptureValues(getZBuffer);
 }
 
 // ****************************************************************************
@@ -4652,6 +4710,13 @@ VisWindow::UpdateParallelAxes()
 //   Jeremy Meredith, Wed May  5 14:31:37 EDT 2010
 //   Added support for title visibility separate from label visibility.
 //
+//   Alister Maguire, Thu Mar  1 16:08:42 PST 2018
+//   Added support for altering the triad. 
+//
+//   Alister Maguire, Fri Mar  9 10:13:30 PST 2018
+//   Only update the triad color if the 
+//   set manually flag is raised. 
+//
 // ****************************************************************************
 
 void
@@ -4730,6 +4795,21 @@ VisWindow::UpdateAxes3D()
     // Triad 
     //
     triad->SetVisibility(axis3D.GetTriadFlag());
+    if (axis3D.GetTriadSetManually())
+    {
+        int *triadColor    = annotationAtts.GetAxes3D().GetTriadColor();
+        double scaledColor[3] = {0.0, 0.0, 0.0};
+        for (int i = 0; i < 3; ++i)
+        {
+            scaledColor[i] = (double)triadColor[i] / 255.0;
+        }
+        triad->SetForegroundColor(scaledColor[0], scaledColor[1], scaledColor[2]);
+    }
+    float lineWidth = annotationAtts.GetAxes3D().GetTriadLineWidth();
+    triad->SetLineWidth(lineWidth, lineWidth, lineWidth);
+    triad->SetBold(annotationAtts.GetAxes3D().GetTriadBold());
+    triad->SetItalic(annotationAtts.GetAxes3D().GetTriadItalic());
+    triad->SetFontFamily(annotationAtts.GetAxes3D().GetTriadFont());
 
     //
     // Bounding Box 
@@ -5185,6 +5265,28 @@ VisWindow::ClearPickPoints()
 {
     queries->ClearPickPoints();
     Render();
+}
+
+
+// ****************************************************************************
+// Method: VisWindow::RemovePicks
+//
+// Purpose: 
+//   Tell the plots to remove a list of pick points. 
+//
+// Programmer: Alister Maguire
+// Creation:   Mon Oct 16 15:41:23 PDT 2017
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+std::string
+VisWindow::RemovePicks(std::vector< std::string > targetLabels)
+{
+    std::string removedPicks = queries->RemovePicks(targetLabels);
+    Render();
+    return removedPicks;
 }
 
 
@@ -6285,73 +6387,6 @@ VisWindow::GetStereoType() const
     return rendering->GetStereoType();
 }
 
-// ****************************************************************************
-// Method: VisWindow::GetImmediateModeRendering
-//
-// Purpose: 
-//   Declares whether or not we should do immediate mode rendering.
-//
-// Programmer: Hank Childs
-// Creation:   May 9, 2004
-//
-// ****************************************************************************
-
-bool
-VisWindow::GetImmediateModeRendering(void)
-{
-    int mode = GetDisplayListMode();
-    if (mode == 0)
-        return true;
-    if (mode == 1)
-        return false;
-
-    return IsDirect();
-}
-
-
-// ****************************************************************************
-// Method: VisWindow::SetDisplayListMode
-//
-// Purpose: 
-//   Tells the window what mode to use for display lists.
-//
-// Arguments:
-//   mode : The new display list mode
-//
-// Programmer: Hank Childs
-// Creation:   May 9, 2004
-//
-// ****************************************************************************
-
-void
-VisWindow::SetDisplayListMode(int mode)
-{
-    rendering->SetDisplayListMode(mode);
-    bool immediateMode = GetImmediateModeRendering();
-
-    std::vector< VisWinColleague * >::iterator it;
-    for (it = colleagues.begin() ; it != colleagues.end() ; it++)
-    {
-        (*it)->SetImmediateModeRendering(immediateMode);
-    }
-}
-
-// ****************************************************************************
-// Method: VisWindow::GetDisplayListMode
-//
-// Purpose: 
-//   Returns the display list mode for the window.
-//
-// Programmer: Hank Childs
-// Creation:   May 10, 2004
-//
-// ****************************************************************************
-
-int
-VisWindow::GetDisplayListMode(void) const
-{
-    return rendering->GetDisplayListMode();
-}
 
 // ****************************************************************************
 // Method: VisWindow::IsDirect
@@ -6798,6 +6833,191 @@ VisWindow::GetCompactDomainsAutoThreshold() const
     return rendering->GetCompactDomainsAutoThreshold();
 }
 
+#ifdef VISIT_OSPRAY
+// ****************************************************************************
+// Method: VisWindow::SetOsprayRendering
+//
+// Purpose: 
+//   Sets the OSPRay rendering flag
+//
+// Arguments:
+//   enabled : Whether or not OSPRay rendering is enabled
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:15:25 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+VisWindow::SetOsprayRendering(bool enabled)
+{
+    if (enabled != rendering->GetOsprayRendering())
+    {
+        rendering->SetOsprayRendering(enabled);
+    }
+}
+
+// ****************************************************************************
+// Method: VisWindow::GetOsprayRendering
+//
+// Purpose: 
+//   Returns the OSPRay rendering flag
+//
+// Returns:    The OSPRay rendering flag
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:17:21 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+VisWindow::GetOsprayRendering() const
+{
+    return rendering->GetOsprayRendering();
+}
+
+// ****************************************************************************
+// Method: VisWindow::SetOspraySPP
+//
+// Purpose: 
+//   Sets the OSPRay samples per pixel
+//
+// Arguments:
+//   val : The new number of samples per pixel
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:15:25 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+VisWindow::SetOspraySPP(int val)
+{
+    if (val != rendering->GetOspraySPP())
+    {
+        rendering->SetOspraySPP(val);
+    }
+}
+
+// ****************************************************************************
+// Method: VisWindow::GetOspraySPP
+//
+// Purpose: 
+//   Returns the OSPRay samples per pixel
+//
+// Returns:    The OSPRay samples per pixel
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:17:21 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+int
+VisWindow::GetOspraySPP() const
+{
+    return rendering->GetOspraySPP();
+}
+
+// ****************************************************************************
+// Method: VisWindow::SetOsprayAO
+//
+// Purpose: 
+//   Sets the OSPRay ambient occlusion samples
+//
+// Arguments:
+//   val : The new number of ambient occlusion samples
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:15:25 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+VisWindow::SetOsprayAO(int val)
+{
+    if (val != rendering->GetOsprayAO())
+    {
+        rendering->SetOsprayAO(val);
+    }
+}
+
+// ****************************************************************************
+// Method: VisWindow::GetOsprayAO
+//
+// Purpose: 
+//   Returns the OSPRay ambient occlusion samples
+//
+// Returns:    The OSPRay ambient occlusion samples
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:17:21 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+int
+VisWindow::GetOsprayAO() const
+{
+    return rendering->GetOsprayAO();
+}
+
+// ****************************************************************************
+// Method: VisWindow::SetOsprayShadows
+//
+// Purpose: 
+//   Set OSPRay shadows on or off
+//
+// Arguments:
+//   enabled : The new on/off setting for shadows
+//
+// Programmer: Alok Hota
+// Creation:   Wed 02 May 2018 10:01:18 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+VisWindow::SetOsprayShadows(bool enabled)
+{
+    if (enabled != rendering->GetOsprayShadows())
+    {
+        rendering->SetOsprayShadows(enabled);
+    }
+}
+
+// ****************************************************************************
+// Method: VisWindow::GetOsprayShadows
+//
+// Purpose: 
+//   Returns the OSPRay shadows flag
+//
+// Returns:    The OSPRay shadows flag
+//
+// Programmer: Alok Hota
+// Creation:   Wed 02 May 2018 10:01:18 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+VisWindow::GetOsprayShadows() const
+{
+    return rendering->GetOsprayShadows();
+}
+#endif
 
 
 // ****************************************************************************
@@ -7628,4 +7848,10 @@ VisWindow::UpdateMouseActions(std::string action,
                                    double end_dx, double end_dy,
                                    bool ctrl, bool shift) {
     rendering->UpdateMouseActions(action, start_dx, start_dy, end_dx, end_dy, ctrl, shift);
+}
+
+void
+VisWindow::GetExtents(double ext[2]) // TODO: Remove with VTK8
+{
+    plots->GetDataRange(ext[0], ext[1]);
 }

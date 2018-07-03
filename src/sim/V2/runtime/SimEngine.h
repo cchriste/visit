@@ -49,6 +49,10 @@ class ObserverToCallback;
 class DBOptionsAttributes;
 class PluginManager;
 
+class VisWindow;
+class View2DAttributes;
+class View3DAttributes;
+
 // ****************************************************************************
 // Class: SimEngine
 //
@@ -99,10 +103,15 @@ public:
     bool DrawPlots();
     bool DeleteActivePlots();
     bool SetActivePlots(const int *ids, int nids);
+    bool ChangePlotVar(const char *var, int all);
     bool SetPlotOptions(const std::string &fieldName, 
                         int fieldType, void *fieldVal, int fieldLen);
     bool SetOperatorOptions(const std::string &fieldName, 
                             int fieldType, void *fieldVal, int fieldLen);
+    bool SetView2D(const View2DAttributes &);
+    bool GetView2D(View2DAttributes &);
+    bool SetView3D(const View3DAttributes &);
+    bool GetView3D(View3DAttributes &);
 private:
     virtual void CreatePluginManagers();
 
@@ -117,6 +126,11 @@ private:
     void AddInitialWindows();
     void RestrictPlugins(PluginManager *mgr,
                          const std::vector<std::string> &idsOrNames);
+
+    void CreateVisWindow(int winID, VisWindow *&viswindow, bool &owns);
+    static void CreateVisWindowCB(int winID, VisWindow *&viswindow, bool &owns, void*);
+
+    bool allowCommandExecution;
 #endif
 
 private:

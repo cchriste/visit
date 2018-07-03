@@ -221,10 +221,19 @@ f_visit_internal_InstallCallbacks(void)
 #define F_VISITDRAWPLOTS            F77_ID(visitdrawplots_,visitdrawplots,VISITDRAWPLOTS)
 #define F_VISITDELETEACTIVEPLOTS    F77_ID(visitdeleteactiveplots_,visitdeleteactiveplots,VISITDELETEACTIVEPLOTS)
 #define F_VISITSETACTIVEPLOTS       F77_ID(visitsetactiveplots_,visitsetactiveplots,VISITSETACTIVEPLOTS)
+#define F_VISITCHANGEPLOTVAR        F77_ID(visitchangeplotvar_,visitchangeplotvar,VISITCHANGEPLOTVAR)
 #define F_VISITGETMEMORY            F77_ID(visitgetmemory_,visitgetmemory,VISITGETMEMORY)
 #define F_VISITEXPORTDATABASE       F77_ID(visitexportdatabase_,visitexportdatabase,VISITEXPORTDATABASE)
 #define F_VISITEXPORTDATABASEWITHOPTIONS       F77_ID(visitexportdatabasewithoptions_,visitexportdatabasewithoptions,VISITEXPORTDATABASEWITHOPTIONS)
 #define F_VISITRESTORESESSION       F77_ID(visitrestoresession_,visitrestoresession,VISITRESTORESESSION)
+
+#define F_VISITSETVIEW2D            F77_ID(visitsetview2d_,visitsetview2d,VISITSETVIEW2D)
+#define F_VISITGETVIEW2D            F77_ID(visitgetview2d_,visitgetview2d,VISITGETVIEW2D)
+#define F_VISITSETVIEW3D            F77_ID(visitsetview3d_,visitsetview3d,VISITSETVIEW3D)
+#define F_VISITGETVIEW3D            F77_ID(visitgetview3d_,visitgetview3d,VISITGETVIEW3D)
+#define F_VISITBEGINCINEMA          F77_ID(visitbegincinema,visitbegincinema,VISITBEGINCINEMA)
+#define F_VISITSAVECINEMA           F77_ID(visitsavecinema,visitsavecinema,VISITSAVECINEMA)
+#define F_VISITENDCINEMA            F77_ID(visitendcinema,visitendcinema,VISITENDCINEMA)
 
 /******************************************************************************
  * Function: F_VISITSETDIRECTORY
@@ -1129,6 +1138,29 @@ F_VISITSETACTIVEPLOTS(int *ids, int *nids)
 }
 
 /******************************************************************************
+ * Function: F_VISITCHANGEPLOTVAR
+ *
+ * Purpose:   Allows FORTRAN to change the plot var.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Mon Feb  2 15:08:42 PST 2015
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN
+F_VISITCHANGEPLOTVAR(const char *var, int *lvar, int *all)
+{
+    int ret = VISIT_ERROR;
+    char *f_var = NULL;
+    COPY_FORTRAN_STRING(f_var, var, lvar);
+    ret = VisItChangePlotVar(f_var, *all);
+    FREE(f_var);
+    return ret;
+}
+
+/******************************************************************************
  * Function: F_VISITGETMEMORY
  *
  * Purpose:   Allows FORTRAN to get memory of running simulation
@@ -1225,6 +1257,145 @@ F_VISITRESTORESESSION(VISIT_F77STRING filename, int *lfilename)
 
     FREE(f_filename);
     return retval;
+}
+
+/******************************************************************************
+ * Function: F_VISITSETVIEW2D
+ *
+ * Purpose:   Allows FORTRAN to set the view.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Tue Jun  6 17:00:55 PDT 2017
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN
+F_VISITSETVIEW2D(visit_handle *view)
+{
+    return VisItSetView2D(*view);
+}
+
+/******************************************************************************
+ * Function: F_VISITGETVIEW2D
+ *
+ * Purpose:   Allows FORTRAN to get the view.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Tue Jun  6 17:00:55 PDT 2017
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN
+F_VISITGETVIEW2D(visit_handle *view)
+{
+    return VisItGetView2D(*view);
+}
+
+/******************************************************************************
+ * Function: F_VISITSETVIEW3D
+ *
+ * Purpose:   Allows FORTRAN to set the view.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Tue Jun  6 17:00:55 PDT 2017
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN
+F_VISITSETVIEW3D(visit_handle *view)
+{
+    return VisItSetView3D(*view);
+}
+
+/******************************************************************************
+ * Function: F_VISITGETVIEW3D
+ *
+ * Purpose:   Allows FORTRAN to get the view.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Tue Jun  6 17:00:55 PDT 2017
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN
+F_VISITGETVIEW3D(visit_handle *view)
+{
+    return VisItGetView3D(*view);
+}
+
+/******************************************************************************
+ * Function: F_VISITBEGINCINEMA
+ *
+ * Purpose:   Allows FORTRAN to begin a Cinema database.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Tue Jun  6 17:00:55 PDT 2017
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN 
+F_VISITBEGINCINEMA(visit_handle *h,
+    VISIT_F77STRING file_cdb, int *lfile_cdb, int *dbspec, int *composite,
+    int *format, int *width, int *height, int *cameratype, int *nphi, int *ntheta,
+    visit_handle *hvar)
+{
+    FORTRAN retval;
+    char *f_file_cdb = NULL;
+
+    COPY_FORTRAN_STRING(f_file_cdb, file_cdb, lfile_cdb);
+
+    retval = VisItBeginCinema(h, f_file_cdb, *dbspec, *composite,
+                              *format, *width, *height, 
+                              *cameratype, *nphi, *ntheta,
+                              *hvar);
+    FREE(f_file_cdb);
+    return retval;
+}
+
+/******************************************************************************
+ * Function: F_VISITSAVECINEMA
+ *
+ * Purpose:   Allows FORTRAN to save the current timestep to a Cinema database.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Tue Jun  6 17:00:55 PDT 2017
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN 
+F_VISITSAVECINEMA(visit_handle *h, double *time)
+{
+    return VisItSaveCinema(*h, *time);
+}
+
+/******************************************************************************
+ * Function: F_VISITENDCINEMA
+ *
+ * Purpose:   Allows FORTRAN to end a Cinema database.
+ *
+ * Programmer: Brad Whitlock
+ * Date:       Tue Jun  6 17:00:55 PDT 2017
+ *
+ * Modifications:
+ *
+ *****************************************************************************/
+
+FORTRAN 
+F_VISITENDCINEMA(visit_handle *h)
+{
+    return VisItEndCinema(*h);
 }
 
 /******************************************************************************

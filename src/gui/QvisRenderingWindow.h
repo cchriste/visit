@@ -165,7 +165,6 @@ private slots:
     void processMultiresolutionSmallestCellText();
     void processMultiresolutionSmallestCellText(const QString &);
     void objectRepresentationChanged(int);
-    void displayListModeChanged(int);
     void stereoToggled(bool);
     void stereoTypeChanged(int);
     void renderNotifyToggled(bool);
@@ -184,6 +183,11 @@ private slots:
     void depthCueingStartChanged();
     void depthCueingEndChanged();
     void colorTexturingToggled(bool);
+    void osprayRenderingToggled(bool);
+    void ospraySPPChanged(int);
+    void osprayAOChanged(int);
+    void osprayShadowsToggled(bool);
+
 private:
     QWidget *CreateBasicPage();
     QWidget *CreateAdvancedPage();
@@ -213,7 +217,6 @@ private:
     QLabel            *multiresolutionSmallestCellLabel;
     QLineEdit         *multiresolutionSmallestCellLineEdit;
     QButtonGroup      *objectRepresentation;
-    QButtonGroup      *dlMode;
     QCheckBox         *stereoToggle;
     QButtonGroup      *stereoType;
     QRadioButton      *redblue;
@@ -252,6 +255,12 @@ private:
     QLabel            *depthCueingEndLabel;
     QLineEdit         *depthCueingEndEdit;
     QCheckBox         *colorTexturingToggle;
+    QCheckBox         *osprayRenderingToggle;
+    QLabel            *ospraySPPLabel;
+    QSpinBox          *ospraySPP;
+    QLabel            *osprayAOLabel;
+    QSpinBox          *osprayAO;
+    QCheckBox         *osprayShadowsToggle;
 
     // Labels to display renderer information.
     QLabel            *scalrenUsingLabel;

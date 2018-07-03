@@ -48,7 +48,21 @@
 #   Burlen Loring, Sun Oct 18 00:47:57 PDT 2015
 #   Added vtkDepthSortPolyData2
 #
+#   Kathleen Biagas, Mon Jul 18 09:57:06 PDT 2016
+#   Remove vtkVisItTIFFWriter (in favor of using VTK's directly).
+#
+#   Brad Whitlock, Tue Sep 19 14:35:20 PDT 2017
+#   OpenEXR support.
+#
+#   Kathleen Biagas, Mon Feb 5 17:22:22 PST 2018
+#   Move vtkDepthSortPolyData2 to avt/Plotter/vtk since it depends on the
+#   vtk rendering libs.  Remove vtk rendering libs from linker.
+#
 #****************************************************************************/
+
+IF(OPENEXR_FOUND)
+    SET(OPENEXR_SRC vtkOpenEXRWriter.C)
+ENDIF(OPENEXR_FOUND)
 
 SET(VISIT_VTK_SOURCES
 InitVTK.C
@@ -58,7 +72,6 @@ vtkCSGCell.C
 vtkCSGGrid.C
 vtkConnectedTubeFilter.C
 vtkDataSetRemoveGhostCells.C
-vtkDepthSortPolyData2.C
 vtkLineoutFilter.C
 vtkLinesFromOriginalCells.C
 vtkMergeTree.C
@@ -91,19 +104,18 @@ vtkVisItGlyph3D.C
 vtkVisItInterpolatedVelocityField.C
 vtkVisItPolyDataNormals.C
 vtkVisItPolyDataNormals2D.C
+vtkVisItStructuredGridNormals.C
 vtkVisItProbeFilter.C
 vtkVisItRectilinearGrid.C
 vtkVisItSTLWriter.C
 vtkVisItScalarTree.C
 vtkVisItSplitter.C
-vtkVisItStreamLine.C
 vtkVisItStructuredGrid.C
-vtkVisItStructuredGridNormals.C
 vtkVisItTubeFilter.C
-vtkVisItTIFFWriter.C
 vtkVisItTensorGlyph.C
 vtkVolumeFromCSGVolume.C
 vtkVolumeFromVolume.C
+${OPENEXR_SRC}
 )
 
 
@@ -118,6 +130,7 @@ ${VISIT_SOURCE_DIR}/common/utility
 ${VISIT_SOURCE_DIR}/visit_vtk/lightweight
 ${VTK_INCLUDE_DIRS}
 ${BOOST_INCLUDE_DIR}
+${OPENEXR_INCLUDE_DIR}
 )
 
 IF(HAVE_BOOST)
@@ -125,17 +138,11 @@ IF(HAVE_BOOST)
 ENDIF(HAVE_BOOST)
 
 # Add link directories needed to use our libraries and VTK.
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${VTK_LIBRARY_DIRS})
+LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${OPENEXR_LIBRARY_DIR})
 
 ADD_LIBRARY(visit_vtk ${VISIT_VTK_SOURCES})
 
-IF(HAVE_LIB_R)
-    TARGET_LINK_LIBRARIES(visit_vtk lightweight_visit_vtk vtkFiltersExtraction vtkFiltersFlowPaths vtkImagingHybrid vtkRenderingOpenGL vtkRenderingFreeType vtkRenderingFreeTypeOpenGL vtkInteractionStyle vtktiff vtkFiltersStatisticsGnuR)
-ELSE(HAVE_LIB_R)
-    TARGET_LINK_LIBRARIES(visit_vtk lightweight_visit_vtk vtkFiltersExtraction vtkFiltersFlowPaths vtkImagingHybrid vtkRenderingOpenGL vtkRenderingFreeType vtkRenderingFreeTypeOpenGL vtkInteractionStyle vtktiff)
-ENDIF(HAVE_LIB_R)
-# Add vtk definitions
-ADD_TARGET_DEFINITIONS(visit_vtk "${VTK_DEFINITIONS}")
+TARGET_LINK_LIBRARIES(visit_vtk lightweight_visit_vtk vtkFiltersExtraction vtkFiltersFlowPaths vtkFiltersSources vtkImagingHybrid vtkIOImage vtktiff ${OPENEXR_LIB})
 
 
 VISIT_INSTALL_TARGETS(visit_vtk)

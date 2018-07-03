@@ -4,7 +4,7 @@
         <required>
             <lib name="cmake"/> <!-- cmake is here -->
             <lib name="python"/> 
-            <lib name="vtk"/> <!-- <lib name="vtk" reqdeps="cmake vtk" optdeps="mesa"/> -->
+            <lib name="vtk"/> <!-- <lib name="vtk" reqdeps="cmake vtk" optdeps="qt mesagl"/> -->
             <lib name="qt"/>
             <lib name="qwt"/>
         </required>
@@ -29,9 +29,8 @@
             <lib name="hdf5"/>
             <lib name="icet"/>
             <lib name="llvm"/>
-            <lib name="manta"/>
 <!--        <lib name="mdsplus"/>    Removed for now by Allen Sanderson-->
-            <lib name="mesa"/>
+            <lib name="mesagl"/>
             <lib name="mfem"/>
             <lib name="mili"/>
             <lib name="moab"/>
@@ -39,12 +38,15 @@
             <lib name="mxml"/>
             <lib name="nektarpp"/>
             <lib name="netcdf"/>
+            <lib name="openexr"/>
             <lib name="pidx"/>
             <lib name="openssl"/>
-            <lib name="openswr"/>
+            <lib name="osmesa"/>
+            <lib name="ospray"/>
             <lib name="pyside"/>
             <lib name="silo"/>
             <lib name="szip"/>
+            <lib name="tbb"/>
             <lib name="tcmalloc"/>
             <lib name="uintah"/>
             <lib name="visus"/>
@@ -57,7 +59,7 @@
         <group name="required" comment="All required libraries" enabled="yes">
             <lib name="cmake"/> <!-- cmake is here -->
             <lib name="python"/>
-            <lib name="vtk"/> <!-- <lib name="vtk" reqdeps="cmake vtk" optdeps="mesa"/> -->
+            <lib name="vtk"/> <!-- <lib name="vtk" reqdeps="cmake vtk" optdeps="qt mesagl"/> -->
             <lib name="qt"/>
             <lib name="qwt"/>
         </group>
@@ -72,19 +74,17 @@
             <lib name="conduit"/>
             <lib name="cgns"/>
             <lib name="gdal"/>
-            <lib name="glu"/>
             <lib name="fastbit"/>
             <lib name="fastquery"/>
             <lib name="hdf5"/>
             <lib name="h5part"/>
-            <lib name="llvm"/>
-            <lib name="mesa"/>
             <lib name="mpich"/>
             <lib name="mxml"/>
             <lib name="netcdf"/>
             <lib name="nektarpp"/>
+            <lib name="openexr"/>
             <lib name="openssl"/>
-            <lib name="openswr"/>
+            <lib name="ospray"/>
             <lib name="pidx"/>
             <lib name="pyside"/>
             <lib name="silo"/>
@@ -123,6 +123,7 @@
             <lib name="mxml"/>
             <lib name="netcdf"/>
             <lib name="nektarpp"/>
+            <lib name="openexr"/>
             <lib name="pidx"/>
             <lib name="silo"/>
             <lib name="szip"/>
@@ -167,11 +168,8 @@
             #all the optional non io libraries
         -->
         <group name="nonio" comment="Build non I/O libraries" enabled="no">
-            <lib name="glu"/>
             <lib name="icet"/>
-            <lib name="llvm"/>
-            <lib name="mesa"/>
-            <lib name="openswr"/>
+            <lib name="ospray"/>
         </group>
 
         <!--
@@ -209,9 +207,9 @@
             <lib name="hdf5"/>
             <lib name="icet"/>
             <lib name="llvm"/>
-            <lib name="mesa"/>
+            <lib name="mesagl"/>
             <lib name="mpich"/>
-            <lib name="openswr"/>
+            <lib name="osmesa"/>
             <lib name="pyqt"/>
             <lib name="uintah"/>
             <lib name="damaris"/>
@@ -233,7 +231,6 @@
             <lib name="boost"/>
             <lib name="hdf5"/>
             <lib name="openssl"/>
-            <lib name="mesa"/>
             <lib name="netcdf"/>
             <lib name="mpich"/>
             <lib name="szip"/>
@@ -272,20 +269,7 @@
         </group>
         <!-- #all the optional non io libraries -->
         <group name="nonio" comment="Build non I/O libraries" enabled="no">
-            <lib name="glu"/>
             <lib name="icet"/>
-            <lib name="llvm"/>
-            <lib name="mesa"/>
-            <lib name="openswr"/>
         </group>
-        
-        <!-- you have to mangle both vtk and visit, otherwise the
-             build_visit will fail -->
-        <!--
-        <group name="mangled" comment="Use mangled VTK to build VisIt" enabled="no">
-            <custom-flag lib="vtk" flag="mangled"/>
-            <custom-flag lib="visit" flag="mangled"/>
-        </group>
-        -->
     </license>
 </modules>

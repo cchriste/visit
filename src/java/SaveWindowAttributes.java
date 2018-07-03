@@ -56,7 +56,7 @@ package llnl.visit;
 
 public class SaveWindowAttributes extends AttributeSubject
 {
-    private static int SaveWindowAttributes_numAdditionalAtts = 19;
+    private static int SaveWindowAttributes_numAdditionalAtts = 20;
 
     // Enum values
     public final static int FILEFORMAT_BMP = 0;
@@ -73,15 +73,23 @@ public class SaveWindowAttributes extends AttributeSubject
     public final static int FILEFORMAT_ULTRA = 11;
     public final static int FILEFORMAT_VTK = 12;
     public final static int FILEFORMAT_PLY = 13;
+    public final static int FILEFORMAT_EXR = 14;
 
     public final static int COMPRESSIONTYPE_NONE = 0;
     public final static int COMPRESSIONTYPE_PACKBITS = 1;
     public final static int COMPRESSIONTYPE_JPEG = 2;
     public final static int COMPRESSIONTYPE_DEFLATE = 3;
+    public final static int COMPRESSIONTYPE_LZW = 4;
 
     public final static int RESCONSTRAINT_NOCONSTRAINT = 0;
     public final static int RESCONSTRAINT_EQUALWIDTHHEIGHT = 1;
     public final static int RESCONSTRAINT_SCREENPROPORTIONS = 2;
+
+    public final static int PIXELDATA_COLORRGB = 1;
+    public final static int PIXELDATA_COLORRGBA = 2;
+    public final static int PIXELDATA_LUMINANCE = 4;
+    public final static int PIXELDATA_VALUE = 8;
+    public final static int PIXELDATA_DEPTH = 16;
 
 
     public SaveWindowAttributes()
@@ -105,6 +113,7 @@ public class SaveWindowAttributes extends AttributeSubject
         compression = COMPRESSIONTYPE_NONE;
         forceMerge = false;
         resConstraint = RESCONSTRAINT_SCREENPROPORTIONS;
+        pixelData = 1;
         advancedMultiWindowSave = false;
         subWindowAtts = new SaveSubWindowsAttributes();
     }
@@ -130,6 +139,7 @@ public class SaveWindowAttributes extends AttributeSubject
         compression = COMPRESSIONTYPE_NONE;
         forceMerge = false;
         resConstraint = RESCONSTRAINT_SCREENPROPORTIONS;
+        pixelData = 1;
         advancedMultiWindowSave = false;
         subWindowAtts = new SaveSubWindowsAttributes();
     }
@@ -155,6 +165,7 @@ public class SaveWindowAttributes extends AttributeSubject
         compression = obj.compression;
         forceMerge = obj.forceMerge;
         resConstraint = obj.resConstraint;
+        pixelData = obj.pixelData;
         advancedMultiWindowSave = obj.advancedMultiWindowSave;
         subWindowAtts = new SaveSubWindowsAttributes(obj.subWindowAtts);
 
@@ -191,6 +202,7 @@ public class SaveWindowAttributes extends AttributeSubject
                 (compression == obj.compression) &&
                 (forceMerge == obj.forceMerge) &&
                 (resConstraint == obj.resConstraint) &&
+                (pixelData == obj.pixelData) &&
                 (advancedMultiWindowSave == obj.advancedMultiWindowSave) &&
                 (subWindowAtts.equals(obj.subWindowAtts)));
     }
@@ -298,16 +310,22 @@ public class SaveWindowAttributes extends AttributeSubject
         Select(16);
     }
 
+    public void SetPixelData(int pixelData_)
+    {
+        pixelData = pixelData_;
+        Select(17);
+    }
+
     public void SetAdvancedMultiWindowSave(boolean advancedMultiWindowSave_)
     {
         advancedMultiWindowSave = advancedMultiWindowSave_;
-        Select(17);
+        Select(18);
     }
 
     public void SetSubWindowAtts(SaveSubWindowsAttributes subWindowAtts_)
     {
         subWindowAtts = subWindowAtts_;
-        Select(18);
+        Select(19);
     }
 
     // Property getting methods
@@ -328,6 +346,7 @@ public class SaveWindowAttributes extends AttributeSubject
     public int                      GetCompression() { return compression; }
     public boolean                  GetForceMerge() { return forceMerge; }
     public int                      GetResConstraint() { return resConstraint; }
+    public int                      GetPixelData() { return pixelData; }
     public boolean                  GetAdvancedMultiWindowSave() { return advancedMultiWindowSave; }
     public SaveSubWindowsAttributes GetSubWindowAtts() { return subWindowAtts; }
 
@@ -369,8 +388,10 @@ public class SaveWindowAttributes extends AttributeSubject
         if(WriteSelect(16, buf))
             buf.WriteInt(resConstraint);
         if(WriteSelect(17, buf))
-            buf.WriteBool(advancedMultiWindowSave);
+            buf.WriteInt(pixelData);
         if(WriteSelect(18, buf))
+            buf.WriteBool(advancedMultiWindowSave);
+        if(WriteSelect(19, buf))
             subWindowAtts.Write(buf);
     }
 
@@ -430,11 +451,14 @@ public class SaveWindowAttributes extends AttributeSubject
             SetResConstraint(buf.ReadInt());
             break;
         case 17:
-            SetAdvancedMultiWindowSave(buf.ReadBool());
+            SetPixelData(buf.ReadInt());
             break;
         case 18:
+            SetAdvancedMultiWindowSave(buf.ReadBool());
+            break;
+        case 19:
             subWindowAtts.Read(buf);
-            Select(18);
+            Select(19);
             break;
         }
     }
@@ -475,6 +499,8 @@ public class SaveWindowAttributes extends AttributeSubject
             str = str + "FILEFORMAT_VTK";
         if(format == FILEFORMAT_PLY)
             str = str + "FILEFORMAT_PLY";
+        if(format == FILEFORMAT_EXR)
+            str = str + "FILEFORMAT_EXR";
         str = str + "\n";
         str = str + intToString("width", width, indent) + "\n";
         str = str + intToString("height", height, indent) + "\n";
@@ -494,6 +520,8 @@ public class SaveWindowAttributes extends AttributeSubject
             str = str + "COMPRESSIONTYPE_JPEG";
         if(compression == COMPRESSIONTYPE_DEFLATE)
             str = str + "COMPRESSIONTYPE_DEFLATE";
+        if(compression == COMPRESSIONTYPE_LZW)
+            str = str + "COMPRESSIONTYPE_LZW";
         str = str + "\n";
         str = str + boolToString("forceMerge", forceMerge, indent) + "\n";
         str = str + indent + "resConstraint = ";
@@ -504,6 +532,7 @@ public class SaveWindowAttributes extends AttributeSubject
         if(resConstraint == RESCONSTRAINT_SCREENPROPORTIONS)
             str = str + "RESCONSTRAINT_SCREENPROPORTIONS";
         str = str + "\n";
+        str = str + intToString("pixelData", pixelData, indent) + "\n";
         str = str + boolToString("advancedMultiWindowSave", advancedMultiWindowSave, indent) + "\n";
         str = str + indent + "subWindowAtts = {\n" + subWindowAtts.toString(indent + "    ") + indent + "}\n";
         return str;
@@ -528,6 +557,7 @@ public class SaveWindowAttributes extends AttributeSubject
     private int                      compression;
     private boolean                  forceMerge;
     private int                      resConstraint;
+    private int                      pixelData;
     private boolean                  advancedMultiWindowSave;
     private SaveSubWindowsAttributes subWindowAtts;
 }

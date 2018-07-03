@@ -77,20 +77,30 @@ public:
         TIFF,
         ULTRA,
         VTK,
-        PLY
+        PLY,
+        EXR
     };
     enum CompressionType
     {
         None,
         PackBits,
         Jpeg,
-        Deflate
+        Deflate,
+        LZW
     };
     enum ResConstraint
     {
         NoConstraint,
         EqualWidthHeight,
         ScreenProportions
+    };
+    enum PixelData
+    {
+        ColorRGB = 1,
+        ColorRGBA = 2,
+        Luminance = 4,
+        Value = 8,
+        Depth = 16
     };
 
     // These constructors are for objects of this class
@@ -141,6 +151,7 @@ public:
     void SetCompression(CompressionType compression_);
     void SetForceMerge(bool forceMerge_);
     void SetResConstraint(ResConstraint resConstraint_);
+    void SetPixelData(int pixelData_);
     void SetAdvancedMultiWindowSave(bool advancedMultiWindowSave_);
     void SetSubWindowAtts(const SaveSubWindowsAttributes &subWindowAtts_);
 
@@ -165,6 +176,7 @@ public:
     CompressionType                GetCompression() const;
     bool                           GetForceMerge() const;
     ResConstraint                  GetResConstraint() const;
+    int                            GetPixelData() const;
     bool                           GetAdvancedMultiWindowSave() const;
     const SaveSubWindowsAttributes &GetSubWindowAtts() const;
           SaveSubWindowsAttributes &GetSubWindowAtts();
@@ -189,6 +201,11 @@ public:
 protected:
     static std::string ResConstraint_ToString(int);
 public:
+    static std::string PixelData_ToString(PixelData);
+    static bool PixelData_FromString(const std::string &, PixelData &);
+protected:
+    static std::string PixelData_ToString(int);
+public:
 
     // Keyframing methods
     virtual std::string               GetFieldName(int index) const;
@@ -198,6 +215,7 @@ public:
 
     // User-defined methods
     bool CurrentFormatIsImageFormat(void);
+    bool CurrentFormatSupportsAlpha();
 
     // IDs that can be used to identify fields in case statements
     enum {
@@ -218,6 +236,7 @@ public:
         ID_compression,
         ID_forceMerge,
         ID_resConstraint,
+        ID_pixelData,
         ID_advancedMultiWindowSave,
         ID_subWindowAtts,
         ID__LAST
@@ -241,6 +260,7 @@ private:
     int                      compression;
     bool                     forceMerge;
     int                      resConstraint;
+    int                      pixelData;
     bool                     advancedMultiWindowSave;
     SaveSubWindowsAttributes subWindowAtts;
 
@@ -248,6 +268,6 @@ private:
     static const char *TypeMapFormatString;
     static const private_tmfs_t TmfsStruct;
 };
-#define SAVEWINDOWATTRIBUTES_TMFS "bssbiiibbibbsbibiba"
+#define SAVEWINDOWATTRIBUTES_TMFS "bssbiiibbibbsbibiiba"
 
 #endif

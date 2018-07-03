@@ -170,6 +170,9 @@ class ViewerState;
 //   Kathleen Biagas, Wed Aug  7 13:05:32 PDT 2013
 //   Added SetPrecisionType.
 //
+//   Brad Whitlock, Thu Sep 12 15:17:57 PDT 2013
+//   Added StartPlotAnimation, StopPlotAnimation.
+//
 //   Cameron Christensen, Tuesday, June 10, 2014
 //   Added SetBackendType.
 //
@@ -178,6 +181,9 @@ class ViewerState;
 //
 //   David Camp, Thu Aug 27 09:40:00 PDT 2015
 //   Added host name to the Export and Import of the state functions.
+//
+//   Alister Maguire, Mon Oct 16 15:41:23 PDT 2017
+//   Added RemovePicks.
 //
 // ****************************************************************************
 
@@ -267,6 +273,8 @@ public:
     void TimeSliderPreviousState();
     void SetTimeSliderState(int state);
     void SetActiveTimeSlider(const std::string &ts);
+    void StartPlotAnimation(const intVector &plotIds);
+    void StopPlotAnimation(const intVector &plotIds);
 
     void AddPlot(int type, const std::string &var);
     void AddEmbeddedPlot(int type, const std::string &var, int id);
@@ -381,6 +389,7 @@ public:
     void ProcessExpressions();
 
     void ClearPickPoints();
+    void RemovePicks(const std::string);
     void ClearReferenceLines();
 
     void SetRenderingAttributes();

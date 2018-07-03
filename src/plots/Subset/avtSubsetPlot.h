@@ -48,6 +48,7 @@
 #include <SubsetAttributes.h>
 
 class     avtLevelsLegend;
+class     avtLevelsMapper;
 class     avtLevelsPointGlyphMapper;
 class     avtLookupTable;
 
@@ -114,6 +115,10 @@ class     avtSubsetBlockMergeFilter;
 //    the block when the wireframe option is selected from the Subset plot
 //    attributes dialog. 
 // 
+//    Kathleen Biagas, Tue Aug 23 11:20:32 PDT 2016
+//    Added LevelsMapper as points and surfaces no longer handled by the
+//    same mapper.
+//
 // ****************************************************************************
 
 class
@@ -137,7 +142,6 @@ avtSubsetPlot : public avtVolumeDataPlot
 
     void                      SetLegend(bool);
     void                      SetLineWidth(int);
-    void                      SetLineStyle(int);
     virtual bool              NeedZBufferToCompositeEvenIn2D(void);
 
   protected:
@@ -151,7 +155,8 @@ avtSubsetPlot : public avtVolumeDataPlot
     avtSubsetBlockMergeFilter       *sbmf; 
 
     SubsetAttributes          atts;
-    avtLevelsPointGlyphMapper *levelsMapper;
+    avtLevelsPointGlyphMapper *glyphMapper;
+    avtLevelsMapper           *levelsMapper;
     avtLevelsLegend          *levelsLegend;
     avtLegend_p               levLegendRefPtr;
     avtLookupTable           *avtLUT;
@@ -159,7 +164,7 @@ avtSubsetPlot : public avtVolumeDataPlot
     void                      SetColors(void); 
     void                      SortLabels(void);
     void                      SetPointGlyphSize();
-    virtual avtMapper        *GetMapper(void);
+    virtual avtMapperBase    *GetMapper(void);
     virtual avtDataObject_p   ApplyOperators(avtDataObject_p);
     virtual avtDataObject_p   ApplyRenderingTransformation(avtDataObject_p);
     virtual void              CustomizeBehavior(void);

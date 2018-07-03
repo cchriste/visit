@@ -126,7 +126,6 @@ public:
     void SetUseStride(bool useStride_);
     void SetStride(int stride_);
     void SetNVectors(int nVectors_);
-    void SetLineStyle(int lineStyle_);
     void SetLineWidth(int lineWidth_);
     void SetScale(double scale_);
     void SetScaleByMagnitude(bool scaleByMagnitude_);
@@ -149,13 +148,13 @@ public:
     void SetStemWidth(double stemWidth_);
     void SetOrigOnly(bool origOnly_);
     void SetGlyphType(GlyphType glyphType_);
+    void SetAnimationStep(int animationStep_);
 
     // Property getting methods
     GlyphLocation        GetGlyphLocation() const;
     bool                 GetUseStride() const;
     int                  GetStride() const;
     int                  GetNVectors() const;
-    int                  GetLineStyle() const;
     int                  GetLineWidth() const;
     double               GetScale() const;
     bool                 GetScaleByMagnitude() const;
@@ -180,6 +179,7 @@ public:
     double               GetStemWidth() const;
     bool                 GetOrigOnly() const;
     GlyphType            GetGlyphType() const;
+    int                  GetAnimationStep() const;
 
     // Persistence methods
     virtual bool CreateNode(DataNode *node, bool completeSave, bool forceAdd);
@@ -225,6 +225,7 @@ public:
 
     // User-defined methods
     bool ChangesRequireRecalculation(const VectorAttributes &obj);
+    double GetAnimationScale() const;
 
     // IDs that can be used to identify fields in case statements
     enum {
@@ -232,7 +233,6 @@ public:
         ID_useStride,
         ID_stride,
         ID_nVectors,
-        ID_lineStyle,
         ID_lineWidth,
         ID_scale,
         ID_scaleByMagnitude,
@@ -255,6 +255,7 @@ public:
         ID_stemWidth,
         ID_origOnly,
         ID_glyphType,
+        ID_animationStep,
         ID__LAST
     };
 
@@ -263,7 +264,6 @@ private:
     bool           useStride;
     int            stride;
     int            nVectors;
-    int            lineStyle;
     int            lineWidth;
     double         scale;
     bool           scaleByMagnitude;
@@ -286,11 +286,12 @@ private:
     double         stemWidth;
     bool           origOnly;
     int            glyphType;
+    int            animationStep;
 
     // Static class format string for type map.
     static const char *TypeMapFormatString;
     static const private_tmfs_t TmfsStruct;
 };
-#define VECTORATTRIBUTES_TMFS "ibiiiidbbdbbbasbibbiddiidbi"
+#define VECTORATTRIBUTES_TMFS "ibiiidbbdbbbasbibbiddiidbii"
 
 #endif

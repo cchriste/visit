@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-  <Attribute name="QueryOverTimeAttributes" purpose="Attributes for queries over time." persistent="true" exportAPI="STATE_API" exportInclude="state_exports.h" codefile="QueryOverTimeAttributes.code">
+  <Attribute name="QueryOverTimeAttributes" purpose="Attributes for queries over time." persistent="true" keyframe="true" exportAPI="STATE_API" exportInclude="state_exports.h" codefile="QueryOverTimeAttributes.code">
     <Enum name="TimeType">
       Cycle
       DTime
@@ -35,6 +35,11 @@
     <Field name="queryAtts" label="queryAtts" type="att" subtype="QueryAttributes" internal="true">
     </Field>
     <Field name="pickAtts" label="pickAtts" type="att" subtype="PickAttributes" internal="true">
+    </Field>
+    <Field name="cachedCurvePts" label="cachedCurvePts" type="doubleVector" access="protected">
+    </Field>
+    <Field name="useCachedPts" label="useCachedPts" type="bool" access="protected">
+      false
     </Field>
     <Function name="CreateNode" user="false" member="true">
     </Function>

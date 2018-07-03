@@ -224,7 +224,7 @@ avtVectorPlot::SetCellCountMultiplierForSRThreshold(const avtDataObject_p dob)
 //
 // ****************************************************************************
 
-avtMapper *
+avtMapperBase *
 avtVectorPlot::GetMapper(void)
 {
     return glyphMapper;
@@ -559,12 +559,11 @@ avtVectorPlot::SetAtts(const AttributeGroup *a)
 
     glyphMapper->SetScaleByMagnitude(atts.GetScaleByMagnitude());
     glyphMapper->SetAutoScale(atts.GetAutoScale());
-    glyphMapper->SetScale(atts.GetScale());
+    glyphMapper->SetScale(atts.GetScale() * atts.GetAnimationScale());
 
     SetMapperColors();
 
     glyphMapper->SetLineWidth(Int2LineWidth(atts.GetLineWidth()));
-    glyphMapper->SetLineStyle(Int2LineStyle(atts.GetLineStyle()));
 
     // Update the plot's colors if needed.
     if (atts.GetColorByMag() &&

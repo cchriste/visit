@@ -61,6 +61,7 @@ class QSocketNotifier;
 class QTimer;
 class QvisAppearanceWindow;
 class QvisApplication;
+class QvisCinemaWizard;
 class QvisCMFEWizard;
 class QvisColorTableWindow;
 class QvisInterpreter;
@@ -348,6 +349,9 @@ class SplashScreen;
 //    Added new ablitiy to save session files on remote host.
 //    This includes a new variable sessionHost.
 //
+//    Brad Whitlock, Thu Sep 14 13:18:12 PDT 2017
+//    Cinema support.
+//
 // ****************************************************************************
 
 class GUI_API QvisGUIApplication : public QObject, public ConfigManager, public GUIBase
@@ -435,6 +439,7 @@ protected:
     void ShowAllWindows();
     bool IsFullyInitialized() const;
     void SetWindowArea(int x, int y, int w, int h);
+    void QueryWindowSize(int tag);
 
 public slots:
     void newExpression();
@@ -469,6 +474,8 @@ protected slots:
 
     void SaveMovie();
     void SaveMovieMain();
+    void SaveCinema();
+    void SaveCinemaMain();
     void SaveWindow();
     void PrintWindow();
     void RefreshFileList();
@@ -580,6 +587,8 @@ protected:
     QvisSaveMovieWizard          *saveMovieWizard;
     QvisCMFEWizard               *setupCMFEWizard;
     QvisMovieProgressDialog      *movieProgress;
+    QvisCinemaWizard             *cinemaWizard;
+    QvisMovieProgressDialog      *cinemaProgress;
 
     // Important objects
     QvisInterpreter              *interpreter;

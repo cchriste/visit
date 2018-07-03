@@ -45,7 +45,9 @@
 
 #include <visit-config.h>
 
-#if (VISIT_APP_VERSION_CHECK(2, 5, 0) <= UINTAH_VERSION_HEX )
+#if (VISIT_APP_VERSION_CHECK(2, 5, 1) <= UINTAH_VERSION_HEX )
+#include <VisIt/interfaces/datatypes.h>
+#elif (VISIT_APP_VERSION_CHECK(2, 5, 0) <= UINTAH_VERSION_HEX )
 #include <VisIt/uda2vis/udaData.h>
 #else
 #include <StandAlone/tools/uda2vis/udaData.h>
@@ -53,9 +55,9 @@
 
 #include <avtMTMDFileFormat.h>
 
-#include <vector>
 #include <map>
 #include <string>
+#include <vector>
 
 // ****************************************************************************
 //  Class: avtUintahFileFormat
@@ -102,7 +104,8 @@ protected:
 
   void             GetLevelAndLocalPatchNumber(int, int&, int&);
   int              GetGlobalDomainNumber(int, int);
-  void             CalculateDomainNesting(int, const std::string&);
+  
+  void             GetDomainBoundariesAndNesting(int, const std::string&);
         
   virtual bool     HasInvariantMetaData(void) const { return !dataVariesOverTime; };
   virtual bool     HasInvariantSIL(void) const { return !dataVariesOverTime; };
@@ -112,14 +115,12 @@ protected:
                              const char* varname,
                              const int level, const int patch);
 
-  // DATA MEMBERS
-  bool useExtraCells;
+  // Data members
+  int  loadExtraElements;
   bool dataVariesOverTime;
   int currTimeStep;
   bool forceMeshReload;
 
-  std::string mesh_for_patch_data;
-  
   // VisIt meshes (see https://visitbugs.ornl.gov/issues/52)
   std::map<std::string, void_ref_ptr> mesh_domains;
   std::map<std::string, void_ref_ptr> mesh_boundaries;
@@ -142,13 +143,15 @@ protected:
   void             (*releaseGrid)(GridP*);
 
   std::vector<double>   (*getCycleTimes)(DataArchive*);
-  TimeStepInfo*    (*getTimeStepInfo)(DataArchive*, GridP*, int, bool);
+  TimeStepInfo*    (*getTimeStepInfo)(DataArchive*, GridP*, int, int);
 
-  GridDataRaw*     (*getGridData)(DataArchive*, GridP*, int, int, std::string, int, int, int[3], int[3], bool);
+  GridDataRaw*     (*getGridData)(DataArchive*, GridP*, int, int,
+                                  std::string, int, int, int[3], int[3], int);
 
   bool             (*variableExists)(DataArchive*, std::string);
 
-  ParticleDataRaw* (*getParticleData)(DataArchive*, GridP*, int, int, std::string, int, int);
+  ParticleDataRaw* (*getParticleData)(DataArchive*, GridP*, int, int,
+                                      std::string, int, int);
 
   std::string      (*getParticlePositionName)(DataArchive*);
 };

@@ -44,10 +44,8 @@
 #ifndef __vtkOBJWriter_
 #define __vtkOBJWriter_
 
-#include <stdio.h>
 #include <visit_vtk_exports.h>
-#include "vtkPolyDataWriter.h"
-#include "vtkPolyData.h"
+#include <vtkPolyDataWriter.h>
 
 class VISIT_VTK_API vtkOBJWriter : public vtkPolyDataWriter
 {
@@ -64,7 +62,7 @@ protected:
   vtkOBJWriter();
   ~vtkOBJWriter();
 
-  void WriteData();
+  void WriteData() override;
 private:
   vtkOBJWriter(const vtkOBJWriter&);  // Not implemented.
   void operator=(const vtkOBJWriter&);  // Not implemented.

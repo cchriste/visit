@@ -17,13 +17,9 @@ SET(LIBG_SOURCES
 VolumeGUIPluginInfo.C
 QvisVolumePlotWindow.C
 ${COMMON_SOURCES}
-${SLIVR_GUI_IMPL}
-TransferFunctionWidget.C
-VolumeRLEFunctions.C
 )
 SET(LIBG_MOC_SOURCES
 QvisVolumePlotWindow.h
-${SLIVR_GUI_HDR}
 )
 
 SET(LIBV_SOURCES
@@ -35,12 +31,7 @@ VolumeRLEFunctions.C
 avtVolumeRenderer.C
 avtVolumeFilter.C
 avtLowerResolutionVolumeFilter.C
-avtOpenGLSplattingVolumeRenderer.C
-avtOpenGL3DTextureVolumeRenderer.C
-avtOpenGLSLIVRVolumeRenderer.C
-avtOpenGLTuvokVolumeRenderer.C
-BoundingBoxContourer.C
-TransferFunctionWidget.C
+avtDefaultRenderer.C
 ${COMMON_SOURCES}
 )
 
@@ -53,21 +44,10 @@ VolumeRLEFunctions.C
 avtVolumeRenderer.C
 avtVolumeFilter.C
 avtLowerResolutionVolumeFilter.C
-avtOpenGLSplattingVolumeRenderer.C
-avtOpenGL3DTextureVolumeRenderer.C
-avtOpenGLSLIVRVolumeRenderer.C
-avtOpenGLTuvokVolumeRenderer.C
-BoundingBoxContourer.C
-TransferFunctionWidget.C
+avtDefaultRenderer.C
 ${COMMON_SOURCES}
 )
 
-IF (NOT WIN32)
-    SET_SOURCE_FILES_PROPERTIES(avtOpenGL3DTextureVolumeRenderer.C avtOpenGLSLIVRVolumeRenderer.C avtOpenGLSplattingVolumeRenderer.C avtOpenGLTuvokVolumeRenderer.C 
-        PROPERTIES
-        COMPILE_FLAGS "-I ${OPENGL_INCLUDE_DIR}"
-    )
-ENDIF (NOT WIN32)
 
 IF(VISIT_PYTHON_SCRIPTING)
     SET(PYINCLUDES ${PYTHON_INCLUDE_PATH} ${VISIT_INCLUDE_DIR}/visitpy/visitpy)
@@ -105,27 +85,19 @@ ${VISIT_INCLUDE_DIR}/viewer/rpc
 ${VISIT_INCLUDE_DIR}/winutil
 ${VISIT_INCLUDE_DIR}/visit_vtk/full
 ${VISIT_INCLUDE_DIR}/visit_vtk/lightweight
-${QT_INCLUDE_DIR}
-${QT_QTCORE_INCLUDE_DIR}
-${QT_QTGUI_INCLUDE_DIR}
 ${EAVL_INCLUDE_DIR}
 ${VTKM_INCLUDE_DIR}
 ${VTK_INCLUDE_DIRS}
 ${PYINCLUDES}
-${QT_QTOPENGL_INCLUDE_DIR}
-${SLIVR_INCLUDE_DIR}
-${GLEW_INCLUDE_DIR}
-${VISIT_INCLUDE_DIR}/third_party_builtin/tuvok/tuvok/IO/3rdParty/boost
-${VISIT_INCLUDE_DIR}/third_party_builtin/tuvok/tuvok/IO/3rdParty
-${VISIT_INCLUDE_DIR}/third_party_builtin/tuvok/tuvok/3rdParty
-${VISIT_INCLUDE_DIR}/third_party_builtin/tuvok/tuvok/3rdParty/boost
-${VISIT_INCLUDE_DIR}/third_party_builtin/tuvok/tuvok
-${VISIT_INCLUDE_DIR}/third_party_builtin/tuvok
 ${VISIT_INCLUDE_DIR}/avt/Expressions/Abstract
 ${VISIT_INCLUDE_DIR}/avt/Expressions/General
 )
 
-LINK_DIRECTORIES(${VISIT_LIBRARY_DIR} ${QT_LIBRARY_DIR} ${QWT_LIBRARY_DIR} ${GLEW_LIBRARY_DIR} ${EAVL_LIBRARY_DIR} ${VTKM_LIBRARY_DIR} ${VTK_LIBRARY_DIRS} )
+IF(VISIT_SLIVR)
+    ADD_DEFINITIONS(-DVISIT_SLIVR)
+ENDIF(VISIT_SLIVR)
+
+LINK_DIRECTORIES(${VISIT_LIBRARY_DIR} ${EAVL_LIBRARY_DIR} ${VTKM_LIBRARY_DIR} )
 
 ADD_LIBRARY(IVolumePlot ${LIBI_SOURCES})
 TARGET_LINK_LIBRARIES(IVolumePlot visitcommon)
@@ -134,10 +106,10 @@ SET(INSTALLTARGETS IVolumePlot)
 IF(NOT VISIT_SERVER_COMPONENTS_ONLY AND NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
     QT_WRAP_CPP(GVolumePlot LIBG_SOURCES ${LIBG_MOC_SOURCES})
     ADD_LIBRARY(GVolumePlot ${LIBG_SOURCES})
-    TARGET_LINK_LIBRARIES(GVolumePlot visitcommon gui ${TUVOK_LIB} ${QT_QTOPENGL_LIB} ${SLIVR_LIB} ${GLEW_LIB} ${OPENGL_gl_LIBRARY} )
+    TARGET_LINK_LIBRARIES(GVolumePlot visitcommon gui )
 
     ADD_LIBRARY(VVolumePlot ${LIBV_SOURCES})
-    TARGET_LINK_LIBRARIES(VVolumePlot visitcommon viewer ${TUVOK_LIB} ${SLIVR_LIB} ${GLEW_LIB} ${OPENGL_gl_LIBRARY} )
+    TARGET_LINK_LIBRARIES(VVolumePlot visitcommon viewer vtkRenderingVolumeOpenGL2 )
 
     SET(INSTALLTARGETS ${INSTALLTARGETS} GVolumePlot VVolumePlot)
 
@@ -145,8 +117,6 @@ IF(NOT VISIT_SERVER_COMPONENTS_ONLY AND NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO
         SET(LIBS_SOURCES
             VolumeScriptingPluginInfo.C
             PyVolumeAttributes.C
-            TransferFunctionWidget.C
-            PyTransferFunctionWidget.C
             ${COMMON_SOURCES}
         )
         ADD_LIBRARY(SVolumePlot ${LIBS_SOURCES})
@@ -156,20 +126,20 @@ IF(NOT VISIT_SERVER_COMPONENTS_ONLY AND NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO
 
     IF(VISIT_JAVA)
         FILE(COPY VolumeAttributes.java DESTINATION ${JavaClient_BINARY_DIR}/src/plots)
-        ADD_CUSTOM_TARGET(JavaVolume ALL ${Java_JAVAC_EXECUTABLE} ${VISIT_Java_FLAGS} -d ${JavaClient_BINARY_DIR} -classpath ${JavaClient_BINARY_DIR} -sourcepath ${JavaClient_BINARY_DIR} TransferFunctionWidget.java VolumeAttributes.java
+        ADD_CUSTOM_TARGET(JavaVolume ALL ${Java_JAVAC_EXECUTABLE} ${VISIT_Java_FLAGS} -d ${JavaClient_BINARY_DIR} -classpath ${JavaClient_BINARY_DIR} -sourcepath ${JavaClient_BINARY_DIR} VolumeAttributes.java
             DEPENDS JavaClient
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     ENDIF(VISIT_JAVA)
 ENDIF(NOT VISIT_SERVER_COMPONENTS_ONLY AND NOT VISIT_ENGINE_ONLY AND NOT VISIT_DBIO_ONLY)
 
 ADD_LIBRARY(EVolumePlot_ser ${LIBE_SOURCES})
-TARGET_LINK_LIBRARIES(EVolumePlot_ser visitcommon avtplotter_ser avtpipeline_ser ${TUVOK_LIB} ${SLIVR_LIB} ${GLEW_LIB} ${OPENGL_gl_LIBRARY} avtexpressions_ser )
+TARGET_LINK_LIBRARIES(EVolumePlot_ser visitcommon avtplotter_ser avtpipeline_ser avtexpressions_ser vtkRenderingVolumeOpenGL2 )
 SET(INSTALLTARGETS ${INSTALLTARGETS} EVolumePlot_ser)
 ADD_TARGET_DEFINITIONS(EVolumePlot_ser ENGINE)
 
 IF(VISIT_PARALLEL)
     ADD_PARALLEL_LIBRARY(EVolumePlot_par ${LIBE_SOURCES})
-    TARGET_LINK_LIBRARIES(EVolumePlot_par visitcommon avtplotter_par avtpipeline_par ${TUVOK_LIB} ${SLIVR_LIB} ${GLEW_LIB} ${OPENGL_gl_LIBRARY} avtexpressions_par )
+    TARGET_LINK_LIBRARIES(EVolumePlot_par visitcommon avtplotter_par avtpipeline_par avtexpressions_par vtkRenderingVolumeOpenGL2 )
     SET(INSTALLTARGETS ${INSTALLTARGETS} EVolumePlot_par)
     ADD_TARGET_DEFINITIONS(EVolumePlot_par ENGINE)
 ENDIF(VISIT_PARALLEL)

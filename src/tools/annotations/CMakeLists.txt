@@ -38,6 +38,10 @@
 #   Kathleen Bonnell, Wed Jan 05 10:25:13 PST 2010
 #   Add FOLDER property.
 #
+#   Kathleen Biagas, Thu Jun  7 14:45:49 PDT 2018
+#   Remove use of VTK_DEFINTIONS in compiler. It initializes some vtk
+#   modules, which is now being done in avt/Plotter/vtk/InitVTKRendering.C.
+#
 #****************************************************************************/
 
 INCLUDE_DIRECTORIES(
@@ -46,21 +50,23 @@ ${VISIT_SOURCE_DIR}/common/utility
 ${VTK_INCLUDE_DIRS}
 )
 
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${MESA_LIBRARY_DIR} ${GLEW_LIBRARY_DIR} ${VTK_LIBRARY_DIRS})
+LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} )
 
 ADD_EXECUTABLE(text2polys text2polys.C arial_font.C)
 ADD_EXECUTABLE(time_annotation time_annotation.C arial_font.C)
 
 # Specify the libraries to link against
 TARGET_LINK_LIBRARIES(text2polys vtkIOLegacy)
-IF(HAVE_LIB_R)
-TARGET_LINK_LIBRARIES(time_annotation vtkRenderingOpenGL vtkRenderingFreeType vtkRenderingFreeTypeOpenGL vtkInteractionStyle vtkFiltersStatisticsGnuR vtksys vtkIOImage)
-ELSE(HAVE_LIB_R)
-TARGET_LINK_LIBRARIES(time_annotation vtkRenderingOpenGL vtkRenderingFreeType vtkRenderingFreeTypeOpenGL vtkInteractionStyle vtksys vtkIOImage)
-ENDIF(HAVE_LIB_R)
-# add vtk definitions
-ADD_TARGET_DEFINITIONS(time_annotation "${VTK_DEFINITIONS}")
 
+TARGET_LINK_LIBRARIES(time_annotation
+    vtkRenderingOpenGL2 vtkRenderingFreeType vtkInteractionStyle
+    vtksys vtkIOImage)
+
+if(HAVE_OSMESA)
+    target_link_libraries(time_annotation ${OSMESA_LIBRARIES})
+elseif(HAVE_EGL)
+    target_link_libraries(time_annotation ${EGL_LIBRARIES})
+endif()
 
 VISIT_INSTALL_TARGETS(text2polys time_annotation)
 VISIT_TOOLS_ADD_FOLDER(annotations text2polys time_annotation)

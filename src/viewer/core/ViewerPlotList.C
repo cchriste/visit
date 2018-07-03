@@ -7849,6 +7849,9 @@ ViewerPlotList::GetPlotAtts(
 //    Brad Whitlock, Fri Jul 23 13:27:02 PDT 2010
 //    Pass back the selection name applied to the plot.
 //
+//    Brad Whitlock, Thu Sep 12 17:14:49 PDT 2013
+//    Pass back plot animation flag.
+//
 // ****************************************************************************
 
 void
@@ -7882,6 +7885,7 @@ ViewerPlotList::UpdatePlotList() const
         plot.SetHiddenFlag(plots[i].hidden);
         plot.SetFollowsTime(plots[i].plot->FollowsTime());
         plot.SetSelection(plots[i].plot->GetNamedSelection());
+        plot.SetAnimatingFlag(plots[i].plot->GetAnimating());
 
         // Figure out the stage of completion that the plot is at.
         if (plots[i].plot->GetErrorFlag())
@@ -9560,13 +9564,27 @@ ViewerPlotList::CanMeshPlotBeOpaque()
     bool canBeOpaque = true;
     for (i = 0; i < nPlots && canBeOpaque; ++i)
     {
-        if (plots[i].plot->IsInRange() && plots[i].realized && 
-            !plots[i].hidden && !plots[i].plot->IsLabel() &&
-            !(plots[i].plot->NoActorExists() && 
-              plots[i].plot->GetErrorFlag()) && 
-            (!plots[i].plot->IsMesh() ||
-             plots[i].plot->GetMeshType() == AVT_POINT_MESH))
-            canBeOpaque = false;
+        // ignore this plot if it is NOT in range
+        if (!plots[i].plot->IsInRange()) continue;
+
+        // ignore this plot if it is NOT realized
+        if (!plots[i].realized) continue;
+
+        // ignore this plot if it IS hidden
+        if (plots[i].hidden) continue; 
+
+        // ignore this plot if it IS a label plot
+        if (plots[i].plot->IsLabel()) continue;
+
+        // ignore this plot if it IS in a bad state
+        if (plots[i].plot->NoActorExists() &&
+            plots[i].plot->GetErrorFlag()) continue;
+
+        // ignore this plot if it IS a non-point mesh
+        if (plots[i].plot->IsMesh() && 
+            plots[i].plot->GetMeshType() != AVT_POINT_MESH) continue;
+
+        canBeOpaque = false;
     }
 
     for (i = 0; i < nPlots; ++i)
@@ -9691,6 +9709,39 @@ ViewerPlotList::SetFullFrameScaling(bool useScale, double *scale)
     {
         if (plots[i].realized)
             retval |= plots[i].plot->SetFullFrameScaling(useScale, scale);
+    }
+
+    return retval;
+}
+
+// ****************************************************************************
+// Method: ViewerPlotList::SetViewScale
+//
+// Purpose: 
+//     Sets the view scale to avoid stretching when the dimensional ranges
+//     do not match. This scale is typically applied to the up vector from 
+//     the model view matrix. 
+//
+// Arguments:
+//   scale    : the view scale to use. 
+//
+// Returns:    True if any plots changed their settings.
+//
+// Programmer: Alister Maguire
+// Creation:   Mon Jun  4 15:13:43 PDT 2018 
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+ViewerPlotList::SetViewScale(const double scale)
+{
+    bool retval = false;
+    for (int i = 0; i < nPlots; i++)
+    {
+        if (plots[i].realized)
+            retval |= plots[i].plot->SetViewScale(scale);
     }
 
     return retval;
@@ -9992,4 +10043,159 @@ ViewerPlotList::ShouldRefineData(double smallestCellSize) const
         refineData = true;
 
     return refineData;
+}
+
+// ****************************************************************************
+// Method: ViewerPlotList::StartPlotAnimation
+//
+// Purpose: 
+//   Start plot animation for the specified plots.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 16:32:35 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+ViewerPlotList::StartPlotAnimation(const intVector &plotIds)
+{
+    bool update = false;
+    for(size_t i = 0; i < plotIds.size(); ++i)
+    {
+        if(plotIds[i] < nPlots)
+        {
+            if(plots[plotIds[i]].realized)
+            {
+                update |= plots[plotIds[i]].plot->SetAnimating(true);
+            }
+            else
+            {
+                GetViewerMessaging()->Warning(
+                    TR("Plot %1 cannot be animated until it is drawn.").arg(i));
+            }
+        }
+    }
+
+    ViewerWindowManager::Instance()->UpdateAnimationTimer();
+
+    UpdatePlotList();
+
+    if(update)
+    {
+        UpdatePlotAtts(false);
+    }
+}
+
+// ****************************************************************************
+// Method: ViewerPlotList::StopPlotAnimation
+//
+// Purpose: 
+//   Stop plot animation for the specified plots.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 16:32:35 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+ViewerPlotList::StopPlotAnimation(const intVector &plotIds)
+{
+    bool update = false;
+    intVector ids;
+    for(size_t i = 0; i < plotIds.size(); ++i)
+    {
+        if(plotIds[i] < nPlots)
+        {
+            update |= plots[plotIds[i]].plot->SetAnimating(false);
+            if(update)
+                ids.push_back(plotIds[i]);
+        }
+    }
+
+    ViewerWindowManager::Instance()->UpdateAnimationTimer();
+
+    UpdatePlotList();
+
+    if(update)
+    {
+        UpdateFrameForPlots(ids);
+        UpdatePlotAtts(false);
+    }
+}
+
+// ****************************************************************************
+// Method: ViewerPlotList::HasAnimatingPlots
+//
+// Purpose:
+//   Determines whether the plot list has plots eligible for animation.
+//
+// Returns:    True if there are plots that can be animated; False otherwise.
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Wed Jan  7 17:54:55 PST 2015
+//
+// Modifications:
+//
+// ****************************************************************************
+
+bool
+ViewerPlotList::HasAnimatingPlots() const
+{
+    for(int i = 0; i < nPlots; ++i)
+    {
+        if(plots[i].realized &&
+           plots[i].plot->GetErrorFlag() == false &&
+           plots[i].plot->GetAnimating())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ****************************************************************************
+// Method: ViewerPlotList::AnimationStep
+//
+// Purpose: 
+//   This method lets the plots that are eligible for plot animation take a step.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 16:32:35 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+ViewerPlotList::AnimationStep()
+{
+    // Give each realized animating plot a chance to change itself.
+    bool update = false;
+    intVector ids;
+    for(int i = 0; i < nPlots; ++i)
+    {
+        if(plots[i].realized &&
+           plots[i].plot->GetErrorFlag() == false &&
+           plots[i].plot->GetAnimating())
+        {
+            update |= plots[i].plot->AnimationStep();
+        }
+
+        ids.push_back(i);
+    }
+
+    // Redraw the plots that changed.
+    if(update)
+    {
+        UpdateFrameForPlots(ids);
+        UpdatePlotAtts(false);
+    }
+
+    return update;
 }

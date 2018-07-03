@@ -1255,37 +1255,6 @@ class JavaGeneratorColor : public virtual Color , public virtual JavaGeneratorFi
 
 
 //
-// --------------------------------- LineStyle --------------------------------
-//
-class JavaGeneratorLineStyle : public virtual LineStyle , public virtual JavaGeneratorField
-{
-  public:
-    JavaGeneratorLineStyle(const QString &n, const QString &l)
-        : Field("linestyle",n,l), LineStyle(n,l), JavaGeneratorField("linestyle",n,l) { }
-
-    virtual void WriteSourceSetDefault(QTextStream &c)
-    {
-        c << "    " << name << " = " << val << ";" << endl;
-    }
-
-    virtual void WriteSourceWriteAtts(QTextStream &c, const QString &indent)
-    {
-        c << indent << "    buf.WriteInt(" << name << ");" << endl;
-    }
-
-    virtual bool WriteSourceReadAtts(QTextStream &c, const QString &indent)
-    {
-        c << indent << "Set" << Name << "(buf.ReadInt());" << endl;
-        return true;
-    }
-    virtual void WriteToString(QTextStream &c, const QString &indent)
-    {
-        c << indent << "str = str + intToString(\"" << name << "\", " << name << ", indent) + \"\\n\";" << endl;       
-    }
-};
-
-
-//
 // --------------------------------- LineWidth --------------------------------
 //
 class JavaGeneratorLineWidth : public virtual LineWidth , public virtual JavaGeneratorField
@@ -1809,7 +1778,6 @@ class JavaFieldFactory
         else if (type == "colortable")   f = new JavaGeneratorColorTable(name,label);
         else if (type == "color")        f = new JavaGeneratorColor(name,label);
         else if (type == "opacity")      f = new JavaGeneratorOpacity(name,label);
-        else if (type == "linestyle")    f = new JavaGeneratorLineStyle(name,label);
         else if (type == "linewidth")    f = new JavaGeneratorLineWidth(name,label);
         else if (type == "variablename") f = new JavaGeneratorVariableName(name,label);
         else if (type == "att")          f = new JavaGeneratorAtt(subtype,name,label);
@@ -2247,7 +2215,12 @@ private:
             for (size_t j = 0; j < EnumType::enums[i]->values.size(); ++j)
             {
                 QString constName(EnumType::enums[i]->type + QString("_") + EnumType::enums[i]->values[j]);
-                h << "    public final static int " << constName.toUpper() << " = " << j << ";" << endl;
+                h << "    public final static int " << constName.toUpper() << " = ";
+                if(EnumType::enums[i]->ivalues[j] >= 0)
+                    h << EnumType::enums[i]->ivalues[j];
+                else
+                    h << j;
+                h << ";" << endl;
             }
             h << endl;
         }

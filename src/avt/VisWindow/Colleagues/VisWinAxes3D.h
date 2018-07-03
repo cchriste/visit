@@ -166,7 +166,7 @@ class VISWINDOW_API VisWinAxes3D : public VisWinColleague
 
     bool                      GetBoundsOverridden() const;
     void                      GetOverrideBounds( double *bounds ) const;
-
+ 
   protected:
     void UpdateTitleTextAttributes(double fr, double fg, double fb);
     void UpdateLabelTextAttributes(double fr, double fg, double fb);

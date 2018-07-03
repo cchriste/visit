@@ -47,6 +47,7 @@
 
 class SimEngine;
 class avtDataObjectString;
+class VisWindow;
 
 // ****************************************************************************
 //  Class: SimEngineManager
@@ -160,7 +161,8 @@ public:
                          void (*waitCB)(void*), void *waitCBData);
 
     virtual int  Render(const EngineKey &ek, avtImage_p &img,
-                        bool sendZBuffer, const intVector &networkIds, 
+                        avtImageType imgT, bool sendZBuffer,
+                        const intVector &networkIds, 
                         int annotMode, int windowID, bool leftEye,
                         void (*waitCB)(void *), void *waitCBData);
 

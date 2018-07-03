@@ -1633,6 +1633,68 @@ ViewerMethods::SetActiveTimeSlider(const std::string &ts)
 }
 
 // ****************************************************************************
+// Method: ViewerMethods::StartPlotAnimation
+//
+// Purpose: 
+//   Start plot animation for some plots.
+//
+// Arguments:
+//  plotIds : The ids of the plots to animate.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 15:24:06 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+ViewerMethods::StartPlotAnimation(const intVector &plotIds)
+{
+    //
+    // Set the rpc type and arguments.
+    //
+    state->GetViewerRPC()->SetRPCType(ViewerRPC::StartPlotAnimationRPC);
+    state->GetViewerRPC()->SetActivePlotIds(plotIds);
+
+    //
+    // Issue the RPC.
+    //
+    state->GetViewerRPC()->Notify();
+}
+
+// ****************************************************************************
+// Method: ViewerMethods::StopPlotAnimation
+//
+// Purpose: 
+//   Stop plot animation for some plots.
+//
+// Arguments:
+//  plotIds : The ids of the plots to animate.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 15:24:06 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+ViewerMethods::StopPlotAnimation(const intVector &plotIds)
+{
+    //
+    // Set the rpc type and arguments.
+    //
+    state->GetViewerRPC()->SetRPCType(ViewerRPC::StopPlotAnimationRPC);
+    state->GetViewerRPC()->SetActivePlotIds(plotIds);
+
+    //
+    // Issue the RPC.
+    //
+    state->GetViewerRPC()->Notify();
+}
+
+// ****************************************************************************
 //  Method: ViewerMethods::SaveWindow
 //
 //  Purpose:
@@ -4748,6 +4810,34 @@ ViewerMethods::ClearPickPoints()
     // Set the rpc type.
     //
     state->GetViewerRPC()->SetRPCType(ViewerRPC::ClearPickPointsRPC);
+
+    //
+    // Issue the RPC.
+    //
+    state->GetViewerRPC()->Notify();
+}
+
+// ****************************************************************************
+// Method: ViewerMethods::RemovePicks
+//
+// Purpose: 
+//   Tells the viewer to remove a list of picks. 
+//
+// Programmer: Alister Maguire
+// Creation:   Mon Oct 16 15:41:23 PDT 2017
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+ViewerMethods::RemovePicks(const std::string sLabels)
+{
+    //
+    // Set the rpc type.
+    //
+    state->GetViewerRPC()->SetRPCType(ViewerRPC::RemovePicksRPC);
+    state->GetViewerRPC()->SetStringArg1(sLabels);
 
     //
     // Issue the RPC.

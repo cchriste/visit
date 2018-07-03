@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- * Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
+ * Copyright (c) 2000 - 2017, Lawrence Livermore National Security, LLC
  * Produced at the Lawrence Livermore National Laboratory
  * LLNL-CODE-442911
  * All rights reserved.
@@ -1749,9 +1749,13 @@ int avtunvFileFormat::getNbfreeSets ()
                 for (itre = freeelts.begin(); itre != freeelts.end(); itre++)
                 {
                     if (itre->matid == iorder)
+                    {
                         itre->matid = imax;
+                    }
                     else if (itre->matid == imax)
+                    {
                         itre->matid = iorder;
+                    }
                 }
             }
         }
@@ -1791,11 +1795,11 @@ int avtunvFileFormat::getNbfreeSets ()
 //
 // ****************************************************************************
 
-avtunvFileFormat::avtunvFileFormat(const char *fn) : avtSTSDFileFormat(fn)
+avtunvFileFormat::avtunvFileFormat(const char *fname) : avtSTSDFileFormat(fname)
 {
     // INITIALIZE DATA MEMBERS
     fileRead = false;
-    filename = strdup(fn);
+    filename = fname ; // strdup(fn);
     // File handles
     handle = NULL;
     gzhandle = Z_NULL;
@@ -1868,6 +1872,7 @@ avtunvFileFormat::FreeUpResources(void)
         meshUnvFacePressures[i].faces.clear();
 
     meshUnvFacePressures.clear();
+    fileRead = false;
 }
 
 
@@ -2142,6 +2147,10 @@ avtunvFileFormat::GetMesh(const char *meshname)
     if (PAR_Rank() != 0)
         return 0 ;
 #endif
+
+    if (!fileRead)
+        ReadFile();
+
     if (strcmp(meshname, "mesh") == 0)
     {
         // Builds the VTK data structure:
@@ -3136,14 +3145,14 @@ avtunvFileFormat::ReadFile()
 #else
             debug1 << "On the way to read unv file " << filename << endl;
 #endif
-            int len = 2048; // Longest line length
-            char *buf = new char[len]; // A line length
+            const int len = 2048; // Longest line length
+            char buf[len]; // A line length
             int code;
             int label;
             double fac = 1.;
             while (fgets(buf, len, handle) != NULL)
             {
-                if (strstr(buf, "    -1") != NULL)
+                if (strstr((const char *)buf, "    -1") != NULL)
                 {
                     // Adding another ideas block
                     // fprintf(stdout,"Found -1 code\n");
@@ -3356,7 +3365,7 @@ avtunvFileFormat::ReadFile()
                             }
                             while (fgets(buf, len, handle) != NULL)
                             {
-                                if (strstr(buf, "    -1") != NULL)
+                                if (strstr((const char *)buf, "    -1") != NULL)
                                 {
 #if INTERACTIVEREAD
                                     if (debuglevel >= 3) fprintf(stdout,"Found End unit section code=%d\n",code);
@@ -3486,7 +3495,6 @@ avtunvFileFormat::ReadFile()
                     }
                 }
             }
-            delete [] buf;
             fclose(handle);
         }
 #if GZSTUFF
@@ -3503,14 +3511,14 @@ avtunvFileFormat::ReadFile()
                 EXCEPTION1(InvalidDBTypeException, "This unv.gz file could not be openend.");
             }
 
-            int len = 2048; // Longest line length
-            char *buf = new char[len]; // A line length
+            const int len = 2048; // Longest line length
+            char buf[len]; // A line length
             int code;
             int label;
             double fac = 1.;
             while (gzgets(gzhandle, buf, len) != Z_NULL)
             {
-                if (strstr(buf, "    -1") != NULL)
+                if (strstr((const char*)buf, "    -1") != NULL)
                 {
                     if (gzgets(gzhandle, buf, len) != Z_NULL)
                     {
@@ -3532,7 +3540,7 @@ avtunvFileFormat::ReadFile()
 #endif
                             while (gzgets(gzhandle, buf, len) != Z_NULL)
                             {
-                                if (strstr(buf, "    -1") != NULL)
+                                if (strstr((const char*)buf, "    -1") != NULL)
                                 {
 #if INTERACTIVEREAD
                                     if (debuglevel >= 2) fprintf(stdout,"Found Element section end, nb3dcells=%d, nb2dcells=%d, nb1dcells=%d\n",nb3dcells,nb2dcells,nb1dcells);
@@ -3686,7 +3694,7 @@ avtunvFileFormat::ReadFile()
 #endif
                             while (gzgets(gzhandle, buf, len) != Z_NULL)
                             {
-                                if (strstr(buf, "    -1") != NULL)
+                                if (strstr((const char*)buf, "    -1") != NULL)
                                 {
 #if !defined(MDSERVER)
                                     nbnodes = anode.number;
@@ -3759,7 +3767,7 @@ avtunvFileFormat::ReadFile()
                             }
                             while (gzgets(gzhandle, buf, len) != Z_NULL)
                             {
-                                if (strstr(buf, "    -1") != NULL)
+                                if (strstr((const char*)buf, "    -1") != NULL)
                                 {
 #if INTERACTIVEREAD
                                     if (debuglevel >= 3) fprintf(stdout,"Found End unit section code=%d\n",code);
@@ -3810,7 +3818,7 @@ avtunvFileFormat::ReadFile()
                                 set<UnvElement, UnvElement::compare_UnvElement>::iterator itre; // Global elements iterator
                                 while (gzgets(gzhandle, buf, len) != NULL)
                                 {
-                                    if (strstr(buf, "    -1") != NULL)
+                                    if (strstr((const char*)buf, "    -1") != NULL)
                                     {
                                         meshUnvFacePressures.push_back(anfp);
 #if INTERACTIVEREAD
@@ -3878,7 +3886,7 @@ avtunvFileFormat::ReadFile()
                         {
                             while (gzgets(gzhandle, buf, len) != Z_NULL)
                             {
-                                if (strstr(buf, "    -1") != NULL)
+                                if (strstr((const char*)buf, "    -1") != NULL)
                                 {
 #if INTERACTIVEREAD
                                     if (debuglevel >= 3) fprintf(stdout,"Found End section code=%d\n",code);
@@ -3892,7 +3900,6 @@ avtunvFileFormat::ReadFile()
                     }
                 }
             }
-            delete [] buf;
             gzclose(gzhandle);
 #if INTERACTIVEREAD
             if (debuglevel >= 1) fprintf(stdout,"Closing file, nbnodes=%d, nbelts=%d\n",nbnodes,nb3dcells+nb2dcells);

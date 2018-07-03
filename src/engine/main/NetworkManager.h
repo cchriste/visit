@@ -41,6 +41,7 @@
 #include <EngineBase.h>
 
 #include <avtDataObjectWriter.h>
+#include <avtImageType.h>
 #include <avtPlot.h>
 #include <AnnotationAttributes.h>
 #include <AnnotationObjectList.h>
@@ -102,6 +103,7 @@ struct EngineVisWinInfo
     std::string                 changedCtName;
     int                         frameAndState[7];
     VisWindow                  *viswin;
+    bool                        owns;
     std::vector<int>            plotsCurrentlyInWindow;
     std::vector<avtPlot_p>      imageBasedPlots;
     bool                        markedForDeletion;
@@ -549,9 +551,14 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
                                     bool calledForRender,
                                     float *cellCountMultiplier);
 
-    virtual avtDataObject_p Render(bool checkThreshold, intVector networkIds, 
-                                   bool getZBuffer, int annotMode,
-                                   int windowID, bool leftEye);
+    virtual avtDataObject_p Render(avtImageType imgT, bool getZBuffer,
+                                   intVector networkIds, 
+                                   bool checkThreshold,  int annotMode,
+                                   int windowID, bool leftEye,
+                                   // out arguments
+                                   int &outImgWidth, int &outImgHeight);
+
+    avtDataObject_p RenderValues(intVector plotIds, bool getZBuffer, int windowID, bool leftEye);
 
     avtDataObjectWriter_p CreateNullDataWriter() const;
 
@@ -588,6 +595,8 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
                                           std::vector<long long> &,
                                           long long &);
 
+    void          SetCreateVisWindow(void (*cb)(int, VisWindow *&, bool &, void *), void *cbdata);
+
  protected:
     bool               ValidNetworkId(int id) const;
     void               ExportSingleDatabase(int, const ExportDBAttributes &);
@@ -595,8 +604,9 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
     virtual
     avtDataObject_p    RenderInternal();
 
-    void               RenderSetup(int windowId, intVector& networkIds, bool getZBuffer,
-                                   int annotMode, bool leftEye, bool checkSRThreshold);
+    void               RenderSetup(avtImageType imgT, int windowId, intVector& networkIds, 
+                                   bool getZBuffer, int annotMode, bool leftEye, 
+                                   bool checkSRThreshold);
     virtual
     avtImage_p         RenderGeometry();
 
@@ -627,6 +637,8 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
 
     int                GetScalableThreshold(const RenderingAttributes &renderAtts) const;
 
+    void (*CreateVisWindowCB)(int, VisWindow *&, bool &, void *);
+    void *CreateVisWindowCBData;
  private:
     struct RenderState
     {
@@ -648,10 +660,11 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
             twoD(false),
             gradientBg(false),
             getZBuffer(true),
+            getAlpha(false),
             zBufferComposite(true),
             allReducePass1(false),
             allReducePass2(false),
-            handledAnnotations(false),
+            restoreAnnotations(false),
             handledCues(false),
             transparency(false),
             transparencyInPass1(false),
@@ -662,7 +675,8 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
             needZBufferToCompositeEvenIn2D(false),
             shadowMap(false),
             depthCues(false),
-            imageBasedPlots(false)
+            imageBasedPlots(false),
+            imageType(ColorRGBImage)
             {}
 
         DataNetwork *origWorkingNet;     // saves this->workingNet
@@ -682,10 +696,11 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
         bool twoD;
         bool gradientBg;                 // background mode is gradient
         bool getZBuffer;                 // should we readback Z too?
+        bool getAlpha;                   // should we read back alpha too?
         bool zBufferComposite;           // opaque composite operation (because 2d may/may not need it)
         bool allReducePass1;             // ensure all ranks have the composited image
         bool allReducePass2;             // ensure all ranks have the composited image
-        bool handledAnnotations;         // annotations already done?
+        bool restoreAnnotations;         // Do we need to restore annotations after rendering?
         bool handledCues;                //
         bool transparency;               // some trasnparent geometry will be rendered
         bool transparencyInPass1;        // handle both opaque and translucent in one pass (serial)
@@ -697,10 +712,21 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
         bool shadowMap;                  // will use a shadow map pass
         bool depthCues;                  // will use a depth que pass
         bool imageBasedPlots;            // has image based plots
+        avtImageType imageType;
     };
     friend ostream &operator<<(ostream &os, const RenderState &rs);
 
  protected:
+    AnnotationAttributes  AnnotationAttributesForRender(
+                              const AnnotationAttributes &atts,
+                              int annotMode) const;
+    AnnotationObjectList  AnnotationObjectListForRender(
+                              const AnnotationObjectList &aolist,
+                              int annotMode) const;
+    void                  ApplyAnnotations(VisWindow *, 
+                              const AnnotationAttributes &atts, 
+                              const AnnotationObjectList &aolist);
+
 
     DataNetwork                      *workingNet;
     std::map<int, EngineVisWinInfo>   viswinMap;
@@ -722,12 +748,6 @@ class ENGINE_MAIN_API NetworkManager : public EngineBase
     void            SetWindowAttributes(EngineVisWinInfo &viswinInfo,
                         const WindowAttributes &atts, const std::string& extstr,
                         const double *vexts, const std::string& ctName);
-
-    void            SetAnnotationAttributes(EngineVisWinInfo &viswinInfo,
-                        const AnnotationAttributes &atts,
-                        const AnnotationObjectList &aolist,
-                        const VisualCueList &visCues, const int *fns,
-                        int annotMode);
 
     // The plugin managers
     DatabasePluginManager      *databasePlugins;

@@ -100,6 +100,7 @@ public:
     void SelectColor();
     void SelectGlyphType();
     void SelectLabel();
+    void SelectHighlightColor();
 
     // Property setting methods
     void SetPoints(const doubleVector &points_);
@@ -108,9 +109,9 @@ public:
     void SetGlyphType(const std::string &glyphType_);
     void SetLabel(const std::string &label_);
     void SetShowLabel(bool showLabel_);
-    void SetLineStyle(int lineStyle_);
     void SetLineWidth(int lineWidth_);
     void SetOpacity(double opacity_);
+    void SetHighlightColor(const float *highlightColor_);
 
     // Property getting methods
     const doubleVector   &GetPoints() const;
@@ -123,9 +124,10 @@ public:
     const std::string    &GetLabel() const;
           std::string    &GetLabel();
     bool                 GetShowLabel() const;
-    int                  GetLineStyle() const;
     int                  GetLineWidth() const;
     double               GetOpacity() const;
+    const float          *GetHighlightColor() const;
+          float          *GetHighlightColor();
 
     // Enum conversion functions
     static std::string CueType_ToString(CueType);
@@ -156,9 +158,9 @@ public:
         ID_glyphType,
         ID_label,
         ID_showLabel,
-        ID_lineStyle,
         ID_lineWidth,
         ID_opacity,
+        ID_highlightColor,
         ID__LAST
     };
 
@@ -169,14 +171,14 @@ private:
     std::string    glyphType;
     std::string    label;
     bool           showLabel;
-    int            lineStyle;
     int            lineWidth;
     double         opacity;
+    float          highlightColor[3];
 
     // Static class format string for type map.
     static const char *TypeMapFormatString;
     static const private_tmfs_t TmfsStruct;
 };
-#define VISUALCUEINFO_TMFS "d*iassbiid"
+#define VISUALCUEINFO_TMFS "d*iassbidF"
 
 #endif

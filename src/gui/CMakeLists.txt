@@ -60,6 +60,9 @@
 #   Added widgets for PickQuery, LineoutQuery, HohlraumFluxQuery,
 #   XRayImageQuery,  TimeQueryOtions.
 #
+#   Brad Whitlock, Thu Sep 14 16:53:41 PDT 2017
+#   Cinema support.
+#
 #****************************************************************************/
 
 SET(GUILIB_SOURCES
@@ -89,6 +92,7 @@ QvisAnnotationWindow.C
 QvisAppearanceWindow.C
 QvisApplication.C
 QvisAxisAttributesWidget.C
+QvisCinemaWizard.C
 QvisCMFEWizard.C
 QvisCollapsibleFrame.C
 QvisColorButton.C
@@ -145,7 +149,6 @@ QvisLightingWindow.C
 QvisLine2DInterface.C
 QvisLine3DInterface.C
 QvisLineoutQueryWidget.C
-QvisLineStyleWidget.C
 QvisLineWidthWidget.C
 QvisMacroWindow.C
 QvisMainWindow.C
@@ -238,6 +241,7 @@ QvisAnnotationWindow.h
 QvisAppearanceWindow.h
 QvisApplication.h
 QvisAxisAttributesWidget.h
+QvisCinemaWizard.h
 QvisColorButton.h
 QvisColorGridWidget.h
 QvisColorSelectionWidget.h
@@ -279,7 +283,6 @@ QvisInterpreter.h
 QvisLightingWidget.h
 QvisLightingWindow.h
 QvisLineoutQueryWidget.h
-QvisLineStyleWidget.h
 QvisLineWidthWidget.h
 QvisMacroWindow.h
 QvisMainWindow.h
@@ -385,19 +388,9 @@ ${VISIT_SOURCE_DIR}/mdserver/rpc
 ${VISIT_SOURCE_DIR}/viewer/proxy
 ${VISIT_SOURCE_DIR}/viewer/rpc
 ${VISIT_SOURCE_DIR}/winutil
-${QT_INCLUDE_DIR} 
-${QT_QTCORE_INCLUDE_DIR} 
-${QT_QTGUI_INCLUDE_DIR} 
-${QT_QTOPENGL_INCLUDE_DIR} 
-${QT_QTNETWORK_INCLUDE_DIR} 
-${QT_QTXML_INCLUDE_DIR} 
-${QT_QTUITOOLS_INCLUDE_DIR}
 ${QWT_INCLUDE_DIR}
 )
-
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY}
-  ${QT_SHAREDLIB_DIR} ${QT_LIBRARY_DIR} ${QWT_LIBRARY_DIR}
-)
+LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} )
 
 SET(GUI_QT_LIBS
 ${QT_QTUITOOLS_LIBRARY}

@@ -81,8 +81,6 @@
 # Copy necessary bin files & directories to the build dir.
 #----------------------------------------------------------------------------
 
-SET(VISIT_BIN_DIRECTORIES shaders)
-
 SET(VISIT_BIN_FILES
         Doxyfile
         curv3dprep
@@ -113,17 +111,8 @@ SET(VISIT_BIN_FILES
         xmledit
         xmltest)
 
-FOREACH(VISIT_BIN_ITEM ${VISIT_BIN_DIRECTORIES})
-    # Resolve symlink 
-    GET_FILENAME_COMPONENT(ITM_RP ${CMAKE_CURRENT_SOURCE_DIR}/${VISIT_BIN_ITEM} 
-                           REALPATH)
-    FILE(COPY ${ITM_RP}
-         DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
-         PATTERN ".svn" EXCLUDE)
-ENDFOREACH(VISIT_BIN_ITEM)
-
 IF (NOT WIN32)
-    FOREACH(VISIT_BIN_ITEM ${VISIT_BIN_FILES} internallauncher makemovie.py makemoviemain.py)
+    FOREACH(VISIT_BIN_ITEM ${VISIT_BIN_FILES} internallauncher makemovie.py makemoviemain.py visitcinema.py visitcinemamain.py)
         EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E copy
                                 ${CMAKE_CURRENT_SOURCE_DIR}/${VISIT_BIN_ITEM}
                                 ${CMAKE_CURRENT_BINARY_DIR}/${VISIT_BIN_ITEM})
@@ -142,7 +131,7 @@ IF (NOT WIN32)
                     GROUP_READ GROUP_WRITE GROUP_EXECUTE
                     WORLD_READ             WORLD_EXECUTE)
 
-    INSTALL(FILES makemovie.py makemoviemain.py visitdiff.py
+    INSTALL(FILES makemovie.py makemoviemain.py visitcinema.py visitcinemamain.py visitdiff.py
         DESTINATION ${VISIT_INSTALLED_VERSION_BIN}
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
                     GROUP_READ GROUP_WRITE GROUP_EXECUTE
@@ -167,6 +156,8 @@ ELSE (NOT WIN32)
     SET(VISIT_BIN_WIN_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/makemovie.py
         ${CMAKE_CURRENT_SOURCE_DIR}/makemoviemain.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/visitcinema.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/visitcinemamain.py
         ${CMAKE_CURRENT_SOURCE_DIR}/visitdiff.py)
 
     INSTALL(FILES ${VISIT_BIN_WIN_FILES}

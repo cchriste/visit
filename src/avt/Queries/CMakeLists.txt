@@ -107,6 +107,7 @@ Queries/avtDistanceFromBoundaryQuery.C
 Queries/avtEllipticalCompactnessFactorQuery.C
 Queries/avtEulerianQuery.C
 Queries/avtExpectedValueQuery.C
+Queries/avtGridInformationQuery.C
 Queries/avtHohlraumFluxQuery.C
 Queries/avtIndividualChordLengthDistributionQuery.C
 Queries/avtIndividualRayLengthDistributionQuery.C
@@ -210,7 +211,7 @@ IF(VISIT_PYTHON_FILTERS)
 ENDIF(VISIT_PYTHON_FILTERS)
 
 # Add link directories
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${EAVL_LIBRARY_DIR} ${VTK_LIBRARY_DIRS} ${MESA_LIBRARY_DIR} ${GLEW_LIBRARY_DIR})
+LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${EAVL_LIBRARY_DIR} )
 
 IF(VISIT_PYTHON_FILTERS)
     LINK_DIRECTORIES(${PYTHON_LIBRARY_DIRS})

@@ -90,6 +90,7 @@ SIMV2_API int     simv2_add_operator(void *, const char *, int);
 SIMV2_API int     simv2_draw_plots(void *);
 SIMV2_API int     simv2_delete_active_plots(void *);
 SIMV2_API int     simv2_set_active_plots(void *, const int *, int);
+SIMV2_API int     simv2_change_plot_var(void *, const char *, int);
 
 SIMV2_API int     simv2_set_plot_options(void *, const char *, int, void *, int);
 SIMV2_API int     simv2_set_operator_options(void *, const char *, int, void *, int);
@@ -97,6 +98,11 @@ SIMV2_API int     simv2_set_operator_options(void *, const char *, int, void *, 
 SIMV2_API int     simv2_exportdatabase(void *, const char *, const char *, visit_handle);
 SIMV2_API int     simv2_exportdatabase_with_options(void *, const char *, const char *, visit_handle, visit_handle);
 SIMV2_API int     simv2_restoresession(void *, const char *);
+
+SIMV2_API int     simv2_set_view2D(void *, visit_handle);
+SIMV2_API int     simv2_get_view2D(void *, visit_handle);
+SIMV2_API int     simv2_set_view3D(void *, visit_handle);
+SIMV2_API int     simv2_get_view3D(void *, visit_handle);
 
 #ifdef __cplusplus
 }

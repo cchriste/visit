@@ -1,6 +1,6 @@
 /*****************************************************************************
 *
-* Copyright (c) 2000 - 2015, Lawrence Livermore National Security, LLC
+* Copyright (c) 2000 - 2018, Lawrence Livermore National Security, LLC
 * Produced at the Lawrence Livermore National Laboratory
 * LLNL-CODE-442911
 * All rights reserved.
@@ -111,10 +111,6 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual bool     HasInvariantMetaData(void) const { return false; };
     virtual bool     HasInvariantSIL(void) const { return false; };
 
-    virtual void     *GetAuxiliaryData(const char *var, int,
-                                     const char *type, void *args,
-                                     DestructorFunction &){ return NULL; }
-
   protected:
 
     std::string                   dataset_filename;
@@ -132,17 +128,12 @@ class avtIDXFileFormat : public avtMTMDFileFormat
 
   private:
 
-    PIDXIO* reader;
+    IDX_IO* reader;
     bool reverse_endian;
     std::map<std::string, void_ref_ptr> mesh_boundaries;
     std::map<std::string, void_ref_ptr> mesh_domains;
 
-    std::string grid_type;
-    std::string mesh_name;
-
     LevelInfo level_info;
-
-    LevelInfo input_patches;
 
     std::vector<double> timeIndex;
     std::vector<int> logTimeIndex;
@@ -154,7 +145,7 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     void computeDomainBoundaries(const char* meshname, int timestate);
     void SetUpDomainConnectivity(const char* meshname);
 
-    void domainDecomposition();
+    void loadBalance();
 
 
 };

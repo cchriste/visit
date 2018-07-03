@@ -200,8 +200,8 @@ static int nConfigArgs = 1;
 #include <sstream>
 
 #include <visit-config.h>
-#ifdef HAVE_OSMESA
-#include <vtkVisItOSMesaRenderingFactory.h>
+#if defined(HAVE_OSMESA) || defined(HAVE_EGL)
+#  include <vtkOffScreenRenderingFactory.h>
 #endif
 
 // We do this so that the strings command on the .o file
@@ -459,7 +459,7 @@ ViewerSubject::ViewerSubject() : ViewerBaseUI(),
     // Initialize timer variables.
     //
     animationTimeout = 1;
-    lastAnimation = 0;
+    animationIndex = 0;
     timer = NULL;
 }
 
@@ -2635,8 +2635,8 @@ ViewerSubject::ProcessCommandLine(int argc, char **argv)
         }
         else if (strcmp(argv[i], "-nowin") == 0)
         {
-#ifdef HAVE_OSMESA
-            vtkVisItOSMesaRenderingFactory::ForceMesa();
+#if defined(HAVE_OSMESA) || defined(HAVE_EGL)
+            vtkOffScreenRenderingFactory::ForceOffScreen();
 #endif
             RemoteProcess::DisablePTY();
             SetNowinMode(true);
@@ -2648,14 +2648,12 @@ ViewerSubject::ProcessCommandLine(int argc, char **argv)
         {
             WindowMetrics::SetEmbeddedWindowState(true);
         }
-        else if (strcmp(argv[i], "-manta") == 0)
-        {
-            avtCallback::SetMantaMode(true);
-        }
+#ifdef VISIT_OSPRAY
         else if (strcmp(argv[i], "-ospray") == 0)
         {
             avtCallback::SetOSPRayMode(true);
         }
+#endif
         else if (strcmp(argv[i], "-fullscreen") == 0)
         {
             GetViewerProperties()->SetWindowFullScreen(true);
@@ -5451,6 +5449,57 @@ ViewerSubject::HandleCommandFromSimulation(const EngineKey &key,
         }
         GetViewerMethods()->SetActivePlots(activePlots);
     }
+    else if(command.substr(0,13) == "ChangePlotVar")
+    {
+        stringVector s = SplitValues(command, ':');
+        // s[0] = ChangePlotVar
+        // s[1] = var
+        // s[2] = all
+        int all = atoi(s[2].c_str());
+        if(all)
+        {
+            int np = GetViewerState()->GetPlotList()->GetNumPlots();
+            intVector activePlots;
+            for(int i = 1; i < np; ++i)
+                activePlots.push_back(i);
+            GetViewerMethods()->SetActivePlots(activePlots);
+        }
+        GetViewerMethods()->ChangeActivePlotsVar(s[1]);
+    }
+    else if(command.substr(0,9) == "SetView2D")
+    {
+        // The message is formatted like: SetView2D:XML
+        std::stringstream xml(command.substr(10));
+        View2DAttributes *atts = GetViewerState()->GetView2DAttributes();
+        SingleAttributeConfigManager mgr(atts);
+        if(mgr.Import(xml))
+        {
+            atts->Notify();
+            GetViewerMethods()->SetView2D();
+        }
+        else
+        {
+            debug5 << "SetView2D failed because the View2DAttributes could not "
+                      "be read from simulation." << endl;
+        }
+    }
+    else if(command.substr(0,9) == "SetView3D")
+    {
+        // The message is formatted like: SetView3D:XML
+        std::stringstream xml(command.substr(10));
+        View3DAttributes *atts = GetViewerState()->GetView3DAttributes();
+        SingleAttributeConfigManager mgr(atts);
+        if(mgr.Import(xml))
+        {
+            atts->Notify();
+            GetViewerMethods()->SetView3D();
+        }
+        else
+        {
+            debug5 << "SetView3D failed because the View3DAttributes could not "
+                      "be read from simulation." << endl;
+        }
+    }
 }
 
 // ****************************************************************************
@@ -5755,6 +5804,9 @@ ViewerSubject::AnimationCallback(int op, void *cbdata)
 //    Brad Whitlock, Tue Sep  2 15:37:13 PDT 2014
 //    Rewrite for ViewerSubject.
 //
+//    Brad Whitlock, Wed Jan  7 18:00:33 PST 2015
+//    Redo animated plots in the new framework.
+//
 // ****************************************************************************
 
 void
@@ -5780,6 +5832,12 @@ ViewerSubject::UpdateAnimationTimer()
 
                 if (mode == AnimationAttributes::PlayMode ||
                     mode == AnimationAttributes::ReversePlayMode)
+                {
+                    playing = true;
+                    break;
+                }
+
+                if(windows[i]->GetPlotList()->HasAnimatingPlots())
                 {
                     playing = true;
                     break;
@@ -5923,6 +5981,9 @@ ViewerSubject::StopAnimationTimer()
 //    Brad Whitlock, Tue Sep  2 15:37:13 PDT 2014
 //    Rewrite for ViewerSubject.
 //
+//    Brad Whitlock, Wed Jan  7 17:57:16 PST 2015
+//    Rewrite plot animation into the new infrastructure.
+//
 // ****************************************************************************
 
 void
@@ -5941,90 +6002,137 @@ ViewerSubject::HandleAnimation()
     }
 
     //
-    // Determine the next animation to update.
+    // Iterate through the windows and make a list of animation work.
     //
     std::vector<ViewerWindow *> windows = windowMgr->GetWindows();
-    int i, startFrame = lastAnimation + 1;
-    if(startFrame == (int)windows.size())
-        startFrame = 0;
-    for(i = startFrame; i != lastAnimation; )
+    const int ANIMATE_PLAY  = 0;
+    const int ANIMATE_RPLAY = 1;
+    const int ANIMATE_PLOTS = 2;
+    std::vector<int> animationWork;
+    for(int i = 0; i < (int)windows.size(); ++i)
     {
         AnimationAttributes::AnimationMode mode =
             windows[i]->GetPlotList()->GetAnimationAttributes().GetAnimationMode();
 
-        if (mode == AnimationAttributes::PlayMode ||
-            mode == AnimationAttributes::ReversePlayMode)
+        if (mode == AnimationAttributes::PlayMode)
         {
-            lastAnimation = i;
-            break;
+            animationWork.push_back(i);
+            animationWork.push_back(ANIMATE_PLAY);
+        }
+        else if(mode == AnimationAttributes::ReversePlayMode)
+        {
+            animationWork.push_back(i);
+            animationWork.push_back(ANIMATE_RPLAY);
         }
 
-        // Go to the next window index wrapping around if needed.
-        if(i == int(windows.size() - 1))
-            i = 0;
-        else
-            ++i;
+        if(windows[i]->GetPlotList()->HasAnimatingPlots())
+        {
+            animationWork.push_back(i);
+            animationWork.push_back(ANIMATE_PLOTS);
+        }
     }
 
-    //
-    // Advance the animation if animation is allowed for the new
-    // animation. We check the flag first in case the window was deleted.
-    //
-    if(windows[lastAnimation] != NULL)
+    // Make sure that animationIndex is in bounds.
+    int nWorkItems = animationWork.size() / 2;
+    if(animationIndex >= nWorkItems)
+        animationIndex = 0;
+
+    // Do the work item for the animationIndex.
+    if(!animationWork.empty())
     {
-        AnimationAttributes::AnimationMode mode =
-            windows[lastAnimation]->GetPlotList()->GetAnimationAttributes().GetAnimationMode();
+        int workWindow = animationWork[animationIndex*2];
+        int workAction = animationWork[animationIndex*2+1];
 
-        // Prevent the timer from emitting any signals since the
-        // code to handle animation may get back to the Qt event
-        // loop which makes it possible to get back here reentrantly.
-        timer->blockSignals(true);
-
-        TRY
+        //
+        // Advance the animation if animation is allowed for the new
+        // animation. We check the flag first in case the window was deleted.
+        //
+        if(windows[workWindow] != NULL)
         {
-            if (mode == AnimationAttributes::PlayMode)
-            {
-                // Change to the next frame in the animation, which will likely
-                // cause us to have to read a plot from the compute engine.
-                windows[lastAnimation]->GetPlotList()->ForwardStep();
+            // Prevent the timer from emitting any signals since the
+            // code to handle animation may get back to the Qt event
+            // loop which makes it possible to get back here reentrantly.
+            timer->blockSignals(true);
 
-                // Send new window information to the client if we're animating
-                // the active window.
-                windowMgr->UpdateWindowInformation(WINDOWINFO_ANIMATION, lastAnimation);
+            TRY
+            {
+                if (workAction == ANIMATE_PLAY)
+                {
+                    // Change to the next frame in the animation, which will likely
+                    // cause us to have to read a plot from the compute engine.
+                    windows[workWindow]->GetPlotList()->ForwardStep();
+
+                    // Send new window information to the client if we're animating
+                    // the active window.
+                    windowMgr->UpdateWindowInformation(WINDOWINFO_ANIMATION, workWindow);
+                }
+                else if(workAction == ANIMATE_RPLAY)
+                {
+                    // Change to the next frame in the animation, which will likely
+                    // cause us to have to read a plot from the compute engine.
+                    windows[workWindow]->GetPlotList()->BackwardStep();
+
+                    // Send new window information to the client if we're animating
+                    // the active window.
+                    windowMgr->UpdateWindowInformation(WINDOWINFO_ANIMATION, workWindow);
+                }
+                else if(workAction == ANIMATE_PLOTS)
+                {
+                    // Let the animated plots in the window have a change to update.
+                    windows[workWindow]->GetPlotList()->AnimationStep();
+                }
 
                 // Process any client input that we had to ignore while reading
                 // the plot from the compute engine.
                 ProcessFromParent();
             }
-            else if(mode == AnimationAttributes::ReversePlayMode)
+            CATCHALL
             {
-                // Change to the next frame in the animation, which will likely
-                // cause us to have to read a plot from the compute engine.
-                windows[lastAnimation]->GetPlotList()->BackwardStep();
-
-                // Send new window information to the client if we're animating
-                // the active window.
-                windowMgr->UpdateWindowInformation(WINDOWINFO_ANIMATION, lastAnimation);
-
-                // Process any client input that we had to ignore while reading
-                // the plot from the compute engine.
-                ProcessFromParent();
+                ; // nothing
             }
-        }
-        CATCHALL
-        {
-            ; // nothing
-        }
-        ENDTRY 
+            ENDTRY 
 
-        // Start the timer up again.
-        timer->blockSignals(false);
+            // Start the timer up again.
+            timer->blockSignals(false);
+        }
     }
+
+    // Try for the next animation work item next time around.
+    animationIndex++;
 }
 
-void ViewerSubject::RenderEventCallback(int windowId, bool inMotion, void* data) {
+// ****************************************************************************
+// Method: ViewerSubject::RenderEventCallback
+//
+// Purpose:
+//   ViewerWindow callback that is called when a VTK renderer updates. We use it to
+//   send a new image to connected clients such as the web client.
+//
+// Arguments:
+//   windowId : The ViewerWindow id that generated the image.
+//   inMotion : Whether the user is interacting with the mouse.
+//   data     : Callback data (a pointer to ViewerSubject).
+//
+// Returns:    
+//
+// Note:       
+//
+// Programmer: Hari Krishnan
+// Creation:   
+//
+// Modifications:
+//
+// ****************************************************************************
+
+void
+ViewerSubject::RenderEventCallback(int windowId, bool inMotion, void* data)
+{
     ViewerSubject* vs = (ViewerSubject*)data;
     ///this windowId is based on 0 index..
+
+    debug5 << "RenderEventCallback windowId " << windowId
+              << ", inMotion=" << inMotion << std::endl;
+
     vs->BroadcastImage(windowId+1, inMotion);
 }
 

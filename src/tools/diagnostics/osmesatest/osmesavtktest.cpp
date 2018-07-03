@@ -1,5 +1,5 @@
 // This junk is needed to make VTK work on startup.
-#define vtkRenderingCore_AUTOINIT 4(vtkInteractionStyle,vtkRenderingFreeType,vtkRenderingFreeTypeOpenGL,vtkRenderingOpenGL)
+#define vtkRenderingCore_AUTOINIT 3(vtkInteractionStyle,vtkRenderingFreeType,vtkRenderingOpenGL2)
 
 #include <vtkActor.h>
 #include <vtkActor2D.h>
@@ -19,7 +19,6 @@
 #include <vtkTexturedSphereSource.h>
 #include <vtkWindowToImageFilter.h>
 
-#include <vtkVisItOSMesaRenderingFactory.h>
 #include <Utility.h>
 
 #include <stdio.h>
@@ -64,16 +63,6 @@ main(int argc, char *argv[])
 
     if(barrier != NULL)
         WaitUntilFile(barrier);
-
-#if 1
-    // Just including this in the shared library build version of the program causes it to bail!
-    if(!interactive)
-    {
-        // Force Mesa rendering classes.
-        printf("Forcing Mesa classes.\n");
-        vtkVisItOSMesaRenderingFactory::ForceMesa();
-    }
-#endif
 
     // This creates a polygonal cylinder model with eight circumferential facets.
     //

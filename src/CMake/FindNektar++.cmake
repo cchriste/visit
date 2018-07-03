@@ -47,13 +47,13 @@
 
 # The libraries as of Nektar++ 4.4
 SET(NEKTAR++_LIBRARIES LibUtilities
-                       StdRegions
-                       SpatialDomains
-                       LocalRegions
-                       MultiRegions
-                       Collections
-                       GlobalMapping
-                       FieldUtils)
+		       StdRegions
+		       SpatialDomains
+		       LocalRegions
+		       MultiRegions 
+		       Collections
+		       GlobalMapping
+		       FieldUtils)
 
 If( EXISTS ${VISIT_NEKTAR++_DIR} )
 

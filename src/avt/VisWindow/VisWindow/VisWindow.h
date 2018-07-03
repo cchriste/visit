@@ -60,6 +60,7 @@
 #include <avtActor.h>
 #include <avtDataset.h>
 #include <avtImage.h>
+#include <avtImageType.h>
 #include <avtToolInterface.h>
 #include <avtTypes.h>
 #include <avtView2D.h>
@@ -464,6 +465,9 @@ class VisitInteractor;
 //    Added set/get methods for compositer thread and blocking
 //    params
 //
+//    Alister Maguire, Mon Oct 16 15:41:23 PDT 2017
+//    Added RemovePicks.
+//
 // ****************************************************************************
 
 class VISWINDOW_API VisWindow
@@ -483,7 +487,8 @@ public:
 
     void                 Realize(void);
 
-    void                 ScreenRender(bool doViewportOnly = false,
+    void                 ScreenRender(avtImageType imgT = ColorRGBImage,
+                                      bool doViewportOnly = false,
                                       bool doZBufferToo = false,
                                       bool doOpaque = true,
                                       bool doTranslucent = true,
@@ -492,6 +497,8 @@ public:
 
     avtImage_p           ScreenReadBack(bool doViewportOnly = false,
                              bool doZBufferToo = false, bool captureAlpha = false);
+
+    avtImage_p           BackgroundReadback(bool doViewportOnly = false);
 
     template <typename T>
     void                 ScreenReadBack(T *&r, T *&g, T *&b,
@@ -517,6 +524,8 @@ public:
 
     avtImage_p           PostProcessScreenCapture(avtImage_p capturedImage,
                                        bool doViewportOnly, bool keepZBuffer);
+
+    avtImage_p           ScreenCaptureValues(bool getZBuffer);
 
     avtDataset_p         GetAllDatasets(void);
 
@@ -653,6 +662,7 @@ public:
 
     void                 UpdateView();
     void                 ClearPickPoints();
+    std::string          RemovePicks(std::vector< std::string >);
     void                 ClearRefLines();
 
     void                 QueryIsValid(const VisualCueInfo *, 
@@ -712,9 +722,6 @@ public:
     void                 SetStereoRendering(bool enabled, int type);
     bool                 GetStereo() const;
     int                  GetStereoType() const;
-    void                 SetDisplayListMode(int mode);
-    int                  GetDisplayListMode(void) const;
-    bool                 GetImmediateModeRendering(void);
     bool                 IsDirect(void);
     void                 SetSurfaceRepresentation(int rep);
     int                  GetSurfaceRepresentation() const;
@@ -732,7 +739,16 @@ public:
     int                  GetCompactDomainsActivationMode() const;
     void                 SetCompactDomainsAutoThreshold(int val);
     int                  GetCompactDomainsAutoThreshold() const;
-
+#ifdef VISIT_OSPRAY
+    void                 SetOsprayRendering(bool enabled);
+    bool                 GetOsprayRendering() const;
+    void                 SetOspraySPP(int val);
+    int                  GetOspraySPP() const;
+    void                 SetOsprayAO(int val);
+    int                  GetOsprayAO() const;
+    void                 SetOsprayShadows(bool enabled);
+    bool                 GetOsprayShadows() const;
+#endif
     void                 SetSpecularProperties(bool,double,double,
                                                const ColorAttribute&);
     bool                 GetSpecularFlag();
@@ -767,6 +783,8 @@ public:
 
     VisWinAxes3D *GetAxes3D() const { return axes3D; }
 
+    void GetExtents(double ext[2]); // TODO: Remove with VTK8
+
 protected:
     VisWindowColleagueProxy            colleagueProxy;
     VisWindowInteractorProxy           interactorProxy;
@@ -777,7 +795,6 @@ protected:
     VisWinBackground                  *windowBackground;
     VisWinAxes                        *axes;
     VisWinAxes3D                      *axes3D;
-
     VisWinFrame                       *frame;
     VisWinAxesArray                   *axesArray;
     VisWinParallelAxes                *parallelAxes;
@@ -933,7 +950,7 @@ VisWindow::ScreenCapture(T *&r, T *&g, T *&b, T *&a, float *&z,
                          bool doOpaque, bool doTranslucent, bool captureAlpha,
                          bool disableBackground, avtImage_p input)
 {
-    rendering->ScreenRender(
+    rendering->ScreenRender(captureAlpha ? ColorRGBAImage : ColorRGBImage,
         doViewportOnly, doZBufferToo, doOpaque, doTranslucent,
         disableBackground, input);
 

@@ -35,6 +35,9 @@
 # DAMAGE.
 #
 # Modifications:
+#   Kathleen Biagas, Thu Jun  7 14:45:49 PDT 2018
+#   Remove use of VTK_DEFINTIONS in compiler. It initializes some vtk
+#   modules, which is now being done in avt/Plotter/vtk/InitVTKRendering.C.
 #
 #****************************************************************************/
 
@@ -53,12 +56,9 @@ ${VTK_INCLUDE_DIRS}
 )
 
 # Add link directories
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${VTK_LIBRARY_DIRS})
+LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} )
 
 ADD_LIBRARY(avtview ${AVTVIEW_SOURCES})
-TARGET_LINK_LIBRARIES(avtview visitcommon vtkRenderingOpenGL vtkRenderingFreeType vtkRenderingFreeTypeOpenGL vtkInteractionStyle)
-
-# Add vtk definitions
-ADD_TARGET_DEFINITIONS(avtview "${VTK_DEFINITIONS}")
+TARGET_LINK_LIBRARIES(avtview visitcommon vtkRenderingOpenGL2 vtkRenderingFreeType vtkInteractionStyle)
 
 VISIT_INSTALL_TARGETS(avtview)

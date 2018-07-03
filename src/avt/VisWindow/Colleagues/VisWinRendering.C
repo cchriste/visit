@@ -53,6 +53,7 @@
 #include <vtkRenderWindowInteractor.h>
 #include <vtkInteractorStyle.h>
 #include <vtkToolkits.h>
+#include <vtkInformation.h>
 
 #include <RenderingAttributes.h>
 
@@ -60,7 +61,6 @@
 #include <VisWindowColleagueProxy.h>
 
 #include <avtCallback.h>
-#include <avtOpenGLExtensionManager.h>
 #include <avtSourceFromImage.h>
 
 #include <ImproperUseException.h>
@@ -69,6 +69,20 @@
 
 #include <vtkCallbackCommand.h>
 #include <vtkSmartPointer.h>
+#include <vtk_glew.h>
+
+// We'd do it another way in VTK8
+//#define VALUE_IMAGE_RENDERING_PRE_VTK8
+#ifdef VALUE_IMAGE_RENDERING_PRE_VTK8
+#include <vtkVisItDataSetMapper.h>
+#include <vtkProperty.h>
+#endif
+
+#ifdef VISIT_OSPRAY
+#include <vtkOSPRayPass.h>
+#include <vtkViewNodeFactory.h>
+#include <vtkVisItViewNodeFactory.h>
+#endif
 
 #include <limits>
 using std::numeric_limits;
@@ -153,12 +167,14 @@ bool VisWinRendering::stereoEnabled = false;
 //   Burlen Loring, Sun Sep  6 09:03:17 PDT 2015
 //   Added option to disable ordered compositing
 //
+//   Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//   Added optional OSPRay initialization to constructor
 // ****************************************************************************
 
 VisWinRendering::VisWinRendering(VisWindowColleagueProxy &p) :
     VisWinColleague(p), background(NULL), foreground(NULL), needsUpdate(false),
     realized(false), antialiasing(false), stereo(false), stereoType(2),
-    displayListMode(2), surfaceRepresentation(0), specularFlag(false),
+    surfaceRepresentation(0), specularFlag(false),
     specularCoeff(0.6), specularPower(10.0),
     specularColor(ColorAttribute(255,255,255,255)), colorTexturingFlag(true),
     orderComposite(true), depthCompositeThreads(2), depthCompositeBlocking(65536),
@@ -193,6 +209,18 @@ VisWinRendering::VisWinRendering(VisWindowColleagueProxy &p) :
     RemoveCullers(foreground);
 
     curRenderTimes[0] = curRenderTimes[1] = curRenderTimes[2] = 0.0;
+
+#ifdef VISIT_OSPRAY
+    osprayPass = vtkOSPRayPass::New();
+    vtkViewNodeFactory* factory = osprayPass->GetViewNodeFactory();
+    factory->RegisterOverride("vtkDataSetMapper", pd_maker);
+    factory->RegisterOverride("vtkPointGlyphMapper", pd_maker);
+    factory->RegisterOverride("vtkMultiRepMapper", pd_maker);
+    factory->RegisterOverride("vtkMeshPlotMapper", pd_maker);
+    factory->RegisterOverride("vtkOpenGLMeshPlotMapper", pd_maker);
+    factory->RegisterOverride("vtkVisItCubeAxesActor", cube_axes_act_maker);
+    factory->RegisterOverride("vtkVisItAxisActor", axis_act_maker);
+#endif
 }
 
 
@@ -563,6 +591,9 @@ VisWinRendering::DisableAlphaChannel()
 //    Eric Brugger, Fri Aug 24 09:15:28 PDT 2001
 //    I added a call to compute the aspect ratio after setting the view.
 //
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
+//
 // ****************************************************************************
 
 void
@@ -575,6 +606,10 @@ VisWinRendering::Start2DMode(void)
     mediator.GetViewport(vport);
     canvas->SetViewport(vport);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY 
+    SetModePerspective(true);
+#endif
 }
 
 
@@ -596,6 +631,9 @@ VisWinRendering::Start2DMode(void)
 //    Eric Brugger, Fri Aug 24 09:15:28 PDT 2001
 //    I added a call to compute the aspect ratio after setting the view.
 //
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
+//
 // ****************************************************************************
 
 void
@@ -607,6 +645,10 @@ VisWinRendering::Stop2DMode(void)
     //
     canvas->SetViewport(0., 0., 1., 1.);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY 
+    SetModePerspective(false);
+#endif
 }
 
 // ****************************************************************************
@@ -618,6 +660,10 @@ VisWinRendering::Stop2DMode(void)
 //
 //  Programmer: Kathleen Bonnell 
 //  Creation:   May 7, 2002 
+//
+//  Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
 //
 // ****************************************************************************
 
@@ -631,6 +677,10 @@ VisWinRendering::StartCurveMode(void)
     mediator.GetViewport(vport);
     canvas->SetViewport(vport);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY 
+    SetModePerspective(true);
+#endif
 }
 
 
@@ -645,6 +695,10 @@ VisWinRendering::StartCurveMode(void)
 //  Programmer: Kathleen Bonnell 
 //  Creation:   May 7, 2002 
 //
+//  Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
+//
 // ****************************************************************************
 
 void
@@ -656,6 +710,10 @@ VisWinRendering::StopCurveMode(void)
     //
     canvas->SetViewport(0., 0., 1., 1.);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY
+    SetModePerspective(false);
+#endif
 }
      
 // ****************************************************************************
@@ -669,6 +727,8 @@ VisWinRendering::StopCurveMode(void)
 //  Creation:   January 30, 2008
 //
 //  Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
 //
 // ****************************************************************************
 
@@ -682,6 +742,10 @@ VisWinRendering::StartAxisArrayMode(void)
     mediator.GetViewport(vport);
     canvas->SetViewport(vport);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY 
+    SetModePerspective(true);
+#endif
 }
 
 
@@ -697,6 +761,8 @@ VisWinRendering::StartAxisArrayMode(void)
 //  Creation:   January 30, 2008
 //
 //  Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
 //
 // ****************************************************************************
 
@@ -709,6 +775,10 @@ VisWinRendering::StopAxisArrayMode(void)
     //
     canvas->SetViewport(0., 0., 1., 1.);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY 
+    SetModePerspective(false);
+#endif
 }
 
 // ****************************************************************************
@@ -722,6 +792,8 @@ VisWinRendering::StopAxisArrayMode(void)
 //  Creation:   December 9, 2008
 //
 //  Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
 //
 // ****************************************************************************
 
@@ -735,6 +807,10 @@ VisWinRendering::StartParallelAxesMode(void)
     mediator.GetViewport(vport);
     canvas->SetViewport(vport);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY 
+    SetModePerspective(true);
+#endif
 }
 
 
@@ -750,6 +826,8 @@ VisWinRendering::StartParallelAxesMode(void)
 //  Creation:   December 9, 2008
 //
 //  Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Added state tracking for non-perspective modes needed by OSPRay
 //
 // ****************************************************************************
 
@@ -762,6 +840,10 @@ VisWinRendering::StopParallelAxesMode(void)
     //
     canvas->SetViewport(0., 0., 1., 1.);
     canvas->ComputeAspect();
+
+#ifdef VISIT_OSPRAY 
+    SetModePerspective(false);
+#endif
 }
 
 // ****************************************************************************
@@ -837,16 +919,16 @@ VisWinRendering::EnableUpdates(void)
 void
 VisWinRendering::Render()
 {
-    const bool forceTiming = true;
-    const bool timingEnabled = visitTimer->Enabled(); 
-    const int timingsIndex = visitTimer->StartTimer(forceTiming);
-    double rt = 0.;
-
     if (realized)
     {
         if (mediator.UpdatesEnabled() && (!avtCallback::GetNowinMode() ||
                                            avtCallback::GetNowinInteractionMode()))
         {
+            const bool forceTiming = true;
+            const bool timingEnabled = visitTimer->Enabled(); 
+            const int timingsIndex = visitTimer->StartTimer(forceTiming);
+            double rt = 0.;
+
             // Do an extra render for 'in progress' visual queue if
             // average time to ender is more than 2 seconds
             if (mediator.IsMakingExternalRenderRequests() &&
@@ -868,37 +950,37 @@ VisWinRendering::Render()
             {
                 EXCEPTION1(VisItException, errorMsg.c_str());
             }
+
+            // Determine the time taken to render the image.
+            rt = (double)visitTimer->StopTimer(timingsIndex, "Render one frame", forceTiming);
+            if(timingEnabled)
+            {
+                // VisIt's timer is going so use its return value.
+                // Dump the timings to the timings file.
+                visitTimer->DumpTimings();
+            }
+
+            // Update the render times and call the renderer information callback
+            // if we need to.
+            summedRenderTime += (rt >= 0.) ? rt : 0.;
+            minRenderTime = (rt < minRenderTime) ? rt : minRenderTime;
+            maxRenderTime = (rt > maxRenderTime) ? rt : maxRenderTime;
+            curRenderTimes[2] = curRenderTimes[1];
+            curRenderTimes[1] = curRenderTimes[0];
+            curRenderTimes[0] = (rt >= 0.) ? rt : 0.;
+            ++nRenders;
+
+            // Call the rendering information callback
+            if(notifyForEachRender && !inMotion && renderInfo != 0)
+            {
+                (*renderInfo)(renderInfoData);
+                ResetCounters();
+            }
         }
         else
         {
             needsUpdate = true;
         }
-    }
-
-    // Determine the time taken to render the image.
-    rt = (double)visitTimer->StopTimer(timingsIndex, "Render one frame", forceTiming);
-    if(timingEnabled)
-    {
-        // VisIt's timer is going so use its return value.
-        // Dump the timings to the timings file.
-        visitTimer->DumpTimings();
-    }
-
-    // Update the render times and call the renderer information callback
-    // if we need to.
-    summedRenderTime += (rt >= 0.) ? rt : 0.;
-    minRenderTime = (rt < minRenderTime) ? rt : minRenderTime;
-    maxRenderTime = (rt > maxRenderTime) ? rt : maxRenderTime;
-    curRenderTimes[2] = curRenderTimes[1];
-    curRenderTimes[1] = curRenderTimes[0];
-    curRenderTimes[0] = (rt >= 0.) ? rt : 0.;
-    ++nRenders;
-
-    // Call the rendering information callback
-    if(notifyForEachRender && !inMotion && renderInfo != 0)
-    {
-        (*renderInfo)(renderInfoData);
-        ResetCounters();
     }
 }
 
@@ -1007,10 +1089,8 @@ VisWinRendering::Realize(void)
 {
     if (realized == false)
     {
-        debug3 << "Forcing GL context initialization..." << std::endl;
         RealizeRenderWindow();
         realized = true;
-        avt::glew::initialize();
     }
 }
 
@@ -1031,12 +1111,27 @@ VisWinRendering::Realize(void)
 // Creation:   Wed Mar 13 16:04:23 PDT 2013
 //
 // Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Force-disable shadows when not using OSPRay to prevent a crash caused
+//    by VTK getting into a strange state when switching back to GL rendering.
 //   
 // ****************************************************************************
 
 void
 VisWinRendering::RenderRenderWindow(void)
 {
+#ifdef VISIT_OSPRAY
+    if (!GetOsprayRendering())
+    {
+        canvas->SetPass(0);
+        canvas->SetUseShadows(false);
+    }
+    else
+    {
+        canvas->SetPass(osprayPass);
+    }
+#endif
+
     GetRenderWindow()->Render();
 }
 
@@ -1188,13 +1283,19 @@ VisWinRendering::GetCaptureRegion(int& r0, int& c0, int& w, int& h,
 //    of the pass 1 image. these are needed for ordered
 //    compositing.
 //
+//    Brad Whitlock, Wed Sep 27 11:43:08 PDT 2017
+//    I added imgT and code that lets us render different image types.
+//    I'd do these things differently after VTK8 vs now with VTK 6.1 so
+//    that's why these things are conditionally compiled. They'll need to
+//    be changed to render passes for VTK 8.
+//
 // ****************************************************************************
 
-
 void
-VisWinRendering::ScreenRender(bool doViewportOnly, bool doCanvasZBufferToo,
-                              bool doOpaque, bool doTranslucent,
-                              bool disableBackground, avtImage_p input)
+VisWinRendering::ScreenRender(avtImageType imgT,
+    bool doViewportOnly, bool doCanvasZBufferToo,
+    bool doOpaque, bool doTranslucent,
+    bool disableBackground, avtImage_p input)
 {
     avtCallback::ClearRenderingExceptions();
 
@@ -1203,7 +1304,12 @@ VisWinRendering::ScreenRender(bool doViewportOnly, bool doCanvasZBufferToo,
     // If we want zbuffer for the canvas, we need to take care that
     // the canvas is rendered last. To achieve this, we temporarily
     // remove the foreground renderer.
-    if (doCanvasZBufferToo)
+    bool removeForeground = false;
+    if(imgT == LuminanceImage || imgT == ValueImage || doCanvasZBufferToo)
+        removeForeground = true;
+
+    // Remove the foreground renderer if needed.
+    if (removeForeground)
         renWin->RemoveRenderer(foreground);
 
     // hide the appropriate geometry here
@@ -1216,6 +1322,71 @@ VisWinRendering::ScreenRender(bool doViewportOnly, bool doCanvasZBufferToo,
     // Set region origin/size to be captured
     int r0, c0, w, h;
     GetCaptureRegion(r0, c0, w, h, doViewportOnly);
+
+#ifdef VALUE_IMAGE_RENDERING_PRE_VTK8
+    double oldBG[3] = {0., 0., 0.};
+    int nActors = 0;
+    double *actorColors = NULL;
+    bool *actorLighting = NULL;
+    double *actorAmbient = NULL;
+    double *actorDiffuse = NULL;
+    if(imgT == ColorRGBImage || imgT == ColorRGBAImage)
+        vtkVisItDataSetMapper::SetRenderingMode(vtkVisItDataSetMapper::RENDERING_MODE_NORMAL);
+    else if(imgT == LuminanceImage)
+    {
+        vtkVisItDataSetMapper::SetRenderingMode(vtkVisItDataSetMapper::RENDERING_MODE_LUMINANCE);
+        background->GetBackground(oldBG);
+        background->SetBackground(0.,0.,0.);
+        // TODO: Turn off gradient background.
+        vtkActorCollection *actors = canvas->GetActors();
+        nActors = actors->GetNumberOfItems();
+        actorColors = new double[nActors * 4];
+        int i = 0;
+        actors->InitTraversal();
+        vtkActor *actor = NULL;
+        while((actor = actors->GetNextActor()) != NULL)
+        {
+            // Save the color and opacity.
+            actor->GetProperty()->GetColor(actorColors[4*i],actorColors[4*i+1],actorColors[4*i+2]);
+            actorColors[4*i+3] = actor->GetProperty()->GetOpacity();
+
+            // Override the color with white. Make opaque.
+            actor->GetProperty()->SetColor(1., 1., 1.);
+            actor->GetProperty()->SetOpacity(1.);
+            i++;
+        }
+    }
+    else if(imgT == ValueImage)
+    {
+        vtkVisItDataSetMapper::SetRenderingMode(vtkVisItDataSetMapper::RENDERING_MODE_VALUE);
+        background->GetBackground(oldBG);
+        background->SetBackground(0.,0.,0.);
+        // TODO: Turn off gradient background.
+
+        vtkActorCollection *actors = canvas->GetActors();
+        nActors = actors->GetNumberOfItems();
+        actorLighting = new bool[nActors];
+        actorAmbient = new double[nActors];
+        actorDiffuse = new double[nActors];
+        int i = 0;
+        actors->InitTraversal();
+        vtkActor *actor = NULL;
+        while((actor = actors->GetNextActor()) != NULL)
+        {
+            // Save the lighting.
+            actor->GetProperty()->GetLighting();
+            actorLighting[i] = actor->GetProperty()->GetOpacity();
+            actorAmbient[i] = actor->GetProperty()->GetAmbient();
+            actorDiffuse[i] = actor->GetProperty()->GetDiffuse();
+
+            // Override the lighting.
+            actor->GetProperty()->SetLighting(false);
+            actor->GetProperty()->SetAmbient(1);
+            actor->GetProperty()->SetDiffuse(0.);
+            i++;
+        }
+    }
+#endif
 
     // render
     if (input)
@@ -1265,16 +1436,57 @@ VisWinRendering::ScreenRender(bool doViewportOnly, bool doCanvasZBufferToo,
         RenderRenderWindow();
     }
 
-    // If we removed the foreground layers to get the canvas' zbuffer,
-    // put it back before we leave
-    if (doCanvasZBufferToo)
-       renWin->AddRenderer(foreground);
+    // If we removed the foreground layer, put it back before we leave
+    if (removeForeground)
+        renWin->AddRenderer(foreground);
 
     // return geometry from hidden status
     if(!doOpaque)
         mediator.ResumeOpaqueGeometry();
     if(!doTranslucent)
         mediator.ResumeTranslucentGeometry();
+
+#ifdef VALUE_IMAGE_RENDERING_PRE_VTK8
+    // If we changed the background color, restore it.
+    if(imgT == LuminanceImage)
+    {
+        background->SetBackground(oldBG);
+
+        vtkActorCollection *actors = canvas->GetActors();
+        int i = 0;
+        actors->InitTraversal();
+        vtkActor *actor = NULL;
+        while((actor = actors->GetNextActor()) != NULL)
+        {
+            // Restore the color.
+            actor->GetProperty()->SetColor(actorColors[4*i],actorColors[4*i+1],actorColors[4*i+2]);
+            actor->GetProperty()->SetOpacity(actorColors[4*i+3]);
+            i++;
+        }
+        delete [] actorColors;
+    }
+    else if(imgT == ValueImage)
+    {
+        background->SetBackground(oldBG);
+
+        vtkActorCollection *actors = canvas->GetActors();
+        int i = 0;
+        actors->InitTraversal();
+        vtkActor *actor = NULL;
+        while((actor = actors->GetNextActor()) != NULL)
+        {
+            // Restore the lighting.
+            actor->GetProperty()->SetLighting(actorLighting[i]);
+            actor->GetProperty()->SetAmbient(actorAmbient[i]);
+            actor->GetProperty()->SetDiffuse(actorDiffuse[i]);
+
+            i++;
+        }
+        delete [] actorLighting;
+        delete [] actorAmbient;
+        delete [] actorDiffuse;
+    }
+#endif
 
     std::string errorMsg = avtCallback::GetRenderingException();
     if (!errorMsg.empty())
@@ -1343,6 +1555,9 @@ VisWinRendering::ScreenRender(bool doViewportOnly, bool doCanvasZBufferToo,
 //    request up the stack so that render/readback sequences can occur safely
 //    without udpates.
 //
+//    Brad Whitlock, Thu Sep 21 16:01:03 PDT 2017
+//    Fix problem with zbuffer read. It wasn't setting the number of tuples.
+//
 // ****************************************************************************
 
 avtImage_p
@@ -1358,9 +1573,8 @@ VisWinRendering::ScreenReadback(
     if (readZ)
     {
         // get zbuffer data for the canvas
-        float *zb = renWin->GetZbufferData(c0,r0,c0+w-1,r0+h-1);
         zbuffer = vtkFloatArray::New();
-        zbuffer->SetArray(zb, /*keep=*/0, /*use delete []=*/1);
+        renWin->GetZbufferData(c0,r0,c0+w-1,r0+h-1, zbuffer);
     }
 
     // Read the pixels from the window and copy them over.
@@ -1415,6 +1629,46 @@ VisWinRendering::ScreenReadback(
 }
 
 // ****************************************************************************
+// Method: VisWinRendering::BackgroundReadback
+//
+// Purpose:
+//   Reads back the window's background as an avtImage.
+//
+// Arguments:
+//   doViewportOnly : Whether to read for viewport only.
+//
+// Returns:    An avtImage containing the background.
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Tue Mar 14 19:46:53 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+avtImage_p
+VisWinRendering::BackgroundReadback(bool doViewportOnly)
+{
+    // temporarily remove canvas and foreground renderers
+    vtkRenderWindow *renWin = GetRenderWindow();
+    renWin->RemoveRenderer(canvas);
+    renWin->RemoveRenderer(foreground);
+
+    // render (background layer only)
+    RenderRenderWindow();
+
+    avtImage_p img = ScreenReadback(doViewportOnly, false, false);
+
+    // add canvas and foreground renderers back in
+    renWin->AddRenderer(canvas);
+    renWin->AddRenderer(foreground);
+
+    return img;
+}
+
+// ****************************************************************************
 //  Method: VisWinRendering::PostProcessScreenCapture
 //
 //  Purpose:
@@ -1442,6 +1696,9 @@ VisWinRendering::ScreenReadback(
 //    Burlen Loring, Tue Sep 15 10:42:31 PDT 2015
 //    Eliminate a memcpy by reading directly into the output
 //    image buffer.
+//
+//    Brad Whitlock, Thu Sep 21 17:17:11 PDT 2017
+//    If we get 4 channel data, output 4 channel data.
 //
 // ****************************************************************************
 
@@ -1472,8 +1729,11 @@ VisWinRendering::PostProcessScreenCapture(avtImage_p input,
 
     // set pixel data
     unsigned char *pixels = input->GetImage().GetRGBBuffer();
-
-    renWin->SetPixelData(c0, r0, c0+w-1, r0+h-1, pixels, /*front=*/1);
+    int nChannels = input->GetImage().GetNumberOfColorChannels();
+    if(nChannels == 4)
+        renWin->SetRGBACharPixelData(c0, r0, c0+w-1, r0+h-1, pixels, /*front=*/1);
+    else
+        renWin->SetPixelData(c0, r0, c0+w-1, r0+h-1, pixels, /*front=*/1);
 
     // render (foreground layer only)
     RenderRenderWindow();
@@ -1484,11 +1744,14 @@ VisWinRendering::PostProcessScreenCapture(avtImage_p input,
     size_t npix = w*h;
 
     vtkUnsignedCharArray *pix = vtkUnsignedCharArray::New();
-    pix->SetNumberOfComponents(3);
+    pix->SetNumberOfComponents(nChannels);
     pix->SetNumberOfTuples(npix);
     pix->SetName("ImageScalars");
 
-    renWin->GetPixelData(c0,r0,c0+w-1,r0+h-1, /*front=*/1, pix);
+    if(nChannels == 4)
+        renWin->GetRGBACharPixelData(c0,r0,c0+w-1,r0+h-1, /*front=*/1, pix);
+    else
+        renWin->GetPixelData(c0,r0,c0+w-1,r0+h-1, /*front=*/1, pix);
 
     // construct the output image
     vtkImageData *im = vtkImageData::New();
@@ -1508,6 +1771,143 @@ VisWinRendering::PostProcessScreenCapture(avtImage_p input,
     renWin->AddRenderer(canvas);
 
     return output;
+}
+
+// ****************************************************************************
+// Method: VisWinRendering::ScreenCaptureValues
+//
+// Purpose:
+//   Renders the window as a value image and returns the values in an avtImage.
+//
+// Returns:    A value image.
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Mon Sep 25 15:35:27 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+//#define SCREEN_CAPTURE_VALUES_DEBUG
+#ifdef SCREEN_CAPTURE_VALUES_DEBUG
+#include <vtkPNGWriter.h>
+#endif
+
+avtImage_p
+VisWinRendering::ScreenCaptureValues(bool readZ)
+{
+#ifdef VALUE_IMAGE_RENDERING_PRE_VTK8
+    bool doViewportOnly = false;
+    bool doCanvasZBufferToo = true;
+    bool doOpaque = 1;
+    bool doTranslucent = true;
+    bool disableBackground = true;
+    avtImage_p input = NULL;
+
+    // Render as a value image. We just install a linear gray lookup 
+    // table and render. (For now).
+    ScreenRender(ValueImage,
+        doViewportOnly, doCanvasZBufferToo,
+        doOpaque, doTranslucent,
+        disableBackground, input);
+
+    //
+    // We have to have custom read-back.
+    //
+    vtkRenderWindow *renWin = GetRenderWindow();
+
+    // read the pixels.
+    int r0, c0, w, h;
+    GetCaptureRegion(r0, c0, w, h, false);
+    size_t npix = w*h;
+    vtkUnsignedCharArray *pix = vtkUnsignedCharArray::New();
+    pix->SetNumberOfComponents(3);
+    pix->SetNumberOfTuples(npix);
+    renWin->GetPixelData(c0,r0,c0+w-1,r0+h-1, /*front=*/1, pix);
+
+#ifdef SCREEN_CAPTURE_VALUES_DEBUG
+    vtkImageData *grayImage = vtkImageData::New();
+    grayImage->SetDimensions(w,h,1);
+    pix->SetName("ImageScalars");
+    grayImage->GetPointData()->SetScalars(pix);
+
+    vtkPNGWriter *writer = vtkPNGWriter::New();
+    writer->SetFileName("screencapturevalues_gray.png");
+    writer->SetInputData(grayImage);
+    writer->Write();
+    writer->Delete(); 
+#endif
+
+    // read z back. We use it to mask.
+    vtkFloatArray *zbuffer = vtkFloatArray::New();
+    renWin->GetZbufferData(c0,r0,c0+w-1,r0+h-1, zbuffer);
+
+    // Get the minval and scale for the values. 
+    double ext[2] = {0., 1.};
+    mediator.GetExtents(ext);
+    float minval = ext[0];
+    float scale = (ext[1] - ext[0]) / 255.f;
+//cout << "ScreenCaptureValues: min=" << ext[0] << ", max=" << ext[1] << endl;
+    // Create the values. We get the grayscale image and scale the values.
+    vtkFloatArray *values = vtkFloatArray::New();
+    values->SetName("ImageScalars");
+    values->SetNumberOfTuples(npix);
+    float *v = (float *)values->GetVoidPointer(0);
+    float *z = (float *)zbuffer->GetVoidPointer(0);
+    const unsigned char *byteval = (const unsigned char *)pix->GetVoidPointer(0);
+    for(int j = 0; j < h; j++)
+    {
+        for(int i = 0; i < w; ++i)
+        {
+            if(*z >= 1.f)
+                *v = 256.f;
+            else
+                *v = minval + scale * float(*byteval);
+            z++;
+            v++;
+            byteval += 3;
+        }
+    }
+
+    // Package it up as an avtImage.
+    vtkImageData *image = vtkImageData::New();
+    image->SetDimensions(w,h,1);
+    image->GetPointData()->SetScalars(values);
+    values->Delete();
+#ifdef SCREEN_CAPTURE_VALUES_DEBUG
+    grayImage->Delete();
+#else
+    pix->Delete();
+#endif
+
+    // If don't need Z, delete it.
+    if(!readZ)
+    {
+        zbuffer->Delete();
+        zbuffer = NULL;
+    }
+
+    avtImage_p output = new avtImage(NULL);
+    output->SetImage(avtImageRepresentation(image, zbuffer));
+    image->Delete();
+    if (zbuffer)
+        zbuffer->Delete();
+
+    return output;
+#else
+    // VTK 8 has a far superior way of doing this.
+
+    // Remove bg/fg renderers
+    // Make a vtkValuePass and add it to the canvas renderer.
+    // Force a render
+    // Get the float values from the value pass.
+    // wrap up the floats as an avtImage.
+    // restore bg/fg renderers.
+    avtImage_p output = new avtImage(NULL);
+    return output;
+#endif
 }
 
 // ****************************************************************************
@@ -2046,25 +2446,6 @@ VisWinRendering::SetStereoRendering(bool enabled, int type)
     }
 }
 
-// ****************************************************************************
-// Method: VisWinRendering::SetDisplayListMode
-//
-// Purpose: 
-//    Sets the display list mode.
-//
-// Arguments:
-//   mode : The new display list mode.
-//
-// Programmer: Hank Childs
-// Creation:   May 10, 2004
-//
-// ****************************************************************************
-
-void
-VisWinRendering::SetDisplayListMode(int mode)
-{
-    displayListMode = mode;
-}
 
 // ****************************************************************************
 // Method: VisWinRendering::SetSurfaceRepresentation
@@ -2393,3 +2774,159 @@ VisWinRendering::UpdateMouseActions(std::string action, double start_dx, double 
         };
     }
 }
+
+#ifdef VISIT_OSPRAY
+// ****************************************************************************
+// Method: VisWinRendering::SetModePerspective
+//
+// Purpose: 
+//   Stores rendering mode state information needed by OSPRay
+//
+// Arguments:
+//   enabled : Whether or not we're using a perspective rendering mode
+//
+// Programmer: Garrett Morrison
+// Creation:   Wed 2 May 2018 08:39:06 PM PDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+VisWinRendering::SetModePerspective(bool modePerspective)
+{
+    if (modePerspective != modeIsPerspective)
+    {
+        modeIsPerspective = modePerspective;
+        SetOsprayRendering(modeIsPerspective);
+    }
+}
+
+
+// ****************************************************************************
+// Method: VisWinRendering::SetOsprayRendering
+//
+// Purpose: 
+//   Sets the OSPRay rendering flag
+//
+// Arguments:
+//   enabled : Whether or not OSPRay rendering is enabled.
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:22:05 AM EDT
+//
+// Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Force-disable shadows when not using OSPRay to prevent a crash caused
+//    by VTK getting into a strange state when switching back to GL rendering.
+//   
+// ****************************************************************************
+
+void
+VisWinRendering::SetOsprayRendering(bool enabled)
+{
+    if (enabled != GetOsprayRendering())
+    {
+        osprayRendering = enabled;
+    }
+
+    if (GetOsprayRendering() && !modeIsPerspective)
+    {
+        canvas->SetPass(osprayPass);
+    }
+    else
+    {
+        SetOsprayShadows(false);
+        canvas->SetPass(0);
+    }
+}
+
+// ****************************************************************************
+// Method: VisWinRendering::SetOspraySPP
+//
+// Purpose: 
+//   Sets the OSPRay samples per pixel
+//
+// Arguments:
+//   val : The new number of samples per pixel
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:22:05 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+VisWinRendering::SetOspraySPP(int val)
+{
+    if(val != ospraySPP)
+    {
+        ospraySPP = val;
+        vtkOSPRayRendererNode::SetSamplesPerPixel(val, canvas);
+    }
+}
+
+// ****************************************************************************
+// Method: VisWinRendering::SetOsprayAO
+//
+// Purpose: 
+//   Sets the OSPRay ambient occlusion samples
+//
+// Arguments:
+//   val : the new number of ambient occlusion samples
+//
+// Programmer: Alok Hota
+// Creation:   Tue 24 Apr 2018 11:22:05 AM EDT
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+void
+VisWinRendering::SetOsprayAO(int val)
+{
+    if(val != osprayAO)
+    {
+        osprayAO = val;
+        vtkOSPRayRendererNode::SetAmbientSamples(val, canvas);
+    }
+}
+
+// ****************************************************************************
+// Method: VisWinRendering::SetOsprayShadows
+//
+// Purpose: 
+//   Sets the OSPRay shadows flag
+//
+// Arguments:
+//   enabled : The new shadows boolean flag
+//
+// Programmer: Alok Hota
+// Creation:   Wed 02 May 2018 09:41:20 AM EDT
+//
+// Modifications:
+//    Garrett Morrison, Fri May 11 17:57:47 PDT 2018
+//    Force-disable shadows when not using OSPRay to prevent a crash caused
+//    by VTK getting into a strange state when switching back to GL rendering.
+//   
+// ****************************************************************************
+
+void
+VisWinRendering::SetOsprayShadows(bool enabled)
+{
+    if(enabled != osprayShadows)
+    {
+        osprayShadows = enabled;
+    }
+    
+    if(osprayShadows && !modeIsPerspective)
+    {
+        canvas->SetUseShadows(true);
+    }
+    else
+    {
+        canvas->SetUseShadows(false);
+    }
+}
+#endif

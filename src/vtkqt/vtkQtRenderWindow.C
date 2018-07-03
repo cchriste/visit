@@ -2,20 +2,10 @@
 
 #include <vtkQtRenderWindow.h>
 
-#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
-  #include "QVTKWidget2.h"
-#else
-  #include "QVTKWidget.h"
-#endif
+#include "QVTKOpenGLWidget.h"
 
-#if defined(Q_WS_X11) || defined(Q_OS_LINUX)
-  #if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
-    #include <QX11Info>
-  #endif
-#endif
-
-#include "vtkGenericOpenGLRenderWindow.h"
-#include "QVTKInteractor.h"
+#include <vtkGenericOpenGLRenderWindow.h>
+#include <QVTKInteractor.h>
 #include <vtkRenderWindow.h>
 
 #include <QApplication>
@@ -26,6 +16,10 @@
 #define GLX_GLXEXT_LEGACY
 #include <GL/glx.h>
 #endif
+
+#include <vtkAutoInit.h>
+VTK_MODULE_INIT(vtkRenderingOpenGL2);
+
 
 #ifdef Q_OS_OSX
 #include "osxHelper.h"
@@ -61,6 +55,12 @@
 //   problems with the viewer window in OSX 10.13 and Qt 5.10.0 appears to
 //   have fixed the underlying issue. This fixes Bug #3020.
 //
+//   Kevin Griffin, Thu May 17 08:16:16 PDT 2018
+//   Commented-out the disable HiDPI work-around for the trunk since we've 
+//   upgraded to VTK-8 and are no longer using QVTKWidget/2 which was causing 
+//   the initial issues. I will investigate whether another form of work-around
+//   is needed, if not I will remove the uncommented code.
+//
 // ****************************************************************************
 
 class VTKQT_API vtkQtRenderWindowPrivate
@@ -77,51 +77,36 @@ public:
         showEventCallback = NULL;
         showEventCallbackData = NULL;
 
-#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
-        QGLFormat glFormat;
-
-        glFormat.setDepth(true);     // Enabled by default.
-        glFormat.setAlpha(true);     // Disabled by default.
-        glFormat.setStereo(stereo);  // Disabled by default.
-
-        // Create the VTK widget and force our custom render window
-        // into it.
-
-        // NOTE: vtkQtRenderWindow via the call to setCentralWidget()
-        // takes ownership of the gl widget pointer and deletes it at
-        // the appropriate time.
-        gl = new QVTKWidget2(glFormat, w);
-
-        if (!gl->format().alpha())
-            qWarning("Could not get alpha channel; results will be suboptimal");
-#else
         // With Qt5 there an issue with QVTKWidget2 asking for an
         // alpha channel (at least for OS X). However, not asking for
         // the channel seems to be benign. In addition, the 2D view
         // bounds and picking are off.
-        gl = new QVTKWidget(w);
+        gl = new QVTKOpenGLWidget(w);
+        if (!gl->GetRenderWindow())
+        {
+            vtkGenericOpenGLRenderWindow *renWin = vtkGenericOpenGLRenderWindow::New();
+            gl->SetRenderWindow(renWin);
+            renWin->Delete();
+        }
+        gl->GetRenderWindow()->AlphaBitPlanesOn();
+        gl->GetRenderWindow()->SetStereoRender( stereo );
         gl->GetRenderWindow()->AlphaBitPlanesOn();
         gl->GetRenderWindow()->SetStereoRender( stereo );
         
-    #ifdef Q_OS_OSX
-        if(QSysInfo::MacintoshVersion >= QSysInfo::MV_10_10)
-        {
-            disableGLHiDPI(gl->winId());
-        }
-    #endif
+   // #ifdef Q_OS_OSX
+   //     if(QSysInfo::MacintoshVersion >= QSysInfo::MV_10_10)
+   //     {
+   //         disableGLHiDPI(gl->winId());
+   //     }
+   //  #endif
         
-#endif
     }
 
     virtual ~vtkQtRenderWindowPrivate()
     {
     }
 
-#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
-    QVTKWidget2    *gl;
-#else
-    QVTKWidget     *gl;
-#endif
+    QVTKOpenGLWidget     *gl;
     
     void          (*resizeEventCallback)(void *);
     void           *resizeEventData;

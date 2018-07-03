@@ -84,6 +84,8 @@ simv2_SpeciesMetaData.C
 simv2_UnstructuredMesh.C
 simv2_VariableData.C
 simv2_VariableMetaData.C
+simv2_View2D.C
+simv2_View3D.C
 )
 
 # If VisIt is static then we need some static symbol lookup functions
@@ -153,9 +155,6 @@ ${SIMV2_PLUGIN_DIR}
 
 LINK_DIRECTORIES(
 ${LIBRARY_OUTPUT_DIRECTORY}
-${MESA_LIBRARY_DIR}
-${GLEW_LIBRARY_DIR}
-${VTK_LIBRARY_DIRS}
 ${ICET_LIBRARY_DIR}
 )
 
@@ -173,8 +172,7 @@ VISIT_INSTALL_TARGETS(simV2runtime_ser)
 
 IF(VISIT_PARALLEL)
     ADD_PARALLEL_LIBRARY(simV2runtime_par ${LIBSIM_RUNTIME_SOURCES} ${LIBSIM_STATIC_SOURCES})
-
-#    TARGET_LINK_LIBRARIES(simV2runtime_par engine_par vtkjsoncpp vtksys vtkpng vtkmetaio vtkDICOMParser ${LIBSIM_RUNTIME_VIEWER_LIBS_PAR})
+#    TARGET_LINK_LIBRARIES(simV2runtime_par engine_par vtksys vtkpng vtkmetaio vtkDICOMParser vtkImagingSources vtkglew vtkCommonSystem vtkCommonColor vtkCommonComputationalGeometry vtkFiltersStatistics vtkalglib vtklz4 vtkImagingFourier ${LIBSIM_RUNTIME_VIEWER_LIBS_PAR})
     TARGET_LINK_LIBRARIES(simV2runtime_par engine_par ${VTK_LIBRARIES} ${LIBSIM_RUNTIME_VIEWER_LIBS_PAR})
     IF(NOT APPLE)
         SET_TARGET_PROPERTIES(simV2runtime_par PROPERTIES INSTALL_RPATH "$ORIGIN")

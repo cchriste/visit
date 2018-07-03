@@ -52,7 +52,6 @@ QvisColorManagerWidget.C
 QvisColorSelectionWidget.C
 QvisGeneralWidget.C
 QvisGridWidget.C
-QvisLineStyleWidget.C
 QvisLineWidthWidget.C
 QvisMessageDialog.C
 QvisOpacitySlider.C
@@ -75,7 +74,6 @@ QvisColorManagerWidget.h
 QvisColorSelectionWidget.h
 QvisGeneralWidget.h
 QvisGridWidget.h
-QvisLineStyleWidget.h
 QvisLineWidthWidget.h
 QvisMessageDialog.h
 QvisOpacitySlider.h
@@ -102,10 +100,6 @@ ${VISIT_SOURCE_DIR}/viewer/main/ui
 ${VISIT_SOURCE_DIR}/viewer/rpc
 ${VISIT_SOURCE_DIR}/vtkqt
 ${VTK_INCLUDE_DIRS}
-${QT_INCLUDE_DIR}
-${QT_QTCORE_INCLUDE_DIR}
-${QT_QTGUI_INCLUDE_DIR}
-${QT_QTXML_INCLUDE_DIR}
 )
 
 SET(VTK_EXTRA_LIBS
@@ -114,10 +108,9 @@ vtkjpeg
 vtkpng
 ${VTKZLIB_LIB}
 ${VTK_FREETYPE_LIBRARIES}
-vtkftgl
 )
 
-LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${QT_LIBRARY_DIR} ${MESA_LIBRARY_DIR} ${GLEW_LIBRARY_DIR} ${EAVL_LIBRARY_DIR} ${VTK_LIBRARY_DIRS})
+LINK_DIRECTORIES(${LIBRARY_OUTPUT_DIRECTORY} ${EAVL_LIBRARY_DIR} )
 
 IF(APPLE)
     ADD_EXECUTABLE(mcurvit MACOSX_BUNDLE ${MCURVIT_SOURCES} ${STATIC_SOURCES})
@@ -166,7 +159,6 @@ vtkqt
 avtdbatts
 ${VIEWER_QT_LIBS}
 ${VTK_EXTRA_LIBS}
-${MESA_LIBS}
 )
 
 # If we're building statically then the viewer can't be linked until the plugin

@@ -246,7 +246,7 @@
 
 SplashScreen::SplashScreen(bool cyclePictures) : QFrame(0, Qt::SplashScreen)
 {
-#if defined(Q_WS_MACX) || defined(Q_OS_MAC)
+#if defined(Q_OS_MAC)
     setWindowModality(Qt::WindowModal);
 #endif    
     
@@ -315,9 +315,9 @@ SplashScreen::SplashScreen(bool cyclePictures) : QFrame(0, Qt::SplashScreen)
             painter.scale(scale, scale);
             QFont font("helvetica", 20, QFont::Bold, true);
             font.setItalic(false);
-            int x = 270;
-            int y = pictures[i].height() - 8;
-            painter.setPen(Qt::black);
+            int x = 290;
+            int y = pictures[i].height() - 10;
+            painter.setPen(QColor(210,37,74));
             painter.drawText(int(x / scale), int(y / scale), ver);
         }
     }

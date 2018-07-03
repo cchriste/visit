@@ -230,8 +230,9 @@ ViewerPlot::ViewerPlot(const int type_,ViewerPlotPluginInfo *viewerPluginInfo_,
     //
     type                = type_;
     viewerPluginInfo    = viewerPluginInfo_;
-    isMesh = (strcmp(viewerPluginInfo->GetName(), "Mesh") == 0);
+    isMesh = (strcmp(viewerPluginInfo->GetName(), "Mesh") == 0); 
     isLabel = (strcmp(viewerPluginInfo->GetName(), "Label") == 0);
+    animating           = false;
     followsTime         = true;
     expandedFlag        = GetViewerState()->GetGlobalAttributes()->GetExpandNewPlots();
     errorFlag           = false;
@@ -742,6 +743,110 @@ void
 ViewerPlot::SetFollowsTime(bool val)
 {
     followsTime = val;
+}
+
+// ****************************************************************************
+// Method: ViewerPlot::SupportsAnimation
+//
+// Purpose: 
+//   Returns whether this plot supports animation.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 16:32:35 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+ViewerPlot::SupportsAnimation() const
+{
+    return viewerPluginInfo->SupportsAnimation();
+}
+
+// ****************************************************************************
+// Method: ViewerPlot::GetAnimating
+//
+// Purpose: 
+//   Get whether the plot is animating.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 16:32:35 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+ViewerPlot::GetAnimating() const
+{
+    return animating;
+}
+
+// ****************************************************************************
+// Method: ViewerPlot::ViewerPlot::SetAnimating
+//
+// Purpose: 
+//   Set whether the plot is animating.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 16:32:35 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+ViewerPlot::SetAnimating(bool val)
+{
+    bool retval = false;
+    if(SupportsAnimation())
+    {
+        retval = animating != val;
+
+        animating = val;
+
+        // If the animation state is different then call the plugin's AnimationReset
+        // so it can adjust the plot attributes if needed.
+        if(retval)
+        {
+            AttributeSubject *atts = viewerPluginInfo->AllocAttributes();
+            atts->CopyAttributes(curPlotAtts);
+            if(viewerPluginInfo->AnimationReset(atts, GetPlotMetaData()))
+            {
+                SetPlotAtts(atts);
+            }
+            delete atts;
+        }
+    }
+    return retval;
+}
+
+// ****************************************************************************
+// Method: ViewerPlot::AnimationStep
+//
+// Purpose: 
+//   Lets the plot change its plot or plot attributes to accomplish animation.
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Sep 12 16:32:35 PDT 2013
+//
+// Modifications:
+//   
+// ****************************************************************************
+
+bool
+ViewerPlot::AnimationStep()
+{
+    bool retval = false;
+    AttributeSubject *atts = viewerPluginInfo->AllocAttributes();
+    atts->CopyAttributes(curPlotAtts);
+    if(viewerPluginInfo->AnimationStep(atts, GetPlotMetaData()))
+    {
+        retval = SetPlotAtts(atts);
+    }
+    delete atts;
+    return retval;
 }
 
 // ****************************************************************************
@@ -1523,8 +1628,29 @@ ViewerPlot::GetMetaData() const
 avtPlotMetaData
 ViewerPlot::GetPlotMetaData() const
 {
+    avtExtents actualSpatial(3), originalSpatial(3);
+    if(*GetActor() != NULL)
+    {
+        const avtDataAttributes &dAtts = GetActor()->GetDataObject()->
+            GetInfo().GetAttributes();
+
+        actualSpatial = *dAtts.GetActualSpatialExtents();
+        if(!actualSpatial.HasExtents() &&
+           dAtts.GetThisProcsActualSpatialExtents()->HasExtents())
+        {
+            actualSpatial = *dAtts.GetThisProcsActualSpatialExtents();
+        }
+
+        originalSpatial = *dAtts.GetOriginalSpatialExtents();
+        if(!originalSpatial.HasExtents() &&
+           dAtts.GetThisProcsOriginalSpatialExtents()->HasExtents())
+        {
+            actualSpatial = *dAtts.GetThisProcsOriginalSpatialExtents();
+        }
+    }
     return avtPlotMetaData(GetMetaData(), GetVariableName(),
-                           GetVarType(), GetSILRestriction());
+                           GetVarType(), GetSILRestriction(),
+                           actualSpatial, originalSpatial);
 }
 
 // ****************************************************************************
@@ -3166,6 +3292,10 @@ ViewerPlot::GetReader() const
 //    Removed maintain data; moved maintain view from Global settings
 //    (Main window) to per-window Window Information (View window).
 //
+//    Kathleen Biagas, Tue Aug 23 11:30:47 PDT 2016
+//    Moved call to Set the plot's atts after sething the varname, so plots
+//    could utilize the varname.
+//
 //    Kathleen Biagas, Mon Feb 26 16:59:52 MST 2018
 //    Moved setting of the plots VarUnits to avtPlot, so that plugins can
 //    override in their CustomizeBehavior call.
@@ -3335,7 +3465,6 @@ ViewerPlot::CreateActor(bool createNew,
         }
     }
 
-    plotList[cacheIndex]->SetAtts(curPlotAtts);
 
     // Set the variable name first as there may be multiple legends
     // and the variable name determines which legend is used.
@@ -3349,6 +3478,8 @@ ViewerPlot::CreateActor(bool createNew,
       plotList[cacheIndex]->SetPlotTitle(plotDescription.c_str());
     else
       plotList[cacheIndex]->SetPlotTitle(GetMenuName());
+
+    plotList[cacheIndex]->SetAtts(curPlotAtts);
 
     plotList[cacheIndex]->SetBackgroundColor(bgColor);
     plotList[cacheIndex]->SetForegroundColor(fgColor);
@@ -6113,6 +6244,34 @@ ViewerPlot::SetFullFrameScaling(bool useScale, double *s)
     return retval;
 }
 
+// ****************************************************************************
+// Method: ViewerPlot::SetViewScale
+//
+// Purpose:
+//   Set the view scale of the mapper. 
+//
+// Arguments:
+//   vs    The view scale. 
+//
+// Returns:    
+//   Whether or not the view scale was set. 
+//
+// Programmer: Alister Maguire
+// Creation:   Mon Jun  4 15:13:43 PDT 2018
+//
+// Modifications:
+//
+// ****************************************************************************
+
+bool
+ViewerPlot::SetViewScale(const double vs)
+{
+    bool retval = false;
+    if(*plotList[cacheIndex] != NULL)
+        retval = plotList[cacheIndex]->GetMapper()->SetViewScale(vs);
+
+    return retval;
+}
 // ****************************************************************************
 // Method: ViewerPlot::AlternateDisplayHide
 //

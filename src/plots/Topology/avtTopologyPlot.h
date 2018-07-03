@@ -78,7 +78,6 @@ class avtTopologyPlot : public avtSurfaceDataPlot
 
     void                        SetLegend(bool);
     void                        SetLineWidth(int);
-    void                        SetLineStyle(int);
     
   protected:
     TopologyAttributes              atts;
@@ -91,7 +90,7 @@ class avtTopologyPlot : public avtSurfaceDataPlot
 
     double                          opacity[4];
 
-    virtual avtMapper          *GetMapper(void);
+    virtual avtMapperBase      *GetMapper(void);
     virtual avtDataObject_p     ApplyOperators(avtDataObject_p);
     virtual avtDataObject_p     ApplyRenderingTransformation(avtDataObject_p);
     virtual void                CustomizeBehavior(void);

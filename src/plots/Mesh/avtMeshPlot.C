@@ -36,21 +36,19 @@
 *
 *****************************************************************************/
 
-// ************************************************************************* // 
+// ************************************************************************* //
 //                              avtMeshPlot.C                                //
-// ************************************************************************* // 
+// ************************************************************************* //
 
 #include <avtMeshPlot.h>
 
-#include <vtkProperty.h>
 #include <vtkLookupTable.h>
 
 #include <MeshAttributes.h>
 
 #include <avtMeshFilter.h>
 #include <avtSmoothPolyDataFilter.h>
-#include <avtSurfaceAndWireframeRenderer.h>
-#include <avtUserDefinedMapper.h>
+#include <avtMeshPlotMapper.h>
 #include <avtVariableLegend.h>
 #include <avtVariablePointGlyphMapper.h>
 
@@ -68,20 +66,20 @@
 //    Kathleen Bonnell, Fri Jun 15 14:58:51 PDT 2001
 //    Added initialization of filter.
 //
-//    Kathleen Bonnell, Wed Aug 22 15:22:55 PDT 2001 
-//    Intialize new renderer, mapper and property. 
+//    Kathleen Bonnell, Wed Aug 22 15:22:55 PDT 2001
+//    Intialize new renderer, mapper and property.
 //
-//    Kathleen Bonnell, Wed Sep  5 12:34:40 PDT 2001 
+//    Kathleen Bonnell, Wed Sep  5 12:34:40 PDT 2001
 //    Getting run-time warnings about legend not having a lut (even though one
 //    isn't needed in this case.)  Send a default lut to the legend to
-//    remove these warnings. 
+//    remove these warnings.
 //
-//    Kathleen Bonnell, Wed Sep 26 15:19:31 PDT 2001 
-//    Initialize fgColor, bgColor. 
-//    
-//    Kathleen Bonnell, Wed Sep 26 17:47:41 PDT 2001 
-//    Use new renderer methods for turning off primitive drawing. 
-//    
+//    Kathleen Bonnell, Wed Sep 26 15:19:31 PDT 2001
+//    Initialize fgColor, bgColor.
+//
+//    Kathleen Bonnell, Wed Sep 26 17:47:41 PDT 2001
+//    Use new renderer methods for turning off primitive drawing.
+//
 //    Hank Childs, Tue Apr 23 20:16:50 PDT 2002
 //    Instatiate the renderer through 'New' to insulate from graphics
 //    library issues.
@@ -107,13 +105,13 @@
 //    Eric Brugger, Wed Jul 16 10:57:44 PDT 2003
 //    Modified to work with the new way legends are managed.
 //
-//    Kathleen Bonnell, Thu Aug 28 10:03:42 PDT 2003 
-//    Initialize opaqueMeshIsAppropriate. 
+//    Kathleen Bonnell, Thu Aug 28 10:03:42 PDT 2003
+//    Initialize opaqueMeshIsAppropriate.
 //
 //    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
 //    Initialize glyphMapper, remove glyphPoints.
 //
-//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004 
+//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
 //    Replaced avtPointGlyphMapper with avtVariablePointGlyphMapper.
 //
 //    Hank Childs, Wed Dec 27 13:51:01 PST 2006
@@ -128,39 +126,16 @@
 
 avtMeshPlot::avtMeshPlot()
 {
-    filter = NULL; 
+    filter = NULL;
     smooth             = new avtSmoothPolyDataFilter();
     ghostAndFaceFilter = new avtGhostZoneAndFacelistFilter;
     ghostAndFaceFilter->SetUseFaceFilter(true);
     ghostAndFaceFilter->GhostDataMustBeRemoved();
-    renderer = avtSurfaceAndWireframeRenderer::New();
-    avtCustomRenderer_p cr;
-    CopyTo(cr, renderer);
-    mapper = new avtUserDefinedMapper(cr);
+
+    mapper = new avtMeshPlotMapper();
 
     glyphMapper = new avtVariablePointGlyphMapper;
-    
-    property = vtkProperty::New();
-    property->SetAmbient(1.);
-    property->SetDiffuse(0.);
-    property->SetEdgeColor(0., 0., 0.); // black
-
-    property->EdgeVisibilityOn();
-    renderer->ScalarVisibilityOff();
-    renderer->IgnoreLighting(true);
-  
-    //
-    //  Since we know our MeshFilter returns lines for the mesh part
-    //  and polys for the opaque part, tell the renderer not to draw
-    //  the polys in the edge-drawing routine, and not to draw lines
-    //  in the surface-drawing routine.
-    //
-    renderer->EdgePolysOff();
-    renderer->EdgeStripsOff();
-    renderer->SurfaceVertsOff();
-    renderer->SurfaceLinesOff();
-
-    property->SetColor(1., 1., 1.); // white
+    glyphMapper->ColorByScalarOff();
 
     varLegend = new avtVariableLegend;
     varLegend->SetTitle("Mesh");
@@ -178,7 +153,7 @@ avtMeshPlot::avtMeshPlot()
     //
     // This is to allow the legend to be reference counted so the behavior can
     // still access it after the plot is deleted.  The legend cannot be
-    // reference counted all of the time since we need to know that it is a 
+    // reference counted all of the time since we need to know that it is a
     // VariableLegend.
     //
     varLegendRefPtr = varLegend;
@@ -196,8 +171,8 @@ avtMeshPlot::avtMeshPlot()
 //    Kathleen Bonnell, Fri Jun 15 14:58:51 PDT 2001
 //    Added destruction of filter.
 //
-//    Kathleen Bonnell, Wed Aug 22 15:22:55 PDT 2001 
-//    Destruct new renderer, mapper and property. 
+//    Kathleen Bonnell, Wed Aug 22 15:22:55 PDT 2001
+//    Destruct new renderer, mapper and property.
 //
 //    Hank Childs, Mon May 20 10:47:18 PDT 2002
 //    Do not delete the renderer, because it is now reference counted.
@@ -215,7 +190,7 @@ avtMeshPlot::avtMeshPlot()
 //    Added poly data smooth filter.
 //
 //    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
-//    Added glyphMapper, removed glyphPoints. 
+//    Added glyphMapper, removed glyphPoints.
 //
 // ****************************************************************************
 
@@ -235,11 +210,6 @@ avtMeshPlot::~avtMeshPlot()
     {
         delete mapper;
         mapper = NULL;
-    }
-    if (property != NULL)
-    {
-        property->Delete();
-        property = NULL;
     }
     if (smooth != NULL)
     {
@@ -264,7 +234,7 @@ avtMeshPlot::~avtMeshPlot()
 //  Purpose:
 //    Call the constructor.
 //
-//  Programmer:  Kathleen Bonnell 
+//  Programmer:  Kathleen Bonnell
 //  Creation:    March 21, 2001
 //
 // ****************************************************************************
@@ -321,11 +291,11 @@ avtMeshPlot::SetCellCountMultiplierForSRThreshold(const avtDataObject_p dob)
 //    Added code to set a flag if the plot needs recalculation.  Also
 //    store the attributes as a class member.
 //
-//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001 
+//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001
 //    Added call to SetRenderOpaque, removed call to SetMeshColor, SetLegend,
 //    already part of 'CustomizeBehavior'. No need to call them twice.
 //
-//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001 
+//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001
 //    Modified arguments to SetLineWidth/Style.
 //
 //    Eric Brugger, Fri Sep  7 15:19:03 PDT 2001
@@ -333,23 +303,23 @@ avtMeshPlot::SetCellCountMultiplierForSRThreshold(const avtDataObject_p dob)
 //    CustomizeBehavior to here, since this is appropriate place for them.
 //
 //    Kathleen Bonnell, Wed Sep 26 15:19:31 PDT 2001
-//    Added logic to handle new meshAtts ForgroundFlag and BackgroundFlag. 
+//    Added logic to handle new meshAtts ForgroundFlag and BackgroundFlag.
 //
-//    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003 
-//    Call SetOpaqueColor and SetMeshColor instead of setting property's 
+//    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003
+//    Call SetOpaqueColor and SetMeshColor instead of setting property's
 //    color directly.
 //
 //    Kathleen Bonnell, Thu Sep  4 11:15:30 PDT 2003
-//    SetRenderOpaque no longer requires an argument. 
+//    SetRenderOpaque no longer requires an argument.
 //
-//    Kathleen Bonnell, Thu Feb  5 13:15:08 PST 2004 
+//    Kathleen Bonnell, Thu Feb  5 13:15:08 PST 2004
 //    Added spatialDim in call to atts.ChangesRequireRecalculation.
 //
-//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004 
-//    Set up glyphMapper. 
+//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
+//    Set up glyphMapper.
 //
-//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004 
-//    Updated glyphMapper methods calls with new names. 
+//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
+//    Updated glyphMapper methods calls with new names.
 //
 //    Brad Whitlock, Wed Jul 20 13:26:13 PST 2005
 //    I made the pointSize in the atts be used for to set the point size for
@@ -377,24 +347,21 @@ avtMeshPlot::SetAtts(const AttributeGroup *a)
     atts = *(const MeshAttributes*)a;
 
     SetLineWidth(Int2LineWidth(atts.GetLineWidth()));
-    SetLineStyle(Int2LineStyle(atts.GetLineStyle()));
     if (atts.GetMeshColorSource()==0)
     {
         SetMeshColor(fgColor);
-        glyphMapper->ColorBySingleColor(fgColor);
     }
-    else 
+    else
     {
         SetMeshColor(atts.GetMeshColor().GetColor());
-        glyphMapper->ColorBySingleColor(atts.GetMeshColor().GetColor());
     }
-    SetPointSize(atts.GetPointSize());
+
     SetRenderOpaque();
-    if (atts.GetOpaqueColorSource()==0)  
+    if (atts.GetOpaqueColorSource()==0)
     {
         SetOpaqueColor(bgColor);
     }
-    else 
+    else
     {
         SetOpaqueColor(atts.GetOpaqueColor().GetColor());
     }
@@ -404,6 +371,7 @@ avtMeshPlot::SetAtts(const AttributeGroup *a)
     // Setup glyphMapper
     //
     glyphMapper->SetScale(atts.GetPointSize());
+
     if (atts.GetPointSizeVarEnabled() &&
         atts.GetPointSizeVar() != "default" &&
         atts.GetPointSizeVar() != "" &&
@@ -423,7 +391,7 @@ avtMeshPlot::SetAtts(const AttributeGroup *a)
     // Do the opacity stuff
     //
     double opacity = atts.GetOpacity();
-    property->SetOpacity(opacity);
+    mapper->SetOpacity(opacity);
     behavior->SetRenderOrder((atts.GetOpacity() < 1.0) ?
                              ABSOLUTELY_LAST : DOES_NOT_MATTER);
     behavior->SetAntialiasedRenderOrder(ABSOLUTELY_LAST);
@@ -434,7 +402,7 @@ avtMeshPlot::SetAtts(const AttributeGroup *a)
 //  Method: avtMeshPlot::SetMeshColor
 //
 //  Purpose:
-//      Sets the color of the mesh. 
+//      Sets the color of the mesh.
 //
 //  Arguments:
 //      col      The color for the mesh.
@@ -444,11 +412,11 @@ avtMeshPlot::SetAtts(const AttributeGroup *a)
 //
 //  Modifications:
 //
-//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001 
-//    Set property edge color instead of mapper actor color. 
+//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001
+//    Set property edge color instead of mapper actor color.
 //
-//    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003 
-//    Added call to SetOpaqueColor. 
+//    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003
+//    Added call to SetOpaqueColor.
 //
 // ****************************************************************************
 
@@ -459,8 +427,9 @@ avtMeshPlot::SetMeshColor(const unsigned char *col)
     rgb[0] = (double) col[0] / 255.0;
     rgb[1] = (double) col[1] / 255.0;
     rgb[2] = (double) col[2] / 255.0;
-    property->SetEdgeColor(rgb);
- 
+    mapper->SetMeshColor(rgb);
+    glyphMapper->ColorBySingleColor(rgb);
+
     if (wireframeRenderingIsInappropriate)
     {
         SetOpaqueColor(col, true);
@@ -472,7 +441,7 @@ avtMeshPlot::SetMeshColor(const unsigned char *col)
 //  Method: avtMeshPlot::SetMeshColor
 //
 //  Purpose:
-//      Sets the color of the mesh. 
+//      Sets the color of the mesh.
 //
 //  Arguments:
 //      col      The color for the mesh.
@@ -488,11 +457,12 @@ void
 avtMeshPlot::SetMeshColor(const double *col)
 {
     double rgb[3];
-    rgb[0] = col[0]; 
+    rgb[0] = col[0];
     rgb[1] = col[1];
     rgb[2] = col[2];
-    property->SetEdgeColor(rgb);
- 
+    mapper->SetMeshColor(rgb);
+    glyphMapper->ColorBySingleColor(rgb);
+
     if (wireframeRenderingIsInappropriate)
     {
         SetOpaqueColor(col, true);
@@ -504,13 +474,13 @@ avtMeshPlot::SetMeshColor(const double *col)
 //  Method: avtMeshPlot::SetOpaqueColor
 //
 //  Purpose:
-//      Sets the color of the opaque portion. 
+//      Sets the color of the opaque portion.
 //
 //  Arguments:
 //      col      The color for the opaque portion.
 //
 //  Programmer:   Kathleen Bonnell
-//  Creation:     September 5, 2001 
+//  Creation:     September 5, 2001
 //
 //  Modifications:
 //    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003
@@ -528,7 +498,7 @@ avtMeshPlot::SetOpaqueColor(const unsigned char *col, bool force)
         rgb[0] = (double) col[0] / 255.0;
         rgb[1] = (double) col[1] / 255.0;
         rgb[2] = (double) col[2] / 255.0;
-        property->SetColor(rgb);
+        mapper->SetSurfaceColor(rgb);
     }
 }
 
@@ -537,13 +507,13 @@ avtMeshPlot::SetOpaqueColor(const unsigned char *col, bool force)
 //  Method: avtMeshPlot::SetOpaqueColor
 //
 //  Purpose:
-//      Sets the color of the opaque portion. 
+//      Sets the color of the opaque portion.
 //
 //  Arguments:
 //      col    The color for the opaque portion.
 //
 //  Programmer:   Kathleen Bonnell
-//  Creation:     March 24, 2003 
+//  Creation:     March 24, 2003
 //
 // ****************************************************************************
 
@@ -556,7 +526,7 @@ avtMeshPlot::SetOpaqueColor(const double *col, bool force)
         rgb[0] = col[0];
         rgb[1] = col[1];
         rgb[2] = col[2];
-        property->SetColor(rgb);
+        mapper->SetSurfaceColor(rgb);
     }
 }
 
@@ -570,8 +540,8 @@ avtMeshPlot::SetOpaqueColor(const double *col, bool force)
 //  Arguments:
 //      legendOn     true if the legend should be turned on, false otherwise.
 //
-//  Programmer: Kathleen Bonnell 
-//  Creation:   March 21, 2001 
+//  Programmer: Kathleen Bonnell
+//  Creation:   March 21, 2001
 //
 // ****************************************************************************
 
@@ -603,59 +573,15 @@ avtMeshPlot::SetLegend(bool legendOn)
 //    Kathleen Bonnell, Sat Aug 18 18:09:04 PDT 2001
 //    Use LineAttributes to ensure proper format gets sent to vtk.
 //
-//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001 
-//    Set property linewidth instead of mapper line width. 
+//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001
+//    Set property linewidth instead of mapper line width.
 //
 // ****************************************************************************
 
 void
 avtMeshPlot::SetLineWidth(_LineWidth lw)
 {
-    property->SetLineWidth(LineWidth2Int(lw));
-}
-
-
-// ****************************************************************************
-//  Method: avtMeshPlot::SetLineStyle
-//
-//  Purpose:
-//      Sets the line style.
-//
-//  Programmer: Kathleen Bonnell
-//  Creation:   March 22, 2001
-//
-//  Modifications:
-//
-//    Kathleen Bonnell, Sat Aug 18 18:09:04 PDT 2001
-//    Use LineAttributes to ensure proper format gets sent to vtk.
-//
-//    Kathleen Bonnell, Mon Jun 25 09:03:29 PDT 2001 
-//    Set property line style instead of mapper line style. 
-//
-// ****************************************************************************
-
-void
-avtMeshPlot::SetLineStyle(_LineStyle ls)
-{
-    property->SetLineStipplePattern(LineStyle2StipplePattern(ls));
-}
-
-
-// ****************************************************************************
-//  Method: avtMeshPlot::SetPointSize
-//
-//  Purpose:
-//      Sets the point size.
-//
-//  Programmer: Kathleen Bonnell
-//  Creation:   March 22, 2001
-//
-// ****************************************************************************
-
-void
-avtMeshPlot::SetPointSize(float ps)
-{
-    property->SetPointSize(ps);
+    mapper->SetLineWidth(LineWidth2Int(lw));
 }
 
 
@@ -663,13 +589,13 @@ avtMeshPlot::SetPointSize(float ps)
 //  Method: avtMeshPlot::SetRenderOpaque
 //
 //  Purpose:
-//    Turns on/off opaque mode. 
+//    Turns on/off opaque mode.
 //
 //  Arguments:
 //    on        True if opaque mode on.
 //
 //  Programmer: Kathleen Bonnell
-//  Creation:   June 25, 2001 
+//  Creation:   June 25, 2001
 //
 //  Modifications:
 //
@@ -679,35 +605,22 @@ avtMeshPlot::SetPointSize(float ps)
 //
 //    Kathleen Bonnell, Wed Sep 26 17:47:41 PDT 2001
 //    Use new renderer methods for turning on/off drawing of primitives.
-//    
-//    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003 
-//    Don't use wireframe mode if not appropriate. 
-//    
-//    Kathleen Bonnell, Wed Aug 27 15:45:45 PDT 2003 
-//    Don't use opaque mode if not appropriate. 
-//    
-//    Kathleen Bonnell, Thu Sep  4 11:15:30 PDT 2003 
-//    Modified to support tri-modal opaque mode. 
-//    
+//
+//    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003
+//    Don't use wireframe mode if not appropriate.
+//
+//    Kathleen Bonnell, Wed Aug 27 15:45:45 PDT 2003
+//    Don't use opaque mode if not appropriate.
+//
+//    Kathleen Bonnell, Thu Sep  4 11:15:30 PDT 2003
+//    Modified to support tri-modal opaque mode.
+//
 // ****************************************************************************
 
 void
 avtMeshPlot::SetRenderOpaque()
 {
-    if (ShouldRenderOpaque())
-    {
-        renderer->SurfacePolysOn();
-        renderer->SurfaceStripsOn();
-        renderer->ResolveTopologyOn();
-        property->SetRepresentationToSurface();
-    }
-    else 
-    {
-        renderer->SurfacePolysOff();
-        renderer->SurfaceStripsOff();
-        renderer->ResolveTopologyOff();
-        property->SetRepresentationToWireframe();
-    }
+    mapper->SetSurfaceVisibility(ShouldRenderOpaque());
 }
 
 
@@ -721,25 +634,25 @@ avtMeshPlot::SetRenderOpaque()
 //  Returns:    The mapper for this plot.
 //
 //  Programmer: Kathleen Bonnell
-//  Creation:   March 21, 2001 
+//  Creation:   March 21, 2001
 //
 //  Modifications:
 //    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
 //    Return glyphMapper when mesh type is point mesh.
 //
-//    Kathleen Bonnell, Wed Nov  3 16:51:24 PST 2004 
-//    Changed test from PointMesh to topologicalDimension == 0. 
+//    Kathleen Bonnell, Wed Nov  3 16:51:24 PST 2004
+//    Changed test from PointMesh to topologicalDimension == 0.
 //
 // ****************************************************************************
 
-avtMapper *
+avtMapperBase *
 avtMeshPlot::GetMapper(void)
 {
     if (topologicalDim != 0)
     {
         return mapper;
     }
-    else 
+    else
     {
         return glyphMapper;
     }
@@ -793,11 +706,11 @@ avtMeshPlot::NeedZBufferToCompositeEvenIn2D(void)
 //    Hank Childs, Fri Jun 15 09:22:37 PDT 2001
 //    Use more general data objects.
 //
-//    Kathleen Bonnell, Thu Jun 21 09:03:29 PDT 2001 
-//    Added filter. 
+//    Kathleen Bonnell, Thu Jun 21 09:03:29 PDT 2001
+//    Added filter.
 //
 //    Hank Childs, Sun Jun 23 21:09:56 PDT 2002
-//    Add the point to glyph filter if needed. 
+//    Add the point to glyph filter if needed.
 //
 //    Jeremy Meredith, Mon Jul  8 18:38:04 PDT 2002
 //    Added facelist filter for all non-zero-dimensional data.
@@ -806,16 +719,16 @@ avtMeshPlot::NeedZBufferToCompositeEvenIn2D(void)
 //    Hank Childs, Fri Jul 19 08:41:39 PDT 2002
 //    Opted to use the ghost zone and facelist filter instead.
 //
-//    Kathleen Bonnell, Tue Oct 22 08:41:29 PDT 2002  
+//    Kathleen Bonnell, Tue Oct 22 08:41:29 PDT 2002
 //    Moved entire method to ApplyRenderingTransformation, so that mesh
-//    plots can be query-able.  (Output of this method is the query input). 
+//    plots can be query-able.  (Output of this method is the query input).
 //
 // ****************************************************************************
 
 avtDataObject_p
 avtMeshPlot::ApplyOperators(avtDataObject_p input)
 {
-    return input; 
+    return input;
 }
 
 
@@ -831,7 +744,7 @@ avtMeshPlot::ApplyOperators(avtDataObject_p input)
 //  Returns:    The data object after the mesh plot applies (same data object).
 //
 //  Programmer: Kathleen Bonnell
-//  Creation:   October 22, 2002 
+//  Creation:   October 22, 2002
 //
 //  Modifications:
 //    Jeremy Meredith, Tue Dec 10 10:07:34 PST 2002
@@ -843,10 +756,10 @@ avtMeshPlot::ApplyOperators(avtDataObject_p input)
 //    Hank Childs, Thu Aug 21 23:07:47 PDT 2003
 //    Added support for different types of glyphs.
 //
-//    Kathleen Bonnell, Thu Feb  5 11:06:01 PST 2004 
-//    Don't use facelist filter if user wants to see internal zones. 
+//    Kathleen Bonnell, Thu Feb  5 11:06:01 PST 2004
+//    Don't use facelist filter if user wants to see internal zones.
 //
-//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004 
+//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
 //    Remove glyphPoints filter, glyphing now done by avtPointGlyphMapper.
 //
 //    Jeremy Meredith, Tue Oct 14 15:49:15 EDT 2008
@@ -860,14 +773,14 @@ avtDataObject_p
 avtMeshPlot::ApplyRenderingTransformation(avtDataObject_p input)
 {
     avtDataObject_p dob = input;
-    
+
     if (dob->GetInfo().GetAttributes().GetTopologicalDimension() > 0)
     {
         // Turn off facelist filter if user wants to see internal zones in 3d.
-        if (atts.GetShowInternal() && 
+        if (atts.GetShowInternal() &&
             dob->GetInfo().GetAttributes().GetSpatialDimension()== 3)
             ghostAndFaceFilter->SetUseFaceFilter(false);
-        else 
+        else
             ghostAndFaceFilter->SetUseFaceFilter(true);
         ghostAndFaceFilter->SetCreate3DCellNumbers(true);
         ghostAndFaceFilter->SetInput(dob);
@@ -898,7 +811,7 @@ avtMeshPlot::ApplyRenderingTransformation(avtDataObject_p input)
 //  Method: avtMeshPlot::CustomizeBehavior
 //
 //  Purpose:
-//      Customizes the behavior of the output.  
+//      Customizes the behavior of the output.
 //
 //  Programmer: Kathleen Bonnell
 //  Creation:   March 21, 2001
@@ -908,11 +821,11 @@ avtMeshPlot::ApplyRenderingTransformation(avtDataObject_p input)
 //    Jeremy Meredith, Tue Jun  5 20:45:02 PDT 2001
 //    Allow storage of attributes as a class member.
 //
-//    Kathleen Bonnell, Wed Aug 22 15:22:55 PDT 2001 
-//    Set renderer's property. 
+//    Kathleen Bonnell, Wed Aug 22 15:22:55 PDT 2001
+//    Set renderer's property.
 //
-//    Kathleen Bonnell, Wed Sep  5 17:16:17 PDT 2001 
-//    Added call to SetOpaqueColor. 
+//    Kathleen Bonnell, Wed Sep  5 17:16:17 PDT 2001
+//    Added call to SetOpaqueColor.
 //
 //    Eric Brugger, Fri Sep  7 15:19:03 PDT 2001
 //    I moved the calls to SetMeshColor, SetOpaqueColor and SetLegend from
@@ -921,7 +834,7 @@ avtMeshPlot::ApplyRenderingTransformation(avtDataObject_p input)
 //    Eric Brugger, Wed Jul 16 10:57:44 PDT 2003
 //    Modified to work with the new way legends are managed.
 //
-//    Kathleen Bonnell, Mon Sep 29 13:07:50 PDT 2003 
+//    Kathleen Bonnell, Mon Sep 29 13:07:50 PDT 2003
 //    Set AntialiasedRenderOrder.
 //
 //    Brad Whitlock, Thu Jul 21 15:27:40 PST 2005
@@ -936,7 +849,6 @@ void
 avtMeshPlot::CustomizeBehavior(void)
 {
     SetPointGlyphSize();
-    renderer->SetProperty(property);
 
     behavior->SetLegend(varLegendRefPtr);
     behavior->SetShiftFactor(0.5);
@@ -961,7 +873,7 @@ avtMeshPlot::CustomizeBehavior(void)
 //    Set internal flag regarding appropriateness of wireframe rendering.
 //
 //    Kathleen Bonnell, Thu Sep  4 11:15:30 PDT 2003
-//    SetRenderOpaque no longer requires an argument. 
+//    SetRenderOpaque no longer requires an argument.
 //
 // ****************************************************************************
 
@@ -1020,14 +932,14 @@ avtMeshPlot::TargetTopologicalDimension(void)
 //
 //  Returns:    True if using this color will require the plot to be redrawn.
 //
-//  Programmer: Kathleen Bonnell 
-//  Creation:   September 26, 2001 
+//  Programmer: Kathleen Bonnell
+//  Creation:   September 26, 2001
 //
 //  Modifications:
 //    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003
 //    Call SetOpaqueColor instead of setting property's color directly.
 //
-//    Kathleen Bonnell, Thu Sep  4 11:35:18 PDT 2003 
+//    Kathleen Bonnell, Thu Sep  4 11:35:18 PDT 2003
 //    Call ShouldRenderOpaque.
 //
 // ****************************************************************************
@@ -1041,7 +953,7 @@ avtMeshPlot::SetBackgroundColor(const double *bg)
     {
        if (bgColor[0] != bg[0] || bgColor[1] != bg[1] || bgColor[2] != bg[2])
        {
-           retVal = true; 
+           retVal = true;
        }
        SetOpaqueColor(bg);
     }
@@ -1061,8 +973,8 @@ avtMeshPlot::SetBackgroundColor(const double *bg)
 //
 //  Returns:    True if using this color will require the plot to be redrawn.
 //
-//  Programmer: Kathleen Bonnell 
-//  Creation:   September 26, 2001 
+//  Programmer: Kathleen Bonnell
+//  Creation:   September 26, 2001
 //
 //  Modifications:
 //    Kathleen Bonnell, Mon Mar 24 17:48:27 PST 2003
@@ -1079,7 +991,7 @@ avtMeshPlot::SetForegroundColor(const double *fg)
     {
        if (fgColor[0] != fg[0] || fgColor[1] != fg[1] || fgColor[2] != fg[2])
        {
-           retVal = true; 
+           retVal = true;
        }
        SetMeshColor(fg);
     }
@@ -1103,7 +1015,7 @@ avtMeshPlot::SetForegroundColor(const double *fg)
 //  Creation:    November  7, 2001
 //
 //  Modification:
-//    Kathleen Bonnell, Thu Feb  5 13:15:08 PST 2004 
+//    Kathleen Bonnell, Thu Feb  5 13:15:08 PST 2004
 //    Added spatialDim in call to atts.ChangesRequireRecalculation.
 //
 // ****************************************************************************
@@ -1134,12 +1046,12 @@ avtMeshPlot::Equivalent(const AttributeGroup *a)
 //    Release data from the smooth filter.
 //
 // ****************************************************************************
- 
+
 void
 avtMeshPlot::ReleaseData(void)
 {
     avtPlot::ReleaseData();
- 
+
     if (filter != NULL)
     {
         filter->ReleaseData();
@@ -1167,21 +1079,21 @@ avtMeshPlot::ReleaseData(void)
 //  Arguments:
 //    val  The new mode.
 //
-//  Programmer: Kathleen Bonnell 
-//  Creation:   August 27, 2003 
+//  Programmer: Kathleen Bonnell
+//  Creation:   August 27, 2003
 //
 //  Modifications:
 //    Kathleen Bonnell, Thu Sep  4 11:35:18 PDT 2003
 //    Only update the value opaqueMode is Auto.
 //
-//    Kathleen Bonnell, Tue Aug 24 16:12:03 PDT 2004 
-//    Exclude point mesh from auto-opaque mode. 
+//    Kathleen Bonnell, Tue Aug 24 16:12:03 PDT 2004
+//    Exclude point mesh from auto-opaque mode.
 //
-//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004 
-//    Removed avtMeshType arg, now available as data member of avtPlot. 
+//    Kathleen Bonnell, Tue Nov  2 10:41:33 PST 2004
+//    Removed avtMeshType arg, now available as data member of avtPlot.
 //
-//    Kathleen Bonnell, Wed Nov  3 14:44:17 PST 2004 
-//    Removed meshType, now use topologicalDim. 
+//    Kathleen Bonnell, Wed Nov  3 14:44:17 PST 2004
+//    Removed meshType, now use topologicalDim.
 //
 // ****************************************************************************
 
@@ -1202,13 +1114,13 @@ avtMeshPlot::SetOpaqueMeshIsAppropriate(bool val)
 //  Method: avtMeshPlot::ShouldlRenderOpaque
 //
 //  Purpose:
-//    Determines whether the opaque surface should be rendered. 
+//    Determines whether the opaque surface should be rendered.
 //
 //  Returns:
-//    True if opaque surface should be rendered, false otherwise. 
+//    True if opaque surface should be rendered, false otherwise.
 //
-//  Programmer: Kathleen Bonnell 
-//  Creation:   September 4, 2003 
+//  Programmer: Kathleen Bonnell
+//  Creation:   September 4, 2003
 //
 //  Modifications:
 //    Kathleen Bonnell, Thu Feb  5 11:07:05 PST 2004
@@ -1248,7 +1160,7 @@ avtMeshPlot::ShouldRenderOpaque(void)
 // ****************************************************************************
 // Method: avtMeshPlot::SetPointGlyphSize
 //
-// Purpose: 
+// Purpose:
 //   Sets the point glyph size into the mapper.
 //
 // Programmer: Brad Whitlock
@@ -1264,7 +1176,7 @@ void
 avtMeshPlot::SetPointGlyphSize()
 {
     // Size used for points when using a point glyph.
-    if(atts.GetPointType() == Point || atts.GetPointType() == Sphere)
+    if(atts.GetPointType() == Point)
         glyphMapper->SetPointSize(atts.GetPointSizePixels());
 }
 

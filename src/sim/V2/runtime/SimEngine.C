@@ -84,6 +84,8 @@
 #include <ViewerWindowManager.h>
 #include <ViewerQueryManager.h>
 
+#include <VisWindow.h>
+
 #include <SimEngineManager.h>
 #include <SimFileServer.h>
 #include <SimPlotPluginManager.h>
@@ -164,7 +166,7 @@ private:
 
 SimEngine::SimEngine() : Engine()
 #ifdef SIMV2_VIEWER_INTEGRATION
-                                 , ViewerBase()
+                                 , ViewerBase(), allowCommandExecution(true)
 #endif
     , viewerInitialized(false), simsource(), rpcNotifier(NULL)
 {
@@ -250,6 +252,13 @@ SimEngine::InitializeViewer(const std::vector<std::string> &plotPlugins,
         // Install a custom factory for viewer object creation.
         SetViewerFactory(new SimViewerFactory(this));
 
+        // Since we're initializing via the viewer, force the network manager
+        // to obtain its vis window pointer from the ViewerWindow objects that 
+        // will be created from the viewer side. This way, the viewer and engine
+        // pieces of VisIt will share the same vis window object, which prevents
+        // some weirdness like having to set the vis window size each time we render.
+        GetNetMgr()->SetCreateVisWindow(CreateVisWindowCB, this);
+
         GetViewerProperties()->SetNowin(true);
         GetViewerProperties()->SetNoConfig(noconfig);
         GetViewerProperties()->SetMasterProcess(PAR_UIProcess());
@@ -271,8 +280,6 @@ SimEngine::InitializeViewer(const std::vector<std::string> &plotPlugins,
         HeavyInitialization(plotPlugins, operatorPlugins);
 
         // Force scalable rendering.
-        GetViewerState()->GetRenderingAttributes()->
-            SetDisplayListMode(RenderingAttributes::Never);
         GetViewerState()->GetRenderingAttributes()->
             SetScalableActivationMode(RenderingAttributes::Always);
         GetViewerState()->GetRenderingAttributes()->
@@ -786,6 +793,8 @@ SimEngine::SaveWindow(const std::string &filename, int w, int h, int format)
             fmt = SaveWindowAttributes::PPM;
         else if(format == VISIT_IMAGEFORMAT_RGB)
             fmt = SaveWindowAttributes::RGB;
+        else if(format == VISIT_IMAGEFORMAT_EXR)
+            fmt = SaveWindowAttributes::EXR;
         else
             fmt = SaveWindowAttributes::TIFF;
 
@@ -1020,6 +1029,11 @@ SimEngine::AddOperator(const std::string &operatorType, bool applyToAll)
 // Creation:   Thu Sep 18 18:02:39 PDT 2014
 //
 // Modifications:
+//   Brad Whitlock, Wed Mar 14 17:45:48 PDT 2018
+//   Disable command execution during DrawPlots. We can end up in situations
+//   where an UpdateFrame indirectly recurses into parts of the viewer that
+//   try to change the SR mode. This can make it try and use network id -1
+//   to get data back from the "engine", which throws an exception.
 //
 // ****************************************************************************
 
@@ -1034,8 +1048,17 @@ SimEngine::DrawPlots()
         // Viewer based method.
         if(viewerInitialized)
         {
+            // Do not allow command execution during the DrawPlots.
+            allowCommandExecution = false;
+
 //cout << "Viewer-based DrawPlots()" << endl;
             GetViewerMethods()->DrawPlots();
+
+            // DrawPlots may have resulted in some internal commands
+            // to process. Do them now.
+            allowCommandExecution = true;
+            SimEngine::GetViewerMessaging()->ProcessCommands();
+
             retval = true;
         }
         else
@@ -1158,6 +1181,73 @@ SimEngine::SetActivePlots(const int *ids, int nids)
                 SNPRINTF(tmp, 10, ":%d", ids[i]);
                 cmd.append(tmp);
             }
+            SimulationInitiateCommand(cmd);
+            retval = true;
+#ifdef SIMV2_VIEWER_INTEGRATION
+        }
+#endif
+    }
+    CATCHALL
+    {
+        retval = false;
+    }
+    ENDTRY
+
+    return retval;
+}
+
+// ****************************************************************************
+// Method: SimEngine::ChangePlotVar
+//
+// Purpose:
+//   Changes the plot variable.
+//
+// Arguments:
+//   var : The new plot variable.
+//   all : Whether to change the variable on all plots.
+//
+// Returns:    
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Dec 14 14:55:33 PST 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+bool
+SimEngine::ChangePlotVar(const char *var, int all)
+{
+    bool retval = false;
+
+    TRY
+    {
+#ifdef SIMV2_VIEWER_INTEGRATION
+        // Viewer based method.
+        if(viewerInitialized)
+        {
+            if(var != NULL)
+            {
+                if(all)
+                {
+                    int np = GetViewerState()->GetPlotList()->GetNumPlots();
+                    intVector activePlotIds;
+                    for(int i = 0; i < np; ++i)
+                        activePlotIds.push_back(i);
+                    GetViewerMethods()->SetActivePlots(activePlotIds);
+                }
+
+                GetViewerMethods()->ChangeActivePlotsVar(var);
+            }
+            retval = true;
+        }
+        else
+        {
+#endif
+            char cmd[1000];
+            SNPRINTF(cmd, 1000, "ChangePlotVar:%s:%d", var, all);
             SimulationInitiateCommand(cmd);
             retval = true;
 #ifdef SIMV2_VIEWER_INTEGRATION
@@ -1675,6 +1765,202 @@ bool SimEngine::SetOperatorOptions(const std::string &fieldName,
     return retval;
 }
 
+// ****************************************************************************
+// Method: SimEngine::SetView2D
+//
+// Purpose:
+//   Sets the 2D view.
+//
+// Arguments:
+//   view : The view object we're using to set the view.
+//
+// Returns:    true on success; false on failure.
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Jun  1 16:25:34 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+bool
+SimEngine::SetView2D(const View2DAttributes &view)
+{
+    bool retval = false;
+
+    TRY
+    {
+#ifdef SIMV2_VIEWER_INTEGRATION
+        // Viewer based method.
+        if(viewerInitialized)
+        {
+            View2DAttributes *v = GetViewerState()->GetView2DAttributes();
+            *v = view;
+            v->Notify();
+
+            GetViewerMethods()->SetView2D();
+
+            retval = true;
+        }
+        else
+        {
+#endif
+            // Send a message to the viewer indicating we want it to set the view.
+            std::stringstream cmd;
+            cmd << "SetView2D:";
+            SingleAttributeConfigManager mgr(GetViewerState()->GetView2DAttributes());
+            mgr.Export(cmd);
+            SimulationInitiateCommand(cmd.str());
+            retval = true;
+#ifdef SIMV2_VIEWER_INTEGRATION
+        }
+#endif
+    }
+    CATCHALL
+    {
+        retval = false;
+    }
+    ENDTRY
+
+    return retval;
+}
+
+bool
+SimEngine::GetView2D(View2DAttributes &view)
+{
+    bool retval = false;
+
+    TRY
+    {
+#ifdef SIMV2_VIEWER_INTEGRATION
+        // Viewer based method.
+        if(viewerInitialized)
+        {
+            View2DAttributes *v = GetViewerState()->GetView2DAttributes();
+            view = *v;
+            debug5 << view << endl;
+
+            retval = true;
+        }
+        else
+        {
+#endif
+            // TODO: get the network manager's vis window and get the view from it.
+
+            retval = false;
+#ifdef SIMV2_VIEWER_INTEGRATION
+        }
+#endif
+    }
+    CATCHALL
+    {
+        retval = false;
+    }
+    ENDTRY
+
+    return retval;
+}
+
+// ****************************************************************************
+// Method: SimEngine::SetView3D
+//
+// Purpose:
+//   Sets the 3D view.
+//
+// Arguments:
+//   view : The view object we're using to set the view.
+//
+// Returns:    true on success; false on failure.
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Jun  1 16:25:34 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+
+bool
+SimEngine::SetView3D(const View3DAttributes &view)
+{
+    bool retval = false;
+
+    TRY
+    {
+#ifdef SIMV2_VIEWER_INTEGRATION
+        // Viewer based method.
+        if(viewerInitialized)
+        {
+            View3DAttributes *v = GetViewerState()->GetView3DAttributes();
+            *v = view;
+            v->Notify();
+
+            GetViewerMethods()->SetView3D();
+
+            retval = true;
+        }
+        else
+        {
+#endif
+            // Send a message to the viewer indicating we want it to set the view.
+            std::stringstream cmd;
+            cmd << "SetView3D:";
+            SingleAttributeConfigManager mgr(GetViewerState()->GetView3DAttributes());
+            mgr.Export(cmd);
+            SimulationInitiateCommand(cmd.str());
+            retval = true;
+#ifdef SIMV2_VIEWER_INTEGRATION
+        }
+#endif
+    }
+    CATCHALL
+    {
+        retval = false;
+    }
+    ENDTRY
+
+    return retval;
+}
+
+bool
+SimEngine::GetView3D(View3DAttributes &view)
+{
+    bool retval = false;
+
+    TRY
+    {
+#ifdef SIMV2_VIEWER_INTEGRATION
+        // Viewer based method.
+        if(viewerInitialized)
+        {
+            View3DAttributes *v = GetViewerState()->GetView3DAttributes();
+            view = *v;
+            debug5 << view << endl;
+
+            retval = true;
+        }
+        else
+        {
+#endif
+            // TODO: get the network manager's vis window and get the view from it.
+
+            retval = false;
+#ifdef SIMV2_VIEWER_INTEGRATION
+        }
+#endif
+    }
+    CATCHALL
+    {
+        retval = false;
+    }
+    ENDTRY
+
+    return retval;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                            VIEWER-RELATED CODE
 ///////////////////////////////////////////////////////////////////////////////
@@ -1979,13 +2265,17 @@ SimEngine::AddInitialWindows()
 // Creation:   Thu Sep 18 12:56:44 PDT 2014
 //
 // Modifications:
+//   Brad Whitlock, Wed Mar 14 17:45:48 PDT 2018
+//   Check to see if we're allowing command execution.
 //
 // ****************************************************************************
 
 void
 SimEngine::CommandNotificationCallback(void *cbdata, int)
 {
-    SimEngine::GetViewerMessaging()->ProcessCommands();
+    SimEngine *This = (SimEngine *)cbdata;
+    if(This->allowCommandExecution)
+        SimEngine::GetViewerMessaging()->ProcessCommands();
 }
 
 // ****************************************************************************
@@ -2022,4 +2312,44 @@ SimEngine::HandleViewerRPCCallback(Subject *, void *)
             HandleAction(*GetViewerState()->GetViewerRPC());
     }
 }
+
+// ****************************************************************************
+// Method: SimEngineManager::CreateVisWindow
+//
+// Purpose:
+//   This method is called when the sim engine's network manager wants to create
+//   a vis window. From the viewer side of the sim runtime, we 
+//
+// Arguments:
+//   
+//
+// Returns:    
+//
+// Note:       
+//
+// Programmer: Brad Whitlock
+// Creation:   Thu Mar 16 13:11:55 PDT 2017
+//
+// Modifications:
+//
+// ****************************************************************************
+void
+SimEngine::CreateVisWindowCB(int winID, VisWindow *&viswindow, bool &owns, void *cbdata)
+{
+    SimEngine *s = (SimEngine *)cbdata;
+    s->CreateVisWindow(winID, viswindow, owns);
+}
+
+void
+SimEngine::CreateVisWindow(int winID, VisWindow *&viswindow, bool &owns)
+{
+    debug5 << "SimEngine::CreateVisWindow: winID = " << winID << endl;
+    ViewerWindow *w = ViewerWindowManager::Instance()->GetWindow(winID);
+    if(w != NULL)
+        viswindow = w->GetVisWindow();
+    else
+        viswindow = NULL;
+    owns = false;
+}
+
 #endif

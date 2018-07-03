@@ -66,7 +66,6 @@
 avtLowerResolutionVolumeFilter::avtLowerResolutionVolumeFilter() : avtPluginDataTreeIterator()
 {
     hist = 0;
-    hist2 = 0;
     hist_size = 256;
 }
 
@@ -86,11 +85,6 @@ avtLowerResolutionVolumeFilter::~avtLowerResolutionVolumeFilter()
     {
         delete [] hist;
         hist = 0;
-    }
-    if(hist2 != 0)
-    {
-        delete [] hist2;
-        hist2 = 0;
     }
 }
 
@@ -171,34 +165,13 @@ avtLowerResolutionVolumeFilter::CalculateHistograms(vtkDataSet *ds)
         }
         else
         {
-            // Since SPH gradient is slow, only calculate it when we have a
-            // 2D transfer function since that's the only time we need it for
-            // histogram calculation.
-            if(atts.GetTransferFunctionDim() == 1)
-            {
-                memset(gm->GetVoidPointer(0), 0, sizeof(float)*nels);
-            }
-            else
-            {
-                VolumeCalculateGradient_SPH(ds, opac, 
-                                            0, // gx
-                                            0, // gy
-                                            0, // gz
-                                            (float *)gm->GetVoidPointer(0),
-                                            0, // gmn
-                                            0, // hs
-                                            true,
-                                            ghostval);
-            }
+            memset(gm->GetVoidPointer(0), 0, sizeof(float)*nels);
         }
 
-        if(hist2 != 0)
-            delete [] hist2;
-        hist2 = new float[hist_size * hist_size];
         if(hist == 0)
             delete [] hist;
         hist = new float[hist_size];
-        VolumeHistograms(atts, data, gm, hist, hist2, hist_size);
+        VolumeHistograms(atts, data, gm, hist, hist_size);
         gm->Delete();
 
         data->Delete();
@@ -323,26 +296,18 @@ avtLowerResolutionVolumeFilter::PostExecute()
 {
     StackTimer t("avtLowerResolutionVolumeFilter::PostExecute");
 
-    if(hist == 0 || hist2 == 0)
+    if(hist == 0)
         return;
 
     floatVector        h1;
-    unsignedCharVector h2;
     h1.reserve(hist_size);
-    h2.reserve(hist_size * hist_size);
     for(int i = 0; i < hist_size; ++i)
         h1.push_back(hist[i]);
 
-    // Convert the 2D hist to uchar and RLE compress it.
-    for(int i = 0; i < hist_size * hist_size; ++i)
-        h2.push_back((unsigned char)(int)(hist2[i] * 255.));
-    unsignedCharVector compressedbuf;
-    VolumeRLECompress(h2, compressedbuf);
 
     MapNode vhist;
     vhist["histogram_size"] = hist_size;
     vhist["histogram_1d"] = h1;
-    vhist["histogram_2d"] = compressedbuf;
 
     GetOutput()->GetInfo().GetAttributes().AddPlotInformation("VolumeHistogram", vhist);
 }

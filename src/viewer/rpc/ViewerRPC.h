@@ -157,6 +157,7 @@ public:
         RedoViewRPC,
         InvertBackgroundRPC,
         ClearPickPointsRPC,
+        RemovePicksRPC,
         SetWindowModeRPC,
         EnableToolRPC,
         SetToolUpdateModeRPC,
@@ -267,6 +268,8 @@ public:
         PlotDDTVispointVariablesRPC,
         ExportRPC,
         ExportHostProfileRPC,
+        StartPlotAnimationRPC,
+        StopPlotAnimationRPC,
         ReadHostProfilesFromDirectoryRPC,
         SetRemoveDuplicateNodesRPC,
         MaxRPC
