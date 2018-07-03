@@ -272,7 +272,7 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
         box.low[k] = 0;
         box.high[k] = box.low[k] + resdata[k];
       }
-      else{ // multibox case (all inside the same domain)
+      else{ // multibox case 
         box.low[k] = std::fabs(p1phy[k]-level_info.anchor[k]) / phy2log[k];// + eCells[k];
         // if(k==0 && low[k]>0)
         //   low[k] += 1;
@@ -323,17 +323,17 @@ void parse_ups(vtkSmartPointer<vtkXMLDataParser> parser, LevelInfo& level_info, 
 
             if(inter_low[d] == low[d]){
               int gap = inter_high[d]-low[d];
-              low[d]    = inter_high[d];
+              low[d]    = inter_high[d]-gap;
               high[d]   = high[d]+gap;
-              eCells[d] = 0;  // removing extracell only on one of the boxes, because they could be overlapping only partially
+              //eCells[d] = 0;  // was on, removing extracell only on one of the boxes, because they could be overlapping only partially
               //teCells[d+3] = 0;
             }
             else if(inter_low[d] == tlow[d]){
               int gap = inter_high[d]-low[d];
-              tlow[d] = inter_high[d];
+              tlow[d] = inter_high[d]-gap;
               thigh[d]   = thigh[d]+gap;
               //teCells[d] = 0;
-              eCells[d+3] = 0;
+              //eCells[d+3] = 0; // was on
             }
 
           }

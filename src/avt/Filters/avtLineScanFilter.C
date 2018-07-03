@@ -1157,6 +1157,20 @@ avtLineScanFilter::CylindricalExecute(vtkDataSet *ds)
 //  Programmer:    Hank Childs
 //  Creation:      July 28, 2006
 //
+//  Modifications:
+//    
+//    Matt Larsen, Thurs May 3rd 09:00:01 PDT 2018
+//    I fixed two issues. One, if the coordinates of a mesh were nearly
+//    vertical or horizontal, floating point error resulted in misses
+//    when there was absolutely a hit. In the worst cases, this resulted in
+//    answers being off by over 66%. Two, there was never a check for a 0
+//    discriminant when solving a quadratic. This resulted in two intersections
+//    when there was only ever one, and the logic around the caller would assume
+//    something whet terribly wrong and ignore the cell.
+//
+//    Matt Larsen, Mon May 7th, 15:33:01 PDT 2018
+//    Altering previous fix to work via a tolerance
+//  
 // ****************************************************************************
 
 int
@@ -1179,7 +1193,23 @@ IntersectLineWithRevolvedSegment(const double *line_pt,
     // of the line to compare with the X-component of the cell,
     // since the cell's X-component is actually 'Z' in RZ-space.
     //
-    if (seg_p1[0] == seg_p2[0])
+   
+    //
+    // We have to check for lines that are near vertical. Slopes
+    // greater than 1B can lead to floating point errors that lead
+    // to missed cell intersections, no matter how large the cell.
+    //
+    bool near_vertical = false;
+    if(seg_p1[0] != seg_p2[0])
+    {
+        double slope = (seg_p1[1] - seg_p2[1]) / (seg_p1[0] - seg_p2[0]);
+        if(slope > 1e10 || slope < -1e10)
+        {
+          near_vertical = true;
+        }
+    }
+
+    if (seg_p1[0] == seg_p2[0] || near_vertical)
     {
         // Vertical line .. revolves to hollow disc.
         // Disc is at some constant Z (seg_p1[0]) and ranges between some
@@ -1208,7 +1238,7 @@ IntersectLineWithRevolvedSegment(const double *line_pt,
                  double soln1 = (-B + sqrt(det)) / (2*A);
                 double soln2 = (-B - sqrt(det)) / (2*A);
                 inter[nInter++] = soln1;
-                inter[nInter++] = soln2;
+                if(det != 0.) inter[nInter++] = soln2;
             }
             C = C0 - Rmin*Rmin;
             det = B*B - 4*A*C;
@@ -1217,7 +1247,7 @@ IntersectLineWithRevolvedSegment(const double *line_pt,
                 double soln1 = (-B + sqrt(det)) / (2*A);
                 double soln2 = (-B - sqrt(det)) / (2*A);
                 inter[nInter++] = soln1;
-                inter[nInter++] = soln2;
+                if(det != 0.) inter[nInter++] = soln2;
             }
         }
         else
@@ -1268,7 +1298,7 @@ IntersectLineWithRevolvedSegment(const double *line_pt,
             inter[nInter] = soln1;
             nInter++;
         }
-        if (Zmin <= Z2 && Z2 <= Zmax)
+        if (Zmin <= Z2 && Z2 <= Zmax && det != 0.)
         {
             inter[nInter] = soln2;
             nInter++;
@@ -1321,24 +1351,30 @@ IntersectLineWithRevolvedSegment(const double *line_pt,
             return 0;
         double soln1 = (-B + sqrt(det)) / (2*A);
         double soln2 = (-B - sqrt(det)) / (2*A);
-        double Z1 = line_pt[2] + soln1*line_dir[2];
-        double Z2 = line_pt[2] + soln2*line_dir[2];
-        int nInter = 0;
+
         double Zmin = (seg_p1[0] < seg_p2[0] ? seg_p1[0] : seg_p2[0]);
         double Zmax = (seg_p1[0] > seg_p2[0] ? seg_p1[0] : seg_p2[0]);
+        
+        int nInter = 0;
+        
+        double Z1 = line_pt[2] + soln1*line_dir[2];
+        double Z2 = line_pt[2] + soln2*line_dir[2];
+
         if (Zmin <= Z1 && Z1 <= Zmax)
         {
             inter[nInter] = soln1;
             nInter++;
         }
-        if (Zmin <= Z2 && Z2 <= Zmax)
+        // We have to check to see if the discrim in
+        // 0, since both solutions would be identicle
+        if (Zmin <= Z2 && Z2 <= Zmax && det != 0.)
         {
             inter[nInter] = soln2;
             nInter++;
         }
+
         return nInter;
     }
-
     return 0;
 }
 

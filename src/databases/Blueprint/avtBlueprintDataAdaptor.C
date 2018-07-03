@@ -220,7 +220,8 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
         Node v_info;
         if(!blueprint::mcarray::verify(n,v_info))
         {
-            BP_PLUGIN_ERROR("Node is not a mcarray " << v_info.to_json());
+            BP_PLUGIN_EXCEPTION1(InvalidVariableException,
+                                 "Node is not a mcarray " << v_info.to_json());
         }
         
         // in this case, each child is a component of the array
@@ -324,8 +325,9 @@ ConduitArrayToVTKDataArray(const conduit::Node &n)
     }
     else
     {
-        BP_PLUGIN_ERROR("unsupported datatype " << n.dtype().name());
-        EXCEPTION2(UnexpectedValueException, "A standard data type", "unknown");
+        BP_PLUGIN_EXCEPTION1(InvalidVariableException,
+                             "Conduit Array to VTK Data Array"
+                             "unsupported data type: " << n.dtype().name());
     }
     return retval;
 }
@@ -344,16 +346,37 @@ UniformCoordsToVTKRectilinearGrid(const Node &n_coords)
     nx[2] = n_coords["dims"].has_child("k") ? n_coords["dims/k"].to_int() : 1;
     rectgrid->SetDimensions(nx);
 
-    double dx[3];
-    dx[0] = n_coords["spacing"].has_child("dx") ? n_coords["spacing/dx"].to_double() : 0;
-    dx[1] = n_coords["spacing"].has_child("dy") ? n_coords["spacing/dy"].to_double() : 0;
-    dx[2] = n_coords["spacing"].has_child("dz") ? n_coords["spacing/dz"].to_double() : 0;
+    double dx[3] = {1.0,1.0,1.0};
+    if(n_coords.has_child("spacing"))
+    {
+        const Node &n_spacing = n_coords["spacing"];
 
-    double x0[3]; 
+        if(n_spacing.has_child("dx"))
+            dx[0] = n_spacing["dx"].to_double();
+
+        if(n_spacing.has_child("dy"))
+            dx[1] = n_spacing["dy"].to_double();
+
+        if(n_spacing.has_child("dz"))
+            dx[2] = n_spacing["dz"].to_double();
+    }
+
+    double x0[3] = {0.0, 0.0, 0.0};
     
-    x0[0] = n_coords["origin"].has_child("x") ? n_coords["origin/x"].to_double() : 0;
-    x0[1] = n_coords["origin"].has_child("y") ? n_coords["origin/y"].to_double() : 0;
-    x0[2] = n_coords["origin"].has_child("z") ? n_coords["origin/z"].to_double() : 0;
+    if(n_coords.has_child("origin"))
+    {
+        const Node &n_origin =  n_coords["origin"];
+
+        if(n_origin.has_child("x"))
+            x0[0] = n_origin["x"].to_double();
+        
+        if(n_origin.has_child("y"))
+            x0[1] = n_origin["y"].to_double();
+
+        if(n_origin.has_child("z"))
+            x0[2] = n_origin["z"].to_double();
+
+    }
 
     for (int i = 0; i < 3; i++)
     {
@@ -391,8 +414,9 @@ UniformCoordsToVTKRectilinearGrid(const Node &n_coords)
             da = vtkDoubleArray::New();
         else
         {
-            BP_PLUGIN_ERROR("unsupported data type " << dt.name());
-            EXCEPTION2(UnexpectedValueException, "A standard data type", dt.name());
+            BP_PLUGIN_EXCEPTION1(InvalidVariableException,
+                                 "Conduit Blueprint to Rectilinear Grid coordinates "
+                                 "unsupported data type: " << dt.name());
         }
 
         da->SetNumberOfTuples(nx[i]);
@@ -678,11 +702,9 @@ avtBlueprintDataAdaptor::VTK::MeshToVTK(const Node &n_mesh)
     }
     else
     {
-        BP_PLUGIN_ERROR( "expected Coordinate type of \"uniform\", \"rectilinear\", or \"explicit\""
-                          << " but found " << n_coords["type"].as_string());
-        EXCEPTION2(UnexpectedValueException,
-                   "Coordinate type of \"uniform\", \"rectilinear\", or \"explicit\"",
-                   n_coords["type"].as_string());
+        BP_PLUGIN_EXCEPTION1(InvalidVariableException,
+                              "expected Coordinate type of \"uniform\", \"rectilinear\", or \"explicit\""
+                              << " but found " << n_coords["type"].as_string());
     }
 
     BP_PLUGIN_INFO("BlueprintVTK::MeshToVTKDataSet End");
@@ -806,7 +828,7 @@ ShapeNameToGeomType(const std::string &shape_name)
    }
    else
    {
-      BP_PLUGIN_ERROR("Unsupported Element Shape: " << shape_name);
+       BP_PLUGIN_WARNING("Unsupported Element Shape: " << shape_name);
    }
 
    return res;
@@ -842,8 +864,11 @@ avtBlueprintDataAdaptor::MFEM::MeshToMFEM(const Node &n_mesh,
    
    if(!n_mesh.has_path("topologies/" + topo_name))
    {
-        BP_PLUGIN_ERROR("Expected topology named \"" + topo_name + "\" "
-                        "(node is missing path \"topologies/" + topo_name + "\")");
+       BP_PLUGIN_EXCEPTION1(InvalidVariableException,
+                            "Expected topology named \""
+                            << topo_name << "\" "
+                            "(node is missing path \"topologies/"
+                            << topo_name << "\")");
    }
    
    // find coord set
@@ -853,8 +878,11 @@ avtBlueprintDataAdaptor::MFEM::MeshToMFEM(const Node &n_mesh,
 
    if(!n_mesh.has_path("coordsets/" + coords_name))
    {
-        BP_PLUGIN_ERROR("Expected topology named \"" + coords_name + "\" "
-                       "(node is missing path \"coordsets/" + coords_name + "\")")
+       BP_PLUGIN_EXCEPTION1(InvalidVariableException,
+                            "Expected coordinate set named \""
+                            << coords_name << "\" "
+                            << "(node is missing path \"coordsets/"
+                            << coords_name << "\")")
    }
 
    const Node &n_coordset = n_mesh["coordsets"][coords_name];
@@ -962,31 +990,43 @@ avtBlueprintDataAdaptor::MFEM::MeshToMFEM(const Node &n_mesh,
    if ( n_mesh_topo.has_child("boundary_topology") )
    {
       std::string bndry_topo_name = n_mesh_topo["boundary_topology"].as_string();
-      const Node &n_bndry_topo    = n_mesh["topologies"][bndry_topo_name];
-      std::string bndry_ele_shape = n_bndry_topo["elements/shape"].as_string();
-
-      bndry_geo = ShapeNameToGeomType(bndry_ele_shape);
-      int num_idxs_per_bndry_ele = Geometry::NumVerts[mesh_geo];
-
-      const Node &n_bndry_conn = n_bndry_topo["elements/connectivity"];
-
-      // mfem requires ints, we could have int64s, etc convert if necessary
-      if ( n_bndry_conn.dtype().is_int() &&
-           n_bndry_conn.is_compact())
+      
+      // We encountered a case were a mesh specified the boundary 
+      // topology, but the boundary topology was was omitted from the blueprint
+      // index, so it's data could not be obtained.
+      // 
+      // This guard prevents an error in that case, allowing the mesh to be
+      // created without boundary info
+      
+      if(n_mesh["topologies"].has_child(bndry_topo_name))
       {
-         bndry_indices = n_bndry_conn.value();
-      }
-      else
-      {
-         Node &(n_bndry_conn_conv) = n_conv["topologies"][bndry_topo_name]["elements/connectivity"];
-         n_bndry_conn.to_int_array(n_bndry_conn_conv);
-         bndry_indices = (n_bndry_conn_conv).value();
+      
+         const Node &n_bndry_topo    = n_mesh["topologies"][bndry_topo_name];
+         std::string bndry_ele_shape = n_bndry_topo["elements/shape"].as_string();
 
-      }
+         bndry_geo = ShapeNameToGeomType(bndry_ele_shape);
+         int num_idxs_per_bndry_ele = Geometry::NumVerts[mesh_geo];
 
-      num_bndry_ele =
-         n_bndry_topo["elements/connectivity"].dtype().number_of_elements();
-      num_bndry_ele = num_bndry_ele / num_idxs_per_bndry_ele;
+         const Node &n_bndry_conn = n_bndry_topo["elements/connectivity"];
+
+         // mfem requires ints, we could have int64s, etc convert if necessary
+         if ( n_bndry_conn.dtype().is_int() &&
+              n_bndry_conn.is_compact())
+         {
+            bndry_indices = n_bndry_conn.value();
+         }
+         else
+         {
+            Node &(n_bndry_conn_conv) = n_conv["topologies"][bndry_topo_name]["elements/connectivity"];
+            n_bndry_conn.to_int_array(n_bndry_conn_conv);
+            bndry_indices = (n_bndry_conn_conv).value();
+
+         }
+
+         num_bndry_ele =
+            n_bndry_topo["elements/connectivity"].dtype().number_of_elements();
+         num_bndry_ele = num_bndry_ele / num_idxs_per_bndry_ele;
+      }
    }
    else
    {

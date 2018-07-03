@@ -111,6 +111,10 @@ class avtIDXFileFormat : public avtMTMDFileFormat
     virtual bool     HasInvariantMetaData(void) const { return false; };
     virtual bool     HasInvariantSIL(void) const { return false; };
 
+    virtual void     *GetAuxiliaryData(const char *var, int,
+                                     const char *type, void *args,
+                                     DestructorFunction &){ return NULL; }
+
   protected:
 
     std::string                   dataset_filename;

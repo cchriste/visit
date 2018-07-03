@@ -390,8 +390,122 @@ void avtIDXFileFormat::createBoxes(){
     // Note: parse ups after timeste.xml so it will use the anchor
     */
     //printf("USING EXTRA CELLS %d\n", use_extracells);
+
     parse_ups(parser, input_patches, dim, use_extracells, grid_type);
-   
+
+#if 0
+    input_patches.patchInfo.clear();
+
+    std::vector<std::vector<int> > lows;
+    std::vector<std::vector<int> > highs;
+
+    std::vector<int> t(3);
+
+
+    t[0]=0; t[1]=0; t[2]=0; lows.push_back(t); t[0]=36; t[1]=6; t[2]=6; highs.push_back(t);
+t[0]=0; t[1]=0; t[2]=6; lows.push_back(t); t[0]=36; t[1]=6; t[2]=12; highs.push_back(t);
+t[0]=0; t[1]=0; t[2]=12; lows.push_back(t); t[0]=36; t[1]=6; t[2]=18; highs.push_back(t);
+t[0]=0; t[1]=0; t[2]=18; lows.push_back(t); t[0]=36; t[1]=6; t[2]=24; highs.push_back(t);
+t[0]=0; t[1]=0; t[2]=24; lows.push_back(t); t[0]=36; t[1]=6; t[2]=30; highs.push_back(t);
+t[0]=0; t[1]=6; t[2]=0; lows.push_back(t); t[0]=36; t[1]=12; t[2]=6; highs.push_back(t);
+t[0]=0; t[1]=6; t[2]=6; lows.push_back(t); t[0]=36; t[1]=12; t[2]=12; highs.push_back(t);
+t[0]=0; t[1]=6; t[2]=12; lows.push_back(t); t[0]=36; t[1]=12; t[2]=18; highs.push_back(t);
+t[0]=0; t[1]=6; t[2]=18; lows.push_back(t); t[0]=36; t[1]=12; t[2]=24; highs.push_back(t);
+t[0]=0; t[1]=6; t[2]=24; lows.push_back(t); t[0]=36; t[1]=12; t[2]=30; highs.push_back(t);
+t[0]=0; t[1]=12; t[2]=0; lows.push_back(t); t[0]=36; t[1]=18; t[2]=6; highs.push_back(t);
+t[0]=0; t[1]=12; t[2]=6; lows.push_back(t); t[0]=36; t[1]=18; t[2]=12; highs.push_back(t);
+t[0]=0; t[1]=12; t[2]=12; lows.push_back(t); t[0]=36; t[1]=18; t[2]=18; highs.push_back(t);
+t[0]=0; t[1]=12; t[2]=18; lows.push_back(t); t[0]=36; t[1]=18; t[2]=24; highs.push_back(t);
+t[0]=0; t[1]=12; t[2]=24; lows.push_back(t); t[0]=36; t[1]=18; t[2]=30; highs.push_back(t);
+t[0]=0; t[1]=18; t[2]=0; lows.push_back(t); t[0]=36; t[1]=24; t[2]=6; highs.push_back(t);
+t[0]=0; t[1]=18; t[2]=6; lows.push_back(t); t[0]=36; t[1]=24; t[2]=12; highs.push_back(t);
+t[0]=0; t[1]=18; t[2]=12; lows.push_back(t); t[0]=36; t[1]=24; t[2]=18; highs.push_back(t);
+t[0]=0; t[1]=18; t[2]=18; lows.push_back(t); t[0]=36; t[1]=24; t[2]=24; highs.push_back(t);
+t[0]=0; t[1]=18; t[2]=24; lows.push_back(t); t[0]=36; t[1]=24; t[2]=30; highs.push_back(t);
+t[0]=0; t[1]=24; t[2]=0; lows.push_back(t); t[0]=36; t[1]=30; t[2]=6; highs.push_back(t);
+t[0]=0; t[1]=24; t[2]=6; lows.push_back(t); t[0]=36; t[1]=30; t[2]=12; highs.push_back(t);
+t[0]=0; t[1]=24; t[2]=12; lows.push_back(t); t[0]=36; t[1]=30; t[2]=18; highs.push_back(t);
+t[0]=0; t[1]=24; t[2]=18; lows.push_back(t); t[0]=36; t[1]=30; t[2]=24; highs.push_back(t);
+t[0]=0; t[1]=24; t[2]=24; lows.push_back(t); t[0]=36; t[1]=30; t[2]=30; highs.push_back(t);
+t[0]=36; t[1]=6; t[2]=6; lows.push_back(t); t[0]=42; t[1]=12; t[2]=12; highs.push_back(t);
+t[0]=36; t[1]=6; t[2]=12; lows.push_back(t); t[0]=42; t[1]=12; t[2]=18; highs.push_back(t);
+t[0]=36; t[1]=6; t[2]=18; lows.push_back(t); t[0]=42; t[1]=12; t[2]=24; highs.push_back(t);
+t[0]=36; t[1]=12; t[2]=6; lows.push_back(t); t[0]=42; t[1]=18; t[2]=12; highs.push_back(t);
+t[0]=36; t[1]=12; t[2]=12; lows.push_back(t); t[0]=42; t[1]=18; t[2]=18; highs.push_back(t);
+t[0]=36; t[1]=12; t[2]=18; lows.push_back(t); t[0]=42; t[1]=18; t[2]=24; highs.push_back(t);
+t[0]=36; t[1]=18; t[2]=6; lows.push_back(t); t[0]=42; t[1]=24; t[2]=12; highs.push_back(t);
+t[0]=36; t[1]=18; t[2]=12; lows.push_back(t); t[0]=42; t[1]=24; t[2]=18; highs.push_back(t);
+t[0]=36; t[1]=18; t[2]=18; lows.push_back(t); t[0]=42; t[1]=24; t[2]=24; highs.push_back(t);
+t[0]=36; t[1]=24; t[2]=6; lows.push_back(t); t[0]=42; t[1]=30; t[2]=12; highs.push_back(t);
+t[0]=36; t[1]=24; t[2]=12; lows.push_back(t); t[0]=42; t[1]=30; t[2]=18; highs.push_back(t);
+t[0]=36; t[1]=24; t[2]=18; lows.push_back(t); t[0]=42; t[1]=30; t[2]=24; highs.push_back(t);
+t[0]=36; t[1]=0; t[2]=6; lows.push_back(t); t[0]=42; t[1]=6; t[2]=12; highs.push_back(t);
+t[0]=36; t[1]=0; t[2]=12; lows.push_back(t); t[0]=42; t[1]=6; t[2]=18; highs.push_back(t);
+t[0]=36; t[1]=0; t[2]=18; lows.push_back(t); t[0]=42; t[1]=6; t[2]=24; highs.push_back(t);
+t[0]=36; t[1]=6; t[2]=24; lows.push_back(t); t[0]=42; t[1]=12; t[2]=30; highs.push_back(t);
+t[0]=36; t[1]=12; t[2]=24; lows.push_back(t); t[0]=42; t[1]=18; t[2]=30; highs.push_back(t);
+t[0]=36; t[1]=18; t[2]=24; lows.push_back(t); t[0]=42; t[1]=24; t[2]=30; highs.push_back(t);
+t[0]=36; t[1]=6; t[2]=0; lows.push_back(t); t[0]=42; t[1]=12; t[2]=6; highs.push_back(t);
+t[0]=36; t[1]=12; t[2]=0; lows.push_back(t); t[0]=42; t[1]=18; t[2]=6; highs.push_back(t);
+t[0]=36; t[1]=18; t[2]=0; lows.push_back(t); t[0]=42; t[1]=24; t[2]=6; highs.push_back(t);
+//     t={0,0,0}; lows.push_back(t); t={36,6,6}; highs.push_back(t);
+// t={0,0,6}; lows.push_back(t); t={36,6,12}; highs.push_back(t);
+// t={0,0,12}; lows.push_back(t); t={36,6,18}; highs.push_back(t);
+// t={0,0,18}; lows.push_back(t); t={36,6,24}; highs.push_back(t);
+// t={0,0,24}; lows.push_back(t); t={36,6,30}; highs.push_back(t);
+// t={0,6,0}; lows.push_back(t); t={36,12,6}; highs.push_back(t);
+// t={0,6,6}; lows.push_back(t); t={36,12,12}; highs.push_back(t);
+// t={0,6,12}; lows.push_back(t); t={36,12,18}; highs.push_back(t);
+// t={0,6,18}; lows.push_back(t); t={36,12,24}; highs.push_back(t);
+// t={0,6,24}; lows.push_back(t); t={36,12,30}; highs.push_back(t);
+// t={0,12,0}; lows.push_back(t); t={36,18,6}; highs.push_back(t);
+// t={0,12,6}; lows.push_back(t); t={36,18,12}; highs.push_back(t);
+// t={0,12,12}; lows.push_back(t); t={36,18,18}; highs.push_back(t);
+// t={0,12,18}; lows.push_back(t); t={36,18,24}; highs.push_back(t);
+// t={0,12,24}; lows.push_back(t); t={36,18,30}; highs.push_back(t);
+// t={0,18,0}; lows.push_back(t); t={36,24,6}; highs.push_back(t);
+// t={0,18,6}; lows.push_back(t); t={36,24,12}; highs.push_back(t);
+// t={0,18,12}; lows.push_back(t); t={36,24,18}; highs.push_back(t);
+// t={0,18,18}; lows.push_back(t); t={36,24,24}; highs.push_back(t);
+// t={0,18,24}; lows.push_back(t); t={36,24,30}; highs.push_back(t);
+// t={0,24,0}; lows.push_back(t); t={36,30,6}; highs.push_back(t);
+// t={0,24,6}; lows.push_back(t); t={36,30,12}; highs.push_back(t);
+// t={0,24,12}; lows.push_back(t); t={36,30,18}; highs.push_back(t);
+// t={0,24,18}; lows.push_back(t); t={36,30,24}; highs.push_back(t);
+// t={0,24,24}; lows.push_back(t); t={36,30,30}; highs.push_back(t);
+// t={36,6,6}; lows.push_back(t); t={42,12,12}; highs.push_back(t);
+// t={36,6,12}; lows.push_back(t); t={42,12,18}; highs.push_back(t);
+// t={36,6,18}; lows.push_back(t); t={42,12,24}; highs.push_back(t);
+// t={36,12,6}; lows.push_back(t); t={42,18,12}; highs.push_back(t);
+// t={36,12,12}; lows.push_back(t); t={42,18,18}; highs.push_back(t);
+// t={36,12,18}; lows.push_back(t); t={42,18,24}; highs.push_back(t);
+// t={36,18,6}; lows.push_back(t); t={42,24,12}; highs.push_back(t);
+// t={36,18,12}; lows.push_back(t); t={42,24,18}; highs.push_back(t);
+// t={36,18,18}; lows.push_back(t); t={42,24,24}; highs.push_back(t);
+// t={36,24,6}; lows.push_back(t); t={42,30,12}; highs.push_back(t);
+// t={36,24,12}; lows.push_back(t); t={42,30,18}; highs.push_back(t);
+// t={36,24,18}; lows.push_back(t); t={42,30,24}; highs.push_back(t);
+// t={36,0,6}; lows.push_back(t); t={42,6,12}; highs.push_back(t);
+// t={36,0,12}; lows.push_back(t); t={42,6,18}; highs.push_back(t);
+// t={36,0,18}; lows.push_back(t); t={42,6,24}; highs.push_back(t);
+// t={36,6,24}; lows.push_back(t); t={42,12,30}; highs.push_back(t);
+// t={36,12,24}; lows.push_back(t); t={42,18,30}; highs.push_back(t);
+// t={36,18,24}; lows.push_back(t); t={42,24,30}; highs.push_back(t);
+// t={36,6,0}; lows.push_back(t); t={42,12,6}; highs.push_back(t);
+// t={36,12,0}; lows.push_back(t); t={42,18,6}; highs.push_back(t);
+// t={36,18,0}; lows.push_back(t); t={42,24,6}; highs.push_back(t);
+
+
+  for(int i=0; i< lows.size(); i++){
+    PatchInfo box;
+    int eCells[6]= {0,0,0,0,0,0};
+    box.setBounds(&lows[i][0],&highs[i][0],eCells, grid_type);
+
+    input_patches.patchInfo.push_back(box);
+
+  }
+#endif 
+
   }
   else{
     Box log_box = reader->getLogicBox();
@@ -750,213 +864,215 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 //
 // ****************************************************************************
 
-  void
-  avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
-    int timestate) 
-  {
-    debug5 << rank << ": Meta data" << std::endl;
+void
+avtIDXFileFormat::PopulateDatabaseMetaData(avtDatabaseMetaData *md,
+  int timestate) 
+{
+  debug5 << rank << ": Meta data" << std::endl;
 
-    ActivateTimestep(timestate);
+  ActivateTimestep(timestate);
 
-    md->ClearMeshes();
-    md->ClearScalars(); 
-    md->ClearVectors();
-    md->ClearLabels();
+  md->ClearMeshes();
+  md->ClearScalars(); 
+  md->ClearVectors();
+  md->ClearLabels();
 
-    avtMeshMetaData *mesh = new avtMeshMetaData;
-    mesh->name = mesh_name;
+  avtMeshMetaData *mesh = new avtMeshMetaData;
+  mesh->name = mesh_name;
 
 #if USE_AMR    
-    mesh->meshType = AVT_AMR_MESH;
-    mesh->topologicalDimension = dim;
-    mesh->spatialDimension = dim;
+  mesh->meshType = AVT_AMR_MESH;
+  mesh->topologicalDimension = dim;
+  mesh->spatialDimension = dim;
 
-    int totalPatches = level_info.patchInfo.size();
-    
-    mesh->numBlocks = totalPatches;
-    
-    //mesh->blockOrigin = 0;
-    //mesh->LODs = reader->getMaxResolution();
+  int totalPatches = level_info.patchInfo.size();
+  
+  mesh->numBlocks = totalPatches;
+  
+  //mesh->blockOrigin = 0;
+  //mesh->LODs = reader->getMaxResolution();
 
-    mesh->blockTitle = "patches";
-    mesh->blockPieceName = "patch";
+  mesh->blockTitle = "patches";
+  mesh->blockPieceName = "patch";
 
-    int numLevels = 1; // only 1 AMR level for now
-    mesh->numGroups = numLevels;
-    mesh->groupTitle = "levels";
-    mesh->groupPieceName = "level";
+  int numLevels = 1; // only 1 AMR level for now
+  mesh->numGroups = numLevels;
+  mesh->groupTitle = "levels";
+  mesh->groupPieceName = "level";
 
-    std::vector<int> groupIds(totalPatches);
-    std::vector<std::string> pieceNames(totalPatches);
-    
-    for (int i = 0; i < mesh->numBlocks; i++) {
-      char tmpName[64];
-      int level = 0; // only 1 level
-      int local_patch = i;
-      sprintf(tmpName,"level%d, patch%d", level, local_patch);
+  std::vector<int> groupIds(totalPatches);
+  std::vector<std::string> pieceNames(totalPatches);
+  
+  for (int i = 0; i < mesh->numBlocks; i++) {
+    char tmpName[64];
+    int level = 0; // only 1 level
+    int local_patch = i;
+    sprintf(tmpName,"level%d, patch%d", level, local_patch);
 
-      //printf("Setting id %d = %d name %s\n", i, level, tmpName);
-      groupIds[i] = level;
-      pieceNames[i] = tmpName;
-    }
+    //printf("Setting id %d = %d name %s\n", i, level, tmpName);
+    groupIds[i] = level;
+    pieceNames[i] = tmpName;
+  }
 
-    mesh->blockNames = pieceNames;
-    mesh->groupIds = groupIds;
+  mesh->blockNames = pieceNames;
+  mesh->groupIds = groupIds;
 
-    mesh->containsExteriorBoundaryGhosts = false;
-    
-    md->AddGroupInformation(numLevels, totalPatches, groupIds);
+  mesh->containsExteriorBoundaryGhosts = false;
+  mesh->hasSpatialExtents = false;
+  
+  md->AddGroupInformation(numLevels, totalPatches, groupIds);
 #else
-    mesh->meshType = AVT_RECTILINEAR_MESH;
-    int totalPatches = level_info.patchInfo.size();
-    mesh->numBlocks = totalPatches;
-    mesh->blockOrigin = 0;
-    mesh->cellOrigin = 1;
-    //mesh->LODs = reader->getMaxResolution();
-    mesh->spatialDimension = dim;
-    mesh->topologicalDimension = dim;
-    mesh->blockTitle = "blocks";
-    mesh->blockPieceName = "piece";//%06d";
-    mesh->groupPieceName = "global_index";
-    
-    /*mesh->groupTitle = "levels";
-    mesh->groupPieceName = "level";
-    mesh->blockTitle = "patches";
-    mesh->blockPieceName = "patch%06d";
-       
-    std::vector<int> groupIds(totalPatches);
-    std::vector<std::string> pieceNames(totalPatches);
-    
-    int numLevels = 1;
-    for (int i = 0; i < mesh->numBlocks; i++) {
-      char tmpName[64];
-      int level = 0; // only 1 level
-      int local_patch = i;
-      sprintf(tmpName,"level%d, patch%d", level, local_patch);
+  mesh->meshType = AVT_RECTILINEAR_MESH;
+  int totalPatches = level_info.patchInfo.size();
+  mesh->numBlocks = totalPatches;
+  mesh->blockOrigin = 0;
+  mesh->cellOrigin = 1;
+  //mesh->LODs = reader->getMaxResolution();
+  mesh->spatialDimension = dim;
+  mesh->topologicalDimension = dim;
+  mesh->blockTitle = "blocks";
+  mesh->blockPieceName = "piece";//%06d";
+  mesh->groupPieceName = "global_index";
+  
+  /*mesh->groupTitle = "levels";
+  mesh->groupPieceName = "level";
+  mesh->blockTitle = "patches";
+  mesh->blockPieceName = "patch%06d";
+     
+  std::vector<int> groupIds(totalPatches);
+  std::vector<std::string> pieceNames(totalPatches);
+  
+  int numLevels = 1;
+  for (int i = 0; i < mesh->numBlocks; i++) {
+    char tmpName[64];
+    int level = 0; // only 1 level
+    int local_patch = i;
+    sprintf(tmpName,"level%d, patch%d", level, local_patch);
 
-      groupIds[i] = level;
-      pieceNames[i] = tmpName;
+    groupIds[i] = level;
+    pieceNames[i] = tmpName;
+  }
+  //mesh->groupTitle = "levels";
+  //mesh->groupPieceName = "level";
+  mesh->numGroups = numLevels; // n AMR levels
+  mesh->containsExteriorBoundaryGhosts = false;
+  mesh->blockNames = pieceNames;
+
+  md->AddGroupInformation(numLevels, totalPatches, groupIds);
+  */
+#endif
+  
+  int low[3],high[3];
+  input_patches.getBounds(low,high,mesh_name,use_extracells);
+ 
+  debug4 << "global low " << low[0] << ","<< low[1]<<","<< low[2] <<std::endl;
+  debug4 << "global high " << high[0] << ","<< high[1]<<","<< high[2] <<std::endl;
+
+  //this can be done once for everything because the spatial range is the same for all meshes
+  double box_min[3] = { input_patches.anchor[0] + low[0] * input_patches.spacing[0],
+  input_patches.anchor[1] + low[1] * input_patches.spacing[1],
+  input_patches.anchor[2] + low[2] * input_patches.spacing[2] };
+  double box_max[3] = { input_patches.anchor[0] + high[0] * input_patches.spacing[0],
+    input_patches.anchor[1] + high[1] * input_patches.spacing[1],
+    input_patches.anchor[2] + high[2] * input_patches.spacing[2] };
+    {
+      debug5 << "Dimensions " << dim <<std::endl;
+      char* debug_str = new char[1024];
+      sprintf(debug_str, "anchor %f %f %f spacing %f %f %f\n",input_patches.anchor[0],input_patches.anchor[1],input_patches.anchor[2], input_patches.spacing[0],input_patches.spacing[1],input_patches.spacing[2]);
+      debug5 << debug_str;
+      sprintf(debug_str, "global log %d %d %d - %d %d %d\n", low[0],low[1],low[2],high[0],high[1],high[2]);
+      debug5 << debug_str;
+
+      sprintf(debug_str, "global phy %f %f %f - %f %f %f\n", box_min[0],box_min[1],box_min[2],box_max[0],box_max[1],box_max[2]);
+      debug5 << debug_str;
+
+     delete [] debug_str;
     }
-    //mesh->groupTitle = "levels";
-    //mesh->groupPieceName = "level";
-    mesh->numGroups = numLevels; // n AMR levels
-    mesh->containsExteriorBoundaryGhosts = false;
-    mesh->blockNames = pieceNames;
 
-    md->AddGroupInformation(numLevels, totalPatches, groupIds);
-    */
-#endif
-    
+    int logical[3];
+    for (int i=0; i<3; i++)
+      logical[i] = high[i]-low[i];
+
+    mesh->hasSpatialExtents = true; 
+    mesh->minSpatialExtents[0] = box_min[0];
+    mesh->maxSpatialExtents[0] = box_max[0];
+    mesh->minSpatialExtents[1] = box_min[1];
+    mesh->maxSpatialExtents[1] = box_max[1];
+    mesh->minSpatialExtents[2] = box_min[2];
+    mesh->maxSpatialExtents[2] = box_max[2];
+
+    mesh->hasLogicalBounds = true;
+    mesh->logicalBounds[0] = logical[0];
+    mesh->logicalBounds[1] = logical[1];
+    mesh->logicalBounds[2] = logical[2];
+
+    md->Add(mesh);
+
+    md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
+    md->SetCyclesAreAccurate(true);
+
+//if(timestate == 0){
+  const std::vector<Field>& fields = reader->getFields();
+  debug5 << "adding " << fields.size() << "fields" << std::endl;
+
+  int ndtype;
+// char testvar[128];
+// sprintf(testvar, "AA_var_%d",timestate);
+// AddScalarVarToMetaData(md, testvar, mesh->name, AVT_ZONECENT);
+  for (int i = 0; i < (int) fields.size(); i++)
+  {
+    const Field& field = fields[i];
+  // printf("adding field %s\n", field.name.c_str());
+    if (!field.isVector){
+      AddScalarVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT);
+      //md->Add(new avtScalarMetaData(field.name,mesh->name,AVT_ZONECENT));
+    }
+    else
+      AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
+      //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
+  }
+
+  std::vector<int> cycles;
+  cycles.resize(GetNTimesteps());
+
+  for (int ti=0;ti<(int)cycles.size();ti++){
+    cycles[ti] = ti;
+  }
+
+  md->SetCycles( cycles );
+  //md->SetMustRepopulateOnStateChange(true);
+
+  debug5 << rank << ": end meta" <<std::endl;
+}
+
+void
+avtIDXFileFormat::SetUpDomainConnectivity(const char* meshname)
+{
+  avtRectilinearDomainBoundaries *rdb =
+  new avtRectilinearDomainBoundaries(true);
+  int ndomains =level_info.patchInfo.size();
+  rdb->SetNumDomains(ndomains);
+  //printf("Rect: Setting number of domains %d for mesh %s\n", ndomains, meshname);
+
+  for(int n=0; n < ndomains; n++) {
     int low[3],high[3];
-    input_patches.getBounds(low,high,mesh_name,use_extracells);
-   
-    debug4 << "global low " << low[0] << ","<< low[1]<<","<< low[2] <<std::endl;
-    debug4 << "global high " << high[0] << ","<< high[1]<<","<< high[2] <<std::endl;
+    level_info.patchInfo[n].getBounds(low,high,meshname, use_extracells);
 
-    //this can be done once for everything because the spatial range is the same for all meshes
-    double box_min[3] = { input_patches.anchor[0] + low[0] * input_patches.spacing[0],
-      input_patches.anchor[1] + low[1] * input_patches.spacing[1],
-      input_patches.anchor[2] + low[2] * input_patches.spacing[2] };
-      double box_max[3] = { input_patches.anchor[0] + high[0] * input_patches.spacing[0],
-        input_patches.anchor[1] + high[1] * input_patches.spacing[1],
-        input_patches.anchor[2] + high[2] * input_patches.spacing[2] };
-        {
-          debug5 << "Dimensions " << dim <<std::endl;
-          char* debug_str = new char[1024];
-          sprintf(debug_str, "anchor %f %f %f spacing %f %f %f\n",input_patches.anchor[0],input_patches.anchor[1],input_patches.anchor[2], input_patches.spacing[0],input_patches.spacing[1],input_patches.spacing[2]);
-          debug5 << debug_str;
-          sprintf(debug_str, "global log %d %d %d - %d %d %d\n", low[0],low[1],low[2],high[0],high[1],high[2]);
-          debug5 << debug_str;
+    int e[6] = { low[0], high[0],
+     low[1], high[1],
+     low[2], high[2] };
 
-          sprintf(debug_str, "global phy %f %f %f - %f %f %f\n", box_min[0],box_min[1],box_min[2],box_max[0],box_max[1],box_max[2]);
-          debug5 << debug_str;
-	  
-         delete [] debug_str;
-        }
+     rdb->SetIndicesForRectGrid(n, e);
+   }
+   rdb->CalculateBoundaries();
+   void_ref_ptr vr =
+   void_ref_ptr(rdb, avtStructuredDomainBoundaries::Destruct);
+   cache->CacheVoidRef("any_mesh",
+     AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
 
-        int logical[3];
-        for (int i=0; i<3; i++)
-          logical[i] = high[i]-low[i];
-
-        mesh->hasSpatialExtents = true; 
-        mesh->minSpatialExtents[0] = box_min[0];
-        mesh->maxSpatialExtents[0] = box_max[0];
-        mesh->minSpatialExtents[1] = box_min[1];
-        mesh->maxSpatialExtents[1] = box_max[1];
-        mesh->minSpatialExtents[2] = box_min[2];
-        mesh->maxSpatialExtents[2] = box_max[2];
-
-        mesh->hasLogicalBounds = true;
-        mesh->logicalBounds[0] = logical[0];
-        mesh->logicalBounds[1] = logical[1];
-        mesh->logicalBounds[2] = logical[2];
-	
-        md->Add(mesh);
-
-        md->AddDefaultSILRestrictionDescription(std::string("!TurnOnAll"));
-        md->SetCyclesAreAccurate(false);
-	
-	/*for (int ti=0;ti<GetNTimesteps();ti++){
-	  metadata->SetCycle(ti, ti);
-	  metadata->SetCycleIsAccurate(true, ti);
-	  }*/
-#ifdef PARALLEL // only PIDX
-   // md->SetFormatCanDoDomainDecomposition(true);
-#endif
-
-    //if(timestate == 0){
-        const std::vector<Field>& fields = reader->getFields();
-        debug5 << "adding " << fields.size() << "fields" << std::endl;
-
-        int ndtype;
-    // char testvar[128];
-    // sprintf(testvar, "AA_var_%d",timestate);
-    // AddScalarVarToMetaData(md, testvar, mesh->name, AVT_ZONECENT);
-        for (int i = 0; i < (int) fields.size(); i++)
-        {
-          const Field& field = fields[i];
-        // printf("adding field %s\n", field.name.c_str());
-          if (!field.isVector){
-            AddScalarVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT);
-            //md->Add(new avtScalarMetaData(field.name,mesh->name,AVT_ZONECENT));
-          }
-          else
-            AddVectorVarToMetaData(md, field.name, mesh->name, AVT_ZONECENT,field.ncomponents);
-            //md->Add(new avtVectorMetaData(field.name,mesh->name,AVT_ZONECENT, field.ncomponents));
-        }
-        md->SetMustRepopulateOnStateChange(true);
-
-        debug5 << rank << ": end meta" <<std::endl;
-      }
-
-      void
-      avtIDXFileFormat::SetUpDomainConnectivity(const char* meshname)
-      {
-        avtRectilinearDomainBoundaries *rdb =
-        new avtRectilinearDomainBoundaries(true);
-        int ndomains =level_info.patchInfo.size();
-        rdb->SetNumDomains(ndomains);
-        //printf("Rect: Setting number of domains %d for mesh %s\n", ndomains, meshname);
-
-        for(int n=0; n < ndomains; n++) {
-          int low[3],high[3];
-          level_info.patchInfo[n].getBounds(low,high,meshname, use_extracells);
-
-          int e[6] = { low[0], high[0],
-           low[1], high[1],
-           low[2], high[2] };
-
-           rdb->SetIndicesForRectGrid(n, e);
-         }
-         rdb->CalculateBoundaries();
-         void_ref_ptr vr =
-         void_ref_ptr(rdb, avtStructuredDomainBoundaries::Destruct);
-         cache->CacheVoidRef("any_mesh",
-           AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, -1, -1, vr);
-
-        void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
-          AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
-          -1, -1);
+  void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
+    AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
+    -1, -1);
   if (*vrTmp == NULL )//|| *vrTmp != *this->mesh_boundaries[meshname])
     fprintf(stderr,"pidx boundary mesh not registered\n");
 
@@ -966,6 +1082,10 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
 void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timestate){
   //if (!avtDatabase::OnlyServeUpMetaData() && level_info.patchInfo.size()>0 ){
 
+#ifdef MDSERVER
+    return;
+#else
+  
   avtRectilinearDomainBoundaries *rdb =
   new avtRectilinearDomainBoundaries(true);
   rdb->SetNumDomains(level_info.patchInfo.size());
@@ -982,45 +1102,56 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
     //     rdb->SetIndicesForAMRPatch(i,0,e);//SetIndicesForRectGrid(i, e);
     // }
+  int glow[3], ghigh[3];
+  level_info.getBounds(glow,ghigh,meshname,use_extracells);
 
   for(int domain=0; domain < level_info.patchInfo.size(); domain++){
-    int low[3], high[3];
-    level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
+
+    int low[3], high[3];//, extracells[6];
+    level_info.patchInfo[domain].getBounds(low,high,meshname);
+
+    // int e[6] = { low[0]+extracells[0], high[0]+extracells[1],
+    //  low[1]+extracells[2], high[1]+extracells[3],
+    //  low[2]+extracells[4], high[2]+extracells[5]};
 
     int e[6] = { low[0], high[0],
-     low[1], high[1],
-     low[2], high[2] };
+                 low[1], high[1],
+                 low[2], high[2]};
 
-      //rdb->SetExtents(domain, e);
-      rdb->SetIndicesForAMRPatch(domain,0,e);//SetIndicesForRectGrid(i, e);
+    rdb->SetIndicesForAMRPatch(domain,0,e);
 
-    // for(int b=0; b < level_info.patchInfo.size(); b++){
-    //   int tlow[3], thigh[3];
-    //   level_info.patchInfo[b].getBounds(tlow,thigh,meshname,use_extracells);
+    //printf("domain %d ext %d %d %d, %d %d %d\n", domain, low[0],low[1],low[2],high[0],high[1],high[2]);
 
-    //   if (b == domain) continue;
+#if 0
+    for(int b=0; b < level_info.patchInfo.size(); b++){
+      int tlow[3], thigh[3];
+      level_info.patchInfo[b].getBounds(tlow,thigh,meshname,use_extracells);
+
+      if (b == domain) continue;
       
-    //   if(overlap(low[0],high[0],tlow[0],thigh[0])&&
-    //      overlap(low[1],high[1],tlow[1],thigh[1])&&
-    //      overlap(low[2],high[2],tlow[2],thigh[2]))
-    //   {
-    //     int neig_low[3] = {max(low[0],tlow[0]),max(low[1],tlow[1]),max(low[2],tlow[2])};
-    //     int neig_high[3] = {min(high[0],thigh[0]),min(high[1],thigh[1]),min(high[2],thigh[2])};
+      if(overlap(low[0],high[0],tlow[0],thigh[0])&&
+         overlap(low[1],high[1],tlow[1],thigh[1])&&
+         overlap(low[2],high[2],tlow[2],thigh[2]))
+      {
+        int neig_low[3] = {max(low[0],tlow[0]),max(low[1],tlow[1]),max(low[2],tlow[2])};
+        int neig_high[3] = {min(high[0],thigh[0]),min(high[1],thigh[1]),min(high[2],thigh[2])};
 
-    //     rdb->AddNeighbor(domain, domain, b,
-    //                              neig_low, neig_high);
+        rdb->AddNeighbor(domain, domain, b,
+                                 neig_low, neig_high);
 
-    //     //printf("%d add neighbour %d [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
+        //printf("%d add neighbour %d [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
 
-    //   }
-    // }
+      }
+    }
+#endif
     }
 
     rdb->CalculateBoundaries();
 
     this->mesh_boundaries[meshname] = void_ref_ptr(rdb,
      avtStructuredDomainBoundaries::Destruct);
-    cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, timestate, -1, this->mesh_boundaries[meshname]);
+    cache->CacheVoidRef("any_mesh", AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION, 
+      timestate, -1, this->mesh_boundaries[meshname]);
 
     void_ref_ptr vrTmp = cache->GetVoidRef("any_mesh", // MUST be called any_mesh
       AUXILIARY_DATA_DOMAIN_BOUNDARY_INFORMATION,
@@ -1031,7 +1162,7 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     //canDoStreaming = false;
 
     //printf("%d: DONE compute domain boundary\n", rank);
-
+#endif
   }
 
 
@@ -1065,6 +1196,14 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     Box slice_box;
 
     vtkRectilinearGrid *rgrid = vtkRectilinearGrid::New();
+
+#if USE_AMR
+  //SetUpDomainConnectivity(mesh->name.c_str());
+  computeDomainBoundaries(meshname, timestate);
+#else
+  SetUpDomainConnectivity(meshname);
+#endif
+
     int my_dims[3];
     float *arrayX;
     float *arrayZ;
@@ -1080,6 +1219,8 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
     int low[3], high[3];
     level_info.patchInfo[domain].getBounds(low,high,meshname,use_extracells);
 
+    //printf("MESH domain %d ext %d %d %d, %d %d %d\n", domain, low[0],low[1],low[2],high[0],high[1],high[2]);
+    
     for(int k=0; k<3; k++){
       int offset = 1 + sfc_offset[k]; 
 
@@ -1131,10 +1272,10 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
           }
           else
             face_offset = -0.5;
-
         }
 
-          array[i] = input_patches.anchor[c] + (i + low[c] + face_offset) * input_patches.spacing[c];
+          array[i] = input_patches.anchor[c] + 
+                     (i + low[c] + face_offset) * input_patches.spacing[c];
 
          // if(i==0)
          //   printf("low %d[%d]: %f\n", domain,c, array[i]);
@@ -1154,29 +1295,29 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
         coords->Delete();
       }
 
-#if 0
+#if 0 // compute ghost cells
     size_t nCells = rgrid->GetNumberOfCells();
     char *blanks = new char[nCells];
     memset(blanks, 0, nCells*sizeof(char));
 
-    // int nNodes = rgrid->GetNumberOfPoints();
-    // int *blanksN = new int[nNodes];
-    // memset(blanksN, 0, nNodes*sizeof(int));
+    int nNodes = rgrid->GetNumberOfPoints();
+    int *blanksN = new int[nNodes];
+    memset(blanksN, 0, nNodes*sizeof(int));
 
-    unsigned char realVal = 0, ghost = 0;//, ghostN = 0, noghostN = 0;
+    unsigned char realVal = 0, ghost = 0, ghostN = 0, noghostN = 0;
 
     avtGhostData::AddGhostZoneType(ghost, DUPLICATED_ZONE_INTERNAL_TO_PROBLEM);
     vtkUnsignedCharArray *ghostCells = vtkUnsignedCharArray::New();
     ghostCells->SetName("avtGhostZones");
     ghostCells->Allocate(nCells);
 
-    // avtGhostData::AddGhostNodeType(ghostN,
-    //                                     DUPLICATED_NODE);
-    // avtGhostData::RemoveGhostNodeType(noghostN,
-    //                                     DUPLICATED_NODE);//NODE_NOT_APPLICABLE_TO_PROBLEM);
-    // vtkUnsignedCharArray *ghostNodes = vtkUnsignedCharArray::New();
-    // ghostNodes->SetName("avtGhostNodes");
-    // ghostNodes->Allocate(nNodes);
+    avtGhostData::AddGhostNodeType(ghostN,
+                                        DUPLICATED_NODE);
+    avtGhostData::RemoveGhostNodeType(noghostN,
+                                        DUPLICATED_NODE);//NODE_NOT_APPLICABLE_TO_PROBLEM);
+    vtkUnsignedCharArray *ghostNodes = vtkUnsignedCharArray::New();
+    ghostNodes->SetName("avtGhostNodes");
+    ghostNodes->Allocate(nNodes);
 
     int dim_block[3] = {my_dims[0]-1,my_dims[1]-1,my_dims[2]-1};
 
@@ -1204,9 +1345,9 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
         int maxv=inter_low[d];
         int minv=inter_high[d];
         neig_low[d] = maxv;
-        neig_high[d] = minv-1;
+        neig_high[d] = minv;
 
-#if 1
+#if 0
         if(box_touch && over[d]){
           if(d==0){
             
@@ -1238,14 +1379,14 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
             if(low[d] < tlow[d]){
               neig_low[d] = maxv+1;//+use_extracells;
               neig_high[d] = minv;
-	          }
-  	        else{
-  		        neig_low[d] = maxv;
-  		        neig_high[d] = minv-1;//-use_extracells;
-  		      }
+            }
+            else{
+              neig_low[d] = maxv;
+              neig_high[d] = minv-1;//-use_extracells;
+            }
           }
           else{
-  		      if(low[d] < tlow[d]){
+            if(low[d] < tlow[d]){
               neig_low[d] = maxv+2;//+use_extracells;
               neig_high[d] = minv;
             }
@@ -1256,18 +1397,18 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
           }
           */
       }
-	    else{
-	      neig_high[d] = minv;
-	      neig_low[d] = maxv;
+      else{
+        neig_high[d] = minv;
+        neig_low[d] = maxv;
       }
 
  #endif     
     }
 
-	   //printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
-      for(int k=neig_low[2]; k < neig_high[2]; k++)
-        for(int j=neig_low[1]; j < neig_high[1]; j++)
-          for(int i=neig_low[0]; i < neig_high[0]; i++){
+      printf("%d->%d Ghost zone [%d %d %d, %d %d %d]\n", domain, b, neig_low[0],neig_low[1],neig_low[2], neig_high[0],neig_high[1],neig_high[2]);
+      for(int k=neig_low[2]; k <= neig_high[2]; k++)
+        for(int j=neig_low[1]; j <= neig_high[1]; j++)
+          for(int i=neig_low[0]; i <= neig_high[0]; i++){
 
             // if(i == glow[0] || j == glow[1] || k == glow[2] || i == ghigh[0] || j == ghigh[1] || k == ghigh[2])
             // if(i == ghigh[0]-1 || j == ghigh[1]-1 || k == ghigh[2]-1)
@@ -1279,48 +1420,39 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
 
             blanks[(size_t)(ii) + (size_t)dim_block[0] * (size_t)((size_t)(jj) + (size_t)dim_block[1] * (size_t)(kk))] = 1;
 
-          //blanksN[ii + (dim_block[0]+1) * (jj + (dim_block[1]+1) * kk)] = 1;
+            blanksN[(size_t)(ii) + (size_t)dim_block[0] * (size_t)((size_t)(jj) + (size_t)dim_block[1] * (size_t)(kk))] = 1;
             count_ghost++;
           }
     }
 
       //printf("%d found %d ghosts %d\n", domain, count_ghost, ghost);
-	//}
+  //}
     //printf("cells %d blanks size %d\n", nCells, dim_block[0]*dim_block[1]*dim_block[2]);
 
   for (int i = 0; i < nCells; i++) {
-    if (!blanks[i]){
-      ghostCells->InsertNextValue(realVal);
+    // if (!blanks[i]){
+    //   ghostCells->InsertNextValue(realVal);
+    // }
+    // else{
+    //   ghostCells->InsertNextValue(ghost);
+    // }
 
+    if(!blanksN[i]){
+      ghostNodes->InsertNextValue(noghostN);
     }
-    else{
-      ghostCells->InsertNextValue(ghost);
-
+    else
+      ghostNodes->InsertNextValue(ghostN);
     }
 
-// if(!blanksN[i]){
-//   ghostNodes->InsertNextValue(noghostN);
-// }
-// else
-//   ghostNodes->InsertNextValue(ghostN);
-
-  }
-
-  rgrid->GetCellData()->AddArray(ghostCells);
-//rgrid->GetPointData()->AddArray(ghostNodes);
+  //rgrid->GetCellData()->AddArray(ghostCells);
+  rgrid->GetPointData()->AddArray(ghostNodes);
 
   vtkStreamingDemandDrivenPipeline::SetUpdateGhostLevel(
     rgrid->GetInformation(), 0);
   ghostCells->Delete();
-// ghostNodes->Delete();
+  ghostNodes->Delete();
 
   delete [] blanks;
-#endif
-
-#if USE_AMR
-//computeDomainBoundaries(meshname, timestate);
-#else
-  SetUpDomainConnectivity(meshname);
 #endif
 
   debug5 << rank << ": end mesh" << std::endl;
@@ -1358,7 +1490,7 @@ vtkDataArray* avtIDXFileFormat::queryToVtk(int timestate, int domain, const char
   debug5 << "read data " << level_info.patchInfo[domain].toString();
   for(int k=0; k<3; k++){
     if(uintah_metadata){
-      if(use_extracells) // cause uintah low starts from -1
+      if(!use_extracells) // cause uintah low starts from -1
         low[k]++;
 
       high[k] += sfc_offset[k];

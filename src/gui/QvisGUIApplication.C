@@ -4572,6 +4572,9 @@ QvisGUIApplication::SaveSession()
 //   David Camp, Tue Aug  4 11:04:14 PDT 2015
 //   Added new dialog to be able to save session files on remote host.
 //
+//   Kathleen Biagas, Thu May 18, 2018
+//   Support UNC style paths on Windows.
+//
 // ****************************************************************************
 
 void
@@ -4580,9 +4583,18 @@ QvisGUIApplication::SaveSessionAs()
     // Create the name of a VisIt session file to use.
     QString defaultFile;
     if(sessionHost.empty())
+    {
         defaultFile.sprintf("%svisit%04d.session", sessionDir.c_str(), sessionCount);
+    }
     else
+    {
+#ifdef WIN32
+        if (sessionDir.substr(0,2) == "\\\\")
+            defaultFile.sprintf("%svisit%04d.session", sessionDir.c_str(), sessionCount);
+        else
+#endif
         defaultFile.sprintf("%s:%svisit%04d.session", sessionHost.c_str(), sessionDir.c_str(), sessionCount);
+    }
 
     // Get the name of the file that the user saved.
     QualifiedFilename qfilename;
@@ -5141,49 +5153,86 @@ QvisGUIApplication::RestoreSessionFile(const QString &s,
 // Creation:   Mon Jul 20 02:21:50 PDT 2015
 //
 // Modifications:
+//    Kathleen Biagas, Wed May 30, 2018
+//    Ensure session-with-different-sources is restored properly if node
+//    is NULL.
+//
 // ****************************************************************************
 
 void
-QvisGUIApplication::ProcessSessionNode(DataNode *node, const std::string &filename, 
-                                       const stringVector &sources, const std::string &hostname)
+QvisGUIApplication::ProcessSessionNode(DataNode *node,
+     const std::string &filename,
+     const stringVector &sources,
+     const std::string &hostname)
 {
-        if(node)
-        {
-            ProcessConfigSettings(node, false);
-            CreateInitiallyVisibleWindows(node);
-            ProcessWindowConfigSettings(node); 
+    if(node)
+    {
+        ProcessConfigSettings(node, false);
+        CreateInitiallyVisibleWindows(node);
+        ProcessWindowConfigSettings(node); 
 
-            // Look for the VisIt tree.
-            DataNode *visitRoot = node->GetNode("VisIt");
-            if(visitRoot != 0)
+        // Look for the VisIt tree.
+        DataNode *visitRoot = node->GetNode("VisIt");
+        if(visitRoot != 0)
+        {
+            // Get the gui node.
+            DataNode *guiNode = visitRoot->GetNode("GUI");
+            if(guiNode != 0)
             {
-                // Get the gui node.
-                DataNode *guiNode = visitRoot->GetNode("GUI");
-                if(guiNode != 0)
+                //
+                // Customize the GUI's appearance based on the session.
+                //
+                GetViewerState()->GetAppearanceAttributes()->SetFromNode(guiNode);
+                CustomizeAppearance(true);
+
+                //
+                // Create a session file helper if needed and disconnect it
+                // so we can hook it up based on how we're feeding it the
+                // source filenames.
+                //
+                if(sessionFileHelper == 0)
+                {
+                    sessionFileHelper = new QvisSessionFileDatabaseLoader(this);
+                    connect(sessionFileHelper, SIGNAL(loadFile(const QString &)),
+                        this, SLOT(sessionFileHelper_LoadFile(const QString &)));
+                }
+                disconnect(sessionFileHelper, SIGNAL(complete(const QString &)),
+                    this, SLOT(sessionFileHelper_LoadSession(const QString &)));
+                disconnect(sessionFileHelper,
+                    SIGNAL(complete(const QString &, const stringVector &)),
+                    this,
+                    SLOT(sessionFileHelper_LoadSessionWithDifferentSources(
+                        const QString &, const stringVector &)));
+
+                if(sources.size() > 0)
                 {
                     //
-                    // Customize the GUI's appearance based on the session.
+                    // If we're going to be opening up files, have the
+                    // viewer tell all engines to clear their caches.
                     //
-                    GetViewerState()->GetAppearanceAttributes()->SetFromNode(guiNode);
-                    CustomizeAppearance(true);
+                    GetViewerMethods()->ClearCacheForAllEngines();
 
-                    //
-                    // Create a session file helper if needed and disconnect it
-                    // so we can hook it up based on how we're feeding it the
-                    // source filenames.
-                    //
-                    if(sessionFileHelper == 0)
-                    {
-                        sessionFileHelper = new QvisSessionFileDatabaseLoader(this);
-                        connect(sessionFileHelper, SIGNAL(loadFile(const QString &)),
-                                this, SLOT(sessionFileHelper_LoadFile(const QString &)));
-                    }
-                    disconnect(sessionFileHelper, SIGNAL(complete(const QString &)),
-                               this, SLOT(sessionFileHelper_LoadSession(const QString &)));
-                    disconnect(sessionFileHelper, SIGNAL(complete(const QString &, const stringVector &)),
-                               this, SLOT(sessionFileHelper_LoadSessionWithDifferentSources(const QString &, const stringVector &)));
+                    // Make sure that when the helper has loaded all of the
+                    // files, it calls back to this object and tells the
+                    // viewer to restore with different sources.
+                    connect(sessionFileHelper,
+                        SIGNAL(complete(const QString &, const stringVector &)),
+                        this, 
+                        SLOT(sessionFileHelper_LoadSessionWithDifferentSources(
+                            const QString &, const stringVector &)));
 
-                    if(sources.size() > 0)
+                    // Start loading files.
+                    sessionFileHelper->SetDatabases(sources);
+                    sessionFileHelper->Start(filename.c_str());
+                }
+                else
+                {
+                    //
+                    // Look for the list of files that we need to open up
+                    // and if we find it, open up each one of them.
+                    //
+                    DataNode *plotDatabases = guiNode->GetNode("plotDatabases");
+                    if(plotDatabases)
                     {
                         //
                         // If we're going to be opening up files, have the
@@ -5193,60 +5242,45 @@ QvisGUIApplication::ProcessSessionNode(DataNode *node, const std::string &filena
 
                         // Make sure that when the helper has loaded all of the
                         // files, it calls back to this object and tells the
-                        // viewer to restore with different sources.
+                        // viewer to restore the session.
                         connect(sessionFileHelper,
-                                SIGNAL(complete(const QString &, const stringVector &)),
-                                this, 
-                                SLOT(sessionFileHelper_LoadSessionWithDifferentSources(const QString &, const stringVector &)));
+                            SIGNAL(complete(const QString &)),
+                            this,
+                            SLOT(sessionFileHelper_LoadSession(const QString &)));
 
                         // Start loading files.
-                        sessionFileHelper->SetDatabases(sources);
+                        sessionFileHelper->SetDatabases(
+                            plotDatabases->AsStringVector());
                         sessionFileHelper->Start(filename.c_str());
                     }
                     else
                     {
-                        //
-                        // Look for the list of files that we need to open up
-                        // and if we find it, open up each one of them.
-                        //
-                        DataNode *plotDatabases = guiNode->GetNode("plotDatabases");
-                        if(plotDatabases)
-                        {
-                            //
-                            // If we're going to be opening up files, have the
-                            // viewer tell all engines to clear their caches.
-                            //
-                            GetViewerMethods()->ClearCacheForAllEngines();
-
-                            // Make sure that when the helper has loaded all of the
-                            // files, it calls back to this object and tells the
-                            // viewer to restore the session.
-                            connect(sessionFileHelper, SIGNAL(complete(const QString &)),
-                                    this, SLOT(sessionFileHelper_LoadSession(const QString &)));
-
-                            // Start loading files.
-                            sessionFileHelper->SetDatabases(plotDatabases->AsStringVector());
-                            sessionFileHelper->Start(filename.c_str());
-                        }
-                        else
-                        {
-                            // If there are no plots, we still need to restore
-                            GetViewerMethods()->ImportEntireState(filename, false, hostname);
-                        }
+                        // If there are no plots, we still need to restore
+                        GetViewerMethods()->ImportEntireState(filename, false,
+                            hostname);
                     }
                 }
             }
+        }
 
-            delete node;
+        delete node;
+    }
+    else
+    {
+        // Have the viewer read in its part of the config. Note that we
+        // pass the inVisItDir flag as false because we don't want to have
+        // the viewer prepend the .visit directory to the file since it's
+        // already part of the filename.
+        if(sources.size() > 0)
+        {
+            GetViewerMethods()->ImportEntireStateWithDifferentSources(filename,
+                false, sources, hostname);
         }
         else
         {
-            // Have the viewer read in its part of the config. Note that we
-            // pass the inVisItDir flag as false because we don't want to have
-            // the viewer prepend the .visit directory to the file since it's
-            // already part of the filename.
             GetViewerMethods()->ImportEntireState(filename, false, hostname);
         }
+    }
 }
 
 // ****************************************************************************
@@ -5528,6 +5562,9 @@ QvisGUIApplication::ProcessWindowConfigSettings(DataNode *node)
 //   Went back to using GetMenuName for the key, as it matches what is used
 //   to write the plugin settings.
 //
+//   Mark C. Miller, Sat May  5 19:42:11 PDT 2018
+//   Fix leak of QString menuName.
+//
 // ****************************************************************************
 
 void
@@ -5546,7 +5583,9 @@ QvisGUIApplication::ReadPluginWindowConfigs(DataNode *parentNode,
         GUIPlotPluginInfo *GUIInfo = plotPluginManager->GetGUIPluginInfo(
             plotPluginManager->GetEnabledID(i));
 
-        std::string key(GUIInfo->GetMenuName()->toStdString());
+        QString *menuName = GUIInfo->GetMenuName();
+        std::string key(menuName->toStdString());
+        delete menuName;
         key += " plot attributes";
 
         if(plotWindows[i] != 0 &&
@@ -5577,7 +5616,9 @@ QvisGUIApplication::ReadPluginWindowConfigs(DataNode *parentNode,
         GUIOperatorPluginInfo *GUIInfo = operatorPluginManager->GetGUIPluginInfo(
                                        operatorPluginManager->GetEnabledID(i));
 
-        std::string key(GUIInfo->GetMenuName()->toStdString());
+        QString *menuName = GUIInfo->GetMenuName();
+        std::string key(menuName->toStdString());
+        delete menuName;
         key += " operator attributes";
 
         if(operatorWindows[i] != 0 &&

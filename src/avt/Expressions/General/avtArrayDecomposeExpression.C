@@ -42,7 +42,10 @@
 
 #include <avtArrayDecomposeExpression.h>
 
-#include <math.h>
+#include <cerrno>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #include <vtkCellData.h>
 #include <vtkDataArray.h>
@@ -50,12 +53,16 @@
 #include <vtkPointData.h>
 
 #include <ExprToken.h>
+#include <avtArrayMetaData.h>
+#include <avtCallback.h>
+#include <avtDatabase.h>
+#include <avtDatabaseMetaData.h>
 #include <avtExprNode.h>
-
 
 #include <DebugStream.h>
 #include <ExpressionException.h>
 #include <ImproperUseException.h>
+#include <InvalidFilesException.h>
 
 #include <string>
 #include <vector>
@@ -123,7 +130,7 @@ avtArrayDecomposeExpression::DeriveVariable(vtkDataSet *in_ds, int currentDomain
 {
     if (activeVariable == NULL)
         EXCEPTION2(ExpressionException, outputVariableName, 
-                   "Asked to decompose an array, but did "
+                   "Asked to decompose an array, but did not "
                    "specify which variable to decompose");
 
     vtkDataArray *data = in_ds->GetPointData()->GetArray(activeVariable);
@@ -134,9 +141,77 @@ avtArrayDecomposeExpression::DeriveVariable(vtkDataSet *in_ds, int currentDomain
         EXCEPTION2(ExpressionException, outputVariableName, 
                    "Unable to locate variable to decompose");
 
-    if (index < 0 || index >= data->GetNumberOfComponents())
-        EXCEPTION2(ExpressionException, outputVariableName, 
-                   "Index into array is not valid.");
+    if (indexStr == "")
+    {
+        if (index < 0)
+            EXCEPTION2(ExpressionException, outputVariableName, 
+                       "Index into array is not valid.");
+    }
+
+    std::string db = GetInput()->GetInfo().GetAttributes().GetFullDBName();
+    ref_ptr<avtDatabase> dbp = avtCallback::GetDatabase(db, 0, NULL);
+    if (*dbp == NULL)
+        EXCEPTION1(InvalidFilesException, db.c_str());
+
+    // Handle case where given index in expression may need to be mapped
+    // through indices embedded in the array's meta data component names.
+    // In truth, we really ought to enhance avtArrayMetaData to indicate
+    // if it should be treated this way. Instead, we are using existence
+    // of a compNames array of strings of the form xx...x#..# where x is
+    // any non-digit and # is any digit and that the number part of the
+    // names is increasing from a minimum of zero.
+    size_t n;
+    avtDatabaseMetaData *md = dbp->GetMetaData(currentTimeState);
+    avtArrayMetaData const *amd = md->GetArray(std::string(activeVariable));
+    if (amd && amd->compNames.size() &&
+       (n = strcspn(amd->compNames[0].c_str(), "0123456789")) < strlen(amd->compNames[0].c_str()))
+    {
+        int absDistMin = INT_MAX;
+        int nearestIndex = -1;
+        int lastIdxVal = -1;
+        bool validIdxSequence = true;
+        for (size_t i = 0; i < amd->compNames.size(); i++)
+        {
+            // An exact match by component name wins
+            if (indexStr == amd->compNames[i])
+            {
+                nearestIndex = i;
+                break;
+            }
+
+            // get the current component index from its name and validate it
+            int compIdxVal = (int) strtol(amd->compNames[i].c_str()+n, 0, 10);
+            if ((errno != 0 && compIdxVal == 0) || compIdxVal < 0 || compIdxVal <= lastIdxVal)
+            {
+                validIdxSequence = false;
+                break;
+            }
+            lastIdxVal = compIdxVal;
+
+            int absDist = abs(index - compIdxVal);
+            if (absDist < absDistMin)
+            {
+                absDistMin = absDist;
+                nearestIndex = (int) i; 
+            }
+        }
+
+        if (validIdxSequence && nearestIndex != -1)
+            index = nearestIndex;
+        else
+        {
+            if (indexStr != "")
+            {
+                EXCEPTION2(ExpressionException, outputVariableName, 
+                           "Component name for array is not valid.");
+            }
+            else if (index >= data->GetNumberOfComponents())
+            {
+                EXCEPTION2(ExpressionException, outputVariableName, 
+                           "Index into array is not valid.");
+            }
+        }
+    }
 
     vtkDataArray *rv = data->NewInstance();
     vtkIdType nvals = data->GetNumberOfTuples();
@@ -190,12 +265,14 @@ avtArrayDecomposeExpression::ProcessArguments(ArgsExpr *args,
     std::string type = secondTree->GetTypeName();
     if (type == "IntegerConst")
         index = dynamic_cast<IntegerConstExpr*>(secondTree)->GetValue();
+    else if (type == "StringConst")
+        indexStr = dynamic_cast<StringConstExpr*>(secondTree)->GetValue();
     else
     {
-        debug5 << "avtArrayDecomposeExpression: Second argument is not an int."
-               << endl;
+        debug5 << "avtArrayDecomposeExpression: Second argument is not an integer index "
+               << "or string component name." << endl;
         EXCEPTION2(ExpressionException, outputVariableName, "Second argument to array_decompose "
-                                        "must be a number.");
+                                        "must be either a number or string.");
     }
 }
 
