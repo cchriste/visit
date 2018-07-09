@@ -21,6 +21,7 @@
 #include <string>
 #include "pidx_idx_io.h"
 #include "PIDX.h"
+#include "PIDX_file_handler.h"
 //#include "data_handle/PIDX_data_types.h"
 
 static PIDX_point global_size, local_offset, local_size;
@@ -144,6 +145,8 @@ bool PIDXIO::openDataset(const String filename){
     logic_box.p2[i] = (double)global_size[i];
   }
   
+  particles_dataset = (pidx_file->idx->io_type == PIDX_PARTICLE_IO);
+
   if (rank == 0) debug5 << "PIDX dims "<<global_size[0]<<" "<<global_size[1]<<" "<<global_size[2]<<std::endl;
   
   ret = PIDX_get_variable_count(pidx_file, &variable_count);
@@ -264,38 +267,10 @@ unsigned char* PIDXIO::getData(const VisitIDXIO::Box box, const int timestate, c
   if (rank == 0) debug5 << "var index " << variable_index <<std::endl;
   
   curr_field = fields[variable_index];
-/*  
-#ifdef PARALLEL
-  local_size[0] = 32;
-  local_size[1] = 32;
-  local_size[2] = 32;
-  local_size[3] = 1;
-  local_size[4] = 1;
-  
-  int sub_div[3];
-  sub_div[0] = (global_size[0] / local_size[0]);
-  sub_div[1] = (global_size[1] / local_size[1]);
-  sub_div[2] = (global_size[2] / local_size[2]);
-  
-  local_offset[2] = (rank / (sub_div[0] * sub_div[1])) * local_size[2];
-  int slice = rank % (sub_div[0] * sub_div[1]);
-  local_offset[1] = (slice / sub_div[0]) * local_size[1];
-  local_offset[0] = (slice % sub_div[0]) * local_size[0];
-  
-#else*/
-  // for(int i=0; i< dims; i++){
-  //     local_size[i] = (unsigned long long)(box.p2[i] - box.p1[i] + 1);
-  //     local_offset[i] = (unsigned long long)(box.p1[i]);
-  // }
-//#endif
   
   PIDX_set_point(local_offset, box.p1[0], box.p1[1], box.p1[2]);
   PIDX_set_point(local_size, (box.p2[0]-box.p1[0]+1), (box.p2[1]-box.p1[1]+1),(box.p2[2]-box.p1[2]+1));
   
-  // local_size[3] = 1;
-  // local_size[4] = 1;
-  // local_offset[3] = 0;
-  // local_offset[4] = 0;
   char* debug_str= new char[1024];
 
   sprintf(debug_str,"%d: local box %lld %lld %lld size %lld %lld %lld time %d\n", rank, local_offset[0],local_offset[1],local_offset[2], local_size[0],local_size[1],local_size[2], timestate);

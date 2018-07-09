@@ -67,6 +67,10 @@ public:
   inline bool isCompressed() const{
     return compressed_dataset;
   }
+
+  inline bool isParticles() const{
+    return particles_dataset;
+  }
   
   virtual ~IDX_IO(){};
     
@@ -81,6 +85,7 @@ protected:
   VisitIDXIO::Field curr_field;
   double logic_to_physic[16];
   bool compressed_dataset;
+  bool particles_dataset;
 };
 
 

@@ -769,6 +769,13 @@ avtIDXFileFormat::avtIDXFileFormat(const char *filename, DBOptionsAttributes* at
       }
     }
 
+    if(reader->isParticles())
+    {
+      grid_type = "Particle";
+      mesh_name = grid_type+"_Mesh";
+    } 
+      
+
     dim = reader->getDimension(); //<ctc> //NOTE: it doesn't work like we want. Instead, when a slice (or box) is added, the full data is read from disk then cropped to the desired subregion. Thus, I/O is never avoided.
 
     createBoxes();
@@ -1192,6 +1199,14 @@ void avtIDXFileFormat::computeDomainBoundaries(const char* meshname, int timesta
   avtIDXFileFormat::GetMesh(int timestate, int domain, const char *meshname)
   {
     debug5 << rank << ": start getMesh "<< meshname << " domain " << domain << std::endl;
+
+#if USE_PARTICLE_IO
+  // TODO Particle data
+  if (strcmp(meshname,"Particle_Mesh") != std::string::npos)
+  {
+   
+  }
+#endif
 
     Box slice_box;
 
